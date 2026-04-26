@@ -6,7 +6,15 @@
 
 **A modern Markdown desktop editor with Windows 11 Fluent Design**
 
-<video src="docs/assets/brand/Prism_Ultimate_Launch.mp4" width="100%" controls autoplay muted loop></video>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ProfilePlus/Prism/main/docs/assets/brand/preview.gif" width="100%" alt="Prism Preview">
+</p>
+
+<p align="center">
+  <video src="https://raw.githubusercontent.com/ProfilePlus/Prism/main/docs/assets/brand/Prism_Ultimate_Launch.mp4" width="100%" controls muted>
+    Your browser does not support the video tag.
+  </video>
+</p>
 
 [![Tauri](https://img.shields.io/badge/Tauri-2.x-blue?logo=tauri)](https://tauri.app)
 [![React](https://img.shields.io/badge/React-18-61dafb?logo=react)](https://react.dev)
