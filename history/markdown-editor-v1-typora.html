@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown 编辑器 - Typora 风格</title>
+    <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            background: #F3F3F3;
+        }
+
+        body.dark {
+            background: #1E1E1E;
+        }
+
+        #root {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .markdown-preview h1,
+        .markdown-preview h2,
+        .markdown-preview h3 {
+            margin: 1.4em 0 0.6em;
+            line-height: 1.25;
+            text-wrap: pretty;
+        }
+
+        .markdown-preview h1 {
+            font-size: clamp(2rem, 3vw, 2.8rem);
+            font-weight: 700;
+        }
+
+        .markdown-preview h2 {
+            font-size: clamp(1.4rem, 2.2vw, 2rem);
+            font-weight: 650;
+        }
+
+        .markdown-preview h3 {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .markdown-preview p,
+        .markdown-preview li,
+        .markdown-preview blockquote {
+            font-size: 16px;
+            line-height: 1.8;
+            text-wrap: pretty;
+        }
+
+        .markdown-preview p,
+        .markdown-preview ul,
+        .markdown-preview ol,
+        .markdown-preview blockquote,
+        .markdown-preview pre {
+            margin: 0.9em 0;
+        }
+
+        .markdown-preview code {
+            padding: 0.18em 0.45em;
+            border-radius: 6px;
+            font-family: 'Cascadia Code', Consolas, monospace;
+            font-size: 0.92em;
+            background: rgba(127, 127, 127, 0.14);
+        }
+
+        .markdown-preview pre {
+            padding: 18px 20px;
+            border-radius: 14px;
+            overflow: auto;
+            background: rgba(127, 127, 127, 0.1);
+        }
+
+        .markdown-preview pre code {
+            padding: 0;
+            background: transparent;
+        }
+
+        .markdown-preview blockquote {
+            padding: 12px 16px;
+            border-left: 3px solid rgba(0, 120, 212, 0.45);
+            background: rgba(127, 127, 127, 0.08);
+            border-radius: 0 12px 12px 0;
+        }
+
+        .markdown-preview a {
+            color: #2383E2;
+            text-decoration: none;
+        }
+        .markdown-preview a:hover { text-decoration: underline; }
+
+        .markdown-preview table {
+            border-collapse: collapse;
+            margin: 1em 0;
+            width: 100%;
+        }
+        .markdown-preview th, .markdown-preview td {
+            border: 1px solid rgba(127,127,127,0.3);
+            padding: 8px 12px;
+            text-align: left;
+        }
+        .markdown-preview th {
+            background: rgba(127,127,127,0.08);
+            font-weight: 600;
+        }
+
+        .menubar {
+            display: flex;
+            align-items: center;
+            height: 36px;
+            padding: 0 8px;
+            -webkit-app-region: drag;
+            user-select: none;
+            position: relative;
+        }
+
+        .menu-item {
+            padding: 6px 12px;
+            font-size: 13px;
+            border-radius: 6px;
+            cursor: pointer;
+            -webkit-app-region: no-drag;
+            position: relative;
+        }
+
+        .menu-item:hover, .menu-item.active {
+            background: rgba(127, 127, 127, 0.15);
+        }
+
+        .menu-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            min-width: 280px;
+            padding: 6px;
+            border-radius: 10px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            z-index: 1000;
+            backdrop-filter: blur(20px);
+        }
+
+        .menu-dropdown-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 7px 12px;
+            font-size: 13px;
+            border-radius: 6px;
+            cursor: pointer;
+            gap: 24px;
+        }
+        .menu-dropdown-item:hover {
+            background: rgba(0, 120, 212, 0.15);
+        }
+        .menu-dropdown-item.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .menu-dropdown-item.disabled:hover {
+            background: transparent;
+        }
+        .menu-shortcut {
+            opacity: 0.55;
+            font-size: 12px;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        .menu-separator {
+            height: 1px;
+            background: rgba(127,127,127,0.2);
+            margin: 4px 6px;
+        }
+        .menu-submenu-arrow {
+            opacity: 0.6;
+            font-size: 10px;
+        }
+
+        button {
+            transition: all 0.15s ease;
+        }
+
+        .quickbar-btn {
+            width: 32px;
+            height: 32px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            background: transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .quickbar-btn:hover {
+            background: rgba(127,127,127,0.18);
+        }
+        .quickbar-btn.active {
+            background: rgba(0, 120, 212, 0.2);
+            color: #0078D4;
+        }
+
+        .sidebar-tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            font-size: 12px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        .sidebar-tab.active {
+            border-bottom-color: #0078D4;
+            color: #0078D4;
+            font-weight: 600;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .file-item:hover { background: rgba(127,127,127,0.12); }
+        .file-item.active {
+            background: rgba(0,120,212,0.15);
+            color: #0078D4;
+            font-weight: 600;
+        }
+
+        .outline-item {
+            padding: 5px 10px;
+            font-size: 13px;
+            border-radius: 6px;
+            cursor: pointer;
+            line-height: 1.4;
+        }
+        .outline-item:hover { background: rgba(127,127,127,0.12); }
+
+        textarea {
+            font-family: 'Cascadia Code', Consolas, monospace;
+        }
+
+        .statusbar-btn {
+            padding: 2px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            font-size: 12px;
+        }
+        .statusbar-btn:hover { background: rgba(127,127,127,0.18); }
+        .statusbar-btn.active { background: rgba(0,120,212,0.18); color: #0078D4; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const menuData = {
+            '文件': [
+                { label: '新建', shortcut: 'Ctrl+N', action: 'new' },
+                { label: '新建窗口', shortcut: 'Ctrl+Shift+N', action: 'newWindow' },
+                { type: 'separator' },
+                { label: '打开...', shortcut: 'Ctrl+O', action: 'open' },
+                { label: '打开文件夹...', action: 'openFolder' },
+                { label: '快速打开...', shortcut: 'Ctrl+P', action: 'quickOpen' },
+                { label: '打开最近文件', submenu: true },
+                { type: 'separator' },
+                { label: '保存', shortcut: 'Ctrl+S', action: 'save' },
+                { label: '另存为...', shortcut: 'Ctrl+Shift+S', action: 'saveAs' },
+                { label: '移动到...', action: 'moveTo' },
+                { label: '保存全部打开的文件...', action: 'saveAll' },
+                { type: 'separator' },
+                { label: '导入...', action: 'import' },
+                { label: '导出', submenu: true },
+                { type: 'separator' },
+                { label: '打印...', shortcut: 'Alt+Shift+P', action: 'print' },
+                { type: 'separator' },
+                { label: '属性', action: 'properties' },
+                { label: '偏好设置...', shortcut: 'Ctrl+,', action: 'preferences' },
+            ],
+            '编辑': [
+                { label: '撤销', shortcut: 'Ctrl+Z', action: 'undo' },
+                { label: '重做', shortcut: 'Ctrl+Y', action: 'redo' },
+                { type: 'separator' },
+                { label: '剪切', shortcut: 'Ctrl+X', action: 'cut' },
+                { label: '复制', shortcut: 'Ctrl+C', action: 'copy' },
+                { label: '粘贴', shortcut: 'Ctrl+V', action: 'paste' },
+                { label: '拼贴图片', action: 'pasteImage' },
+                { type: 'separator' },
+                { label: '复制为纯文本', action: 'copyPlain' },
+                { label: '复制为 Markdown', shortcut: 'Ctrl+Shift+C', action: 'copyMd' },
+                { label: '复制为 HTML 代码', action: 'copyHtml' },
+                { label: '复制为其他格式', submenu: true },
+                { type: 'separator' },
+                { label: '粘贴为文本', shortcut: 'Ctrl+Shift+V', action: 'pastePlain' },
+                { type: 'separator' },
+                { label: '选择', submenu: true },
+                { type: 'separator' },
+                { label: '删除', submenu: true },
+                { type: 'separator' },
+                { label: '查找替换', submenu: true },
+                { type: 'separator' },
+                { label: '数字工具', submenu: true },
+                { label: '智能标点', submenu: true },
+                { label: '换行符', submenu: true },
+                { label: '拼写检查...', action: 'spellCheck' },
+                { type: 'separator' },
+                { label: '查找对应模块', shortcut: 'Ctrl+Shift+L', action: 'findBlock' },
+                { label: '表情与符号', shortcut: 'Win键+句号', action: 'emoji' },
+            ],
+            '段落': [
+                { label: '一级标题', shortcut: 'Ctrl+1', action: 'h1' },
+                { label: '二级标题', shortcut: 'Ctrl+2', action: 'h2' },
+                { label: '三级标题', shortcut: 'Ctrl+3', action: 'h3' },
+                { label: '四级标题', shortcut: 'Ctrl+4', action: 'h4' },
+                { label: '五级标题', shortcut: 'Ctrl+5', action: 'h5' },
+                { label: '六级标题', shortcut: 'Ctrl+6', action: 'h6' },
+                { type: 'separator' },
+                { label: '段落', shortcut: 'Ctrl+0', action: 'paragraph' },
+                { type: 'separator' },
+                { label: '提升标题级别', shortcut: 'Ctrl+=', action: 'increaseHeading' },
+                { label: '降低标题级别', shortcut: 'Ctrl+-', action: 'decreaseHeading' },
+                { type: 'separator' },
+                { label: '表格', submenu: true },
+                { label: '公式块', shortcut: 'Ctrl+Shift+M', action: 'mathBlock' },
+                { label: '代码块', shortcut: 'Ctrl+Shift+K', action: 'codeBlock' },
+                { label: '代码工具', submenu: true },
+                { label: '警告框', submenu: true },
+                { label: '引用', shortcut: 'Ctrl+Shift+Q', action: 'quote' },
+                { type: 'separator' },
+                { label: '有序列表', shortcut: 'Ctrl+Shift+[', action: 'orderedList' },
+                { label: '无序列表', shortcut: 'Ctrl+Shift+]', action: 'unorderedList' },
+                { label: '任务列表', shortcut: 'Ctrl+Shift+X', action: 'taskList' },
+                { label: '任务状态', submenu: true },
+                { label: '列表缩进', submenu: true },
+                { type: 'separator' },
+                { label: '在上方插入段落', action: 'insertAbove' },
+                { label: '在下方插入段落', action: 'insertBelow' },
+                { type: 'separator' },
+                { label: '链接引用', action: 'linkReference' },
+                { label: '脚注', action: 'footnote' },
+                { type: 'separator' },
+                { label: '水平分割线', action: 'hr' },
+                { label: '内容目录', action: 'toc' },
+                { label: 'YAML Front Matter', action: 'yaml' },
+            ],
+            '格式': [
+                { label: '加粗', shortcut: 'Ctrl+B', action: 'bold' },
+                { label: '斜体', shortcut: 'Ctrl+I', action: 'italic' },
+                { label: '下划线', shortcut: 'Ctrl+U', action: 'underline' },
+                { label: '代码', shortcut: 'Ctrl+Shift+`', action: 'inlineCode' },
+                { type: 'separator' },
+                { label: '删除线', shortcut: 'Alt+Shift+5', action: 'strikethrough' },
+                { label: '注释', action: 'comment' },
+                { type: 'separator' },
+                { label: '超链接', shortcut: 'Ctrl+K', action: 'link' },
+                { label: '链接操作', submenu: true },
+                { label: '图像', submenu: true },
+                { type: 'separator' },
+                { label: '清除样式', shortcut: 'Ctrl+\\', action: 'clearFormat' },
+            ],
+            '视图': [
+                { label: '显示 / 隐藏侧边栏', shortcut: 'Ctrl+Shift+L', action: 'toggleSidebar' },
+                { label: '大纲', shortcut: 'Ctrl+Shift+1', action: 'showOutline' },
+                { label: '文档列表', shortcut: 'Ctrl+Shift+2', action: 'showDocs' },
+                { label: '文件树', shortcut: 'Ctrl+Shift+3', action: 'showFiles' },
+                { label: '搜索', shortcut: 'Ctrl+Shift+F', action: 'showSearch' },
+                { type: 'separator' },
+                { label: '源代码模式', shortcut: 'Ctrl+/', action: 'sourceMode' },
+                { type: 'separator' },
+                { label: '专注模式', shortcut: 'F8', action: 'focusMode' },
+                { label: '打字机模式', shortcut: 'F9', action: 'typewriterMode' },
+                { label: '显示状态栏', action: 'statusBar' },
+                { label: '字数统计窗口', action: 'wordCountWindow' },
+                { type: 'separator' },
+                { label: '切换全屏', shortcut: 'F11', action: 'fullscreen' },
+                { label: '保持窗口在最前端', action: 'alwaysOnTop' },
+                { type: 'separator' },
+                { label: '实际大小', shortcut: 'Ctrl+Shift+9', action: 'actualSize' },
+                { label: '放大', shortcut: 'Ctrl+Shift+=', action: 'zoomIn' },
+                { label: '缩小', shortcut: 'Ctrl+Shift+-', action: 'zoomOut' },
+                { type: 'separator' },
+                { label: '应用内窗口切换', shortcut: 'Ctrl+Tab 键', action: 'switchWindow' },
+                { label: '开发者工具', shortcut: 'Shift+F12', action: 'devTools' },
+            ],
+            '主题': [
+                { label: 'Github', action: 'themeGithub' },
+                { label: 'Newsprint', action: 'themeNewsprint' },
+                { label: 'Night', action: 'themeNight' },
+                { label: 'Pixyll', action: 'themePixyll' },
+                { label: 'Whitey', action: 'themeWhitey' },
+            ],
+            '帮助': [
+                { label: "What's New...", action: 'whatsNew' },
+                { type: 'separator' },
+                { label: 'Quick Start', action: 'quickStart' },
+                { label: 'Markdown Reference', action: 'mdReference' },
+                { label: 'Install and Use Pandoc', action: 'pandoc' },
+                { label: 'Custom Themes', action: 'customThemes' },
+                { label: 'Use Images in Typora', action: 'useImages' },
+                { label: 'Data Recovery and Version Control', action: 'dataRecovery' },
+                { label: 'More Topics...', action: 'moreTopics' },
+                { type: 'separator' },
+                { label: '鸣谢', action: 'thanks' },
+                { label: '更新日志', action: 'changelog' },
+                { label: '隐私条款', action: 'privacy' },
+                { label: '官方网站', action: 'website' },
+                { label: '反馈', action: 'feedback' },
+                { type: 'separator' },
+                { label: '检查更新...', action: 'checkUpdate' },
+                { label: '我的许可证...', action: 'myLicense' },
+                { label: '关于', action: 'about' },
+            ],
+        };
+
+        function App() {
+            const [darkMode, setDarkMode] = useState(false);
+            const [sidebarOpen, setSidebarOpen] = useState(true);
+            const [sidebarTab, setSidebarTab] = useState('files');
+            const [sourceMode, setSourceMode] = useState(false);
+            const [focusMode, setFocusMode] = useState(false);
+            const [fullscreen, setFullscreen] = useState(false);
+            const [activeMenu, setActiveMenu] = useState(null);
+            const [markdown, setMarkdown] = useState(`# 欢迎使用 Markdown 编辑器\n\n这是一个完整的 **Typora 风格** Markdown 编辑器原型。\n\n## 主要特性\n\n- 完整的菜单栏系统（文件、编辑、段落、格式、视图、主题、帮助）\n- 侧边栏三标签页（文件树、大纲、搜索）\n- 源代码模式 / 所见即所得模式切换\n- 专注模式、打字机模式、全屏模式\n- Windows 11 Fluent Design 风格\n\n> 所有菜单项都显示了对应的快捷键，方便新手学习。\n\n### 示例代码\n\n\`\`\`javascript\nfunction hello() {\n  console.log('Hello Markdown');\n}\n\`\`\`\n\n### 示例表格\n\n| 功能 | 快捷键 | 说明 |\n|------|--------|------|\n| 加粗 | Ctrl+B | 加粗文本 |\n| 斜体 | Ctrl+I | 斜体文本 |\n| 保存 | Ctrl+S | 保存文件 |\n\n[了解更多](#)`);
+            const [cursor, setCursor] = useState({ line: 1, column: 1 });
+            const editorRef = useRef(null);
+
+            useEffect(() => {
+                document.body.className = darkMode ? 'dark' : '';
+            }, [darkMode]);
+
+            useEffect(() => {
+                const editor = editorRef.current;
+                if (!editor) return;
+                const updateCursor = () => {
+                    const pos = editor.selectionStart;
+                    const textBefore = markdown.slice(0, pos);
+                    const lines = textBefore.split('\n');
+                    setCursor({ line: lines.length, column: lines[lines.length - 1].length + 1 });
+                };
+                editor.addEventListener('keyup', updateCursor);
+                editor.addEventListener('click', updateCursor);
+                return () => {
+                    editor.removeEventListener('keyup', updateCursor);
+                    editor.removeEventListener('click', updateCursor);
+                };
+            }, [markdown]);
+
+            const wordCount = markdown.replace(/[#*`\-\[\]()]/g, '').trim().split(/\s+/).filter(Boolean).length;
+
+            const formatText = (prefix, suffix = prefix) => {
+                const editor = editorRef.current;
+                if (!editor) return;
+                const start = editor.selectionStart;
+                const end = editor.selectionEnd;
+                const selected = markdown.slice(start, end);
+                const before = markdown.slice(0, start);
+                const after = markdown.slice(end);
+                const newText = before + prefix + selected + suffix + after;
+                setMarkdown(newText);
+                setTimeout(() => {
+                    editor.focus();
+                    editor.setSelectionRange(start + prefix.length, end + prefix.length);
+                }, 0);
+            };
+
+            const appColors = darkMode
+                ? { bg: '#1E1E1E', surface: '#2D2D2D', text: '#E1E1E1', border: '#3F3F3F', primary: '#0078D4' }
+                : { bg: '#F3F3F3', surface: '#FFFFFF', text: '#1F1F1F', border: '#E0E0E0', primary: '#0078D4' };
+
+            const handleMenuAction = (action) => {
+                setActiveMenu(null);
+                switch (action) {
+                    case 'bold': formatText('**'); break;
+                    case 'italic': formatText('*'); break;
+                    case 'underline': formatText('<u>', '</u>'); break;
+                    case 'inlineCode': formatText('`'); break;
+                    case 'strikethrough': formatText('~~'); break;
+                    case 'link': formatText('[', '](url)'); break;
+                    case 'image': formatText('![描述](', ')'); break;
+                    case 'h1': formatText('# ', ''); break;
+                    case 'h2': formatText('## ', ''); break;
+                    case 'h3': formatText('### ', ''); break;
+                    case 'h4': formatText('#### ', ''); break;
+                    case 'h5': formatText('##### ', ''); break;
+                    case 'h6': formatText('###### ', ''); break;
+                    case 'quote': formatText('> ', ''); break;
+                    case 'codeBlock': formatText('```\n', '\n```'); break;
+                    case 'orderedList': formatText('1. ', ''); break;
+                    case 'unorderedList': formatText('- ', ''); break;
+                    case 'taskList': formatText('- [ ] ', ''); break;
+                    case 'hr': formatText('\n---\n', ''); break;
+                    case 'sourceMode': setSourceMode(!sourceMode); break;
+                    case 'focusMode': setFocusMode(!focusMode); break;
+                    case 'fullscreen': setFullscreen(!fullscreen); break;
+                    case 'toggleSidebar': setSidebarOpen(!sidebarOpen); break;
+                    case 'showOutline': setSidebarOpen(true); setSidebarTab('outline'); break;
+                    case 'showDocs': setSidebarOpen(true); setSidebarTab('files'); break;
+                    case 'showFiles': setSidebarOpen(true); setSidebarTab('files'); break;
+                    case 'showSearch': setSidebarOpen(true); setSidebarTab('search'); break;
+                    case 'themeNight': setDarkMode(true); break;
+                    case 'themeGithub': setDarkMode(false); break;
+                    default: console.log('Action:', action);
+                }
+            };
+
+            return (
+                <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: appColors.bg, color: appColors.text }}>
+                    {!fullscreen && (
+                        <div className="menubar" style={{ background: appColors.surface, borderBottom: `1px solid ${appColors.border}` }}>
+                            {Object.keys(menuData).map((menuName) => (
+                                <MenuBarItem
+                                    key={menuName}
+                                    label={menuName}
+                                    items={menuData[menuName]}
+                                    active={activeMenu === menuName}
+                                    onToggle={() => setActiveMenu(activeMenu === menuName ? null : menuName)}
+                                    onAction={handleMenuAction}
+                                    colors={appColors}
+                                />
+                            ))}
+                            <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, alignItems: 'center', paddingRight: 8 }}>
+                                <button className="quickbar-btn" onClick={() => handleMenuAction('bold')} title="加粗">B</button>
+                                <button className="quickbar-btn" onClick={() => handleMenuAction('italic')} title="斜体">I</button>
+                                <button className="quickbar-btn" onClick={() => handleMenuAction('h2')} title="二级标题">H2</button>
+                                <button className="quickbar-btn" onClick={() => handleMenuAction('unorderedList')} title="无序列表">•</button>
+                                <button className="quickbar-btn" onClick={() => handleMenuAction('link')} title="链接">⌁</button>
+                            </div>
+                        </div>
+                    )}
+
+                    <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+                        {sidebarOpen && !fullscreen && (
+                            <Sidebar tab={sidebarTab} setTab={setSidebarTab} colors={appColors} markdown={markdown} />
+                        )}
+
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                            {sourceMode ? (
+                                <textarea
+                                    ref={editorRef}
+                                    value={markdown}
+                                    onChange={(e) => setMarkdown(e.target.value)}
+                                    style={{
+                                        flex: 1,
+                                        width: '100%',
+                                        padding: focusMode ? '10vh 20vw' : '32px',
+                                        border: 'none',
+                                        outline: 'none',
+                                        resize: 'none',
+                                        fontSize: 15,
+                                        lineHeight: 1.7,
+                                        background: appColors.surface,
+                                        color: appColors.text,
+                                        transition: 'padding 0.3s ease',
+                                    }}
+                                />
+                            ) : (
+                                <div style={{
+                                    flex: 1,
+                                    overflow: 'auto',
+                                    padding: focusMode ? '10vh 20vw' : '32px 15%',
+                                    background: appColors.surface,
+                                    transition: 'padding 0.3s ease',
+                                }}>
+                                    <div className="markdown-preview" style={{ maxWidth: 860, margin: '0 auto', color: appColors.text }}>
+                                        <div dangerouslySetInnerHTML={{ __html: marked.parse(markdown) }} />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {!fullscreen && (
+                        <div style={{
+                            height: 28,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '0 12px',
+                            background: appColors.surface,
+                            borderTop: `1px solid ${appColors.border}`,
+                            fontSize: 12,
+                        }}>
+                            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                                <button className={`statusbar-btn ${sourceMode ? 'active' : ''}`} onClick={() => setSourceMode(!sourceMode)} style={{ color: appColors.text }}>
+                                    {sourceMode ? '源代码模式' : '所见即所得'}
+                                </button>
+                                <span>{wordCount} 词</span>
+                                <span>Ln {cursor.line}, Col {cursor.column}</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <button className="statusbar-btn" onClick={() => setFocusMode(!focusMode)} style={{ color: appColors.text }}>
+                                    {focusMode ? '退出专注' : '专注模式'}
+                                </button>
+                                <button className="statusbar-btn" onClick={() => setDarkMode(!darkMode)} style={{ color: appColors.text }}>
+                                    {darkMode ? '亮色主题' : '暗色主题'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function MenuBarItem({ label, items, active, onToggle, onAction, colors }) {
+            const ref = useRef(null);
+
+            useEffect(() => {
+                if (!active) return;
+                const handleClick = (e) => {
+                    if (ref.current && !ref.current.contains(e.target)) {
+                        onToggle();
+                    }
+                };
+                document.addEventListener('mousedown', handleClick);
+                return () => document.removeEventListener('mousedown', handleClick);
+            }, [active, onToggle]);
+
+            return (
+                <div ref={ref} style={{ position: 'relative' }}>
+                    <div className={`menu-item ${active ? 'active' : ''}`} onClick={onToggle} style={{ color: colors.text }}>
+                        {label}
+                    </div>
+                    {active && (
+                        <div className="menu-dropdown" style={{ background: colors.surface, border: `1px solid ${colors.border}` }}>
+                            {items.map((item, idx) => {
+                                if (item.type === 'separator') {
+                                    return <div key={idx} className="menu-separator" />;
+                                }
+                                return (
+                                    <div
+                                        key={idx}
+                                        className={`menu-dropdown-item ${item.disabled ? 'disabled' : ''}`}
+                                        onClick={() => !item.disabled && !item.submenu && onAction(item.action)}
+                                        style={{ color: colors.text }}
+                                    >
+                                        <span>{item.label}</span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                            {item.shortcut && <span className="menu-shortcut">{item.shortcut}</span>}
+                                            {item.submenu && <span className="menu-submenu-arrow">▸</span>}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function Sidebar({ tab, setTab, colors, markdown }) {
+            const files = [
+                { name: '我的文档.md', active: true },
+                { name: '会议记录.md' },
+                { name: '学习笔记.md' },
+                { name: '项目计划.md' },
+            ];
+
+            const outlineItems = markdown
+                .split('\n')
+                .filter((line) => line.startsWith('#'))
+                .map((line, idx) => {
+                    const level = line.match(/^#+/)[0].length;
+                    const text = line.replace(/^#+\s*/, '');
+                    return { level, text, key: idx };
+                });
+
+            return (
+                <div style={{ width: 280, display: 'flex', flexDirection: 'column', background: colors.surface, borderRight: `1px solid ${colors.border}` }}>
+                    <div style={{ display: 'flex', borderBottom: `1px solid ${colors.border}` }}>
+                        <div className={`sidebar-tab ${tab === 'files' ? 'active' : ''}`} onClick={() => setTab('files')} style={{ color: colors.text }}>文件树</div>
+                        <div className={`sidebar-tab ${tab === 'outline' ? 'active' : ''}`} onClick={() => setTab('outline')} style={{ color: colors.text }}>大纲</div>
+                        <div className={`sidebar-tab ${tab === 'search' ? 'active' : ''}`} onClick={() => setTab('search')} style={{ color: colors.text }}>搜索</div>
+                    </div>
+                    <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
+                        {tab === 'files' && (
+                            <div>
+                                <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 8, textTransform: 'uppercase', color: colors.text }}>最近文件</div>
+                                {files.map((file) => (
+                                    <div key={file.name} className={`file-item ${file.active ? 'active' : ''}`} style={{ color: colors.text }}>
+                                        <span>[文]</span>
+                                        <span>{file.name}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {tab === 'outline' && (
+                            <div>
+                                {outlineItems.length === 0 ? (
+                                    <div style={{ opacity: 0.5, fontSize: 13, textAlign: 'center', marginTop: 40, color: colors.text }}>暂无标题</div>
+                                ) : (
+                                    outlineItems.map((item) => (
+                                        <div key={item.key} className="outline-item" style={{ paddingLeft: (item.level - 1) * 16 + 10, color: colors.text }}>
+                                            {item.text}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        )}
+                        {tab === 'search' && (
+                            <div>
+                                <input
+                                    placeholder="搜索文档内容..."
+                                    style={{
+                                        width: '100%',
+                                        padding: '9px 10px',
+                                        borderRadius: 8,
+                                        border: `1px solid ${colors.border}`,
+                                        background: colors.bg,
+                                        color: colors.text,
+                                        outline: 'none',
+                                        marginBottom: 12,
+                                    }}
+                                />
+                                <div style={{ opacity: 0.5, fontSize: 13, textAlign: 'center', marginTop: 24, color: colors.text }}>输入关键字开始搜索</div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>

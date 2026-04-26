@@ -1,0 +1,100 @@
+.dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 300px;
+  padding: 4px;
+  border-radius: var(--radius-lg);
+  background: var(--layer-2);
+  border: 1px solid var(--stroke-control);
+  box-shadow: var(--elevation-flyout);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  z-index: 1000;
+  animation: flyoutIn 0.18s cubic-bezier(0.17, 0.67, 0.3, 0.99);
+}
+
+body.dark .dropdown {
+  background: var(--layer-2);
+  border-color: var(--stroke-control);
+  box-shadow: var(--elevation-flyout);
+}
+
+@keyframes flyoutIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-size: 13px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  gap: 24px;
+  color: var(--text-primary);
+  transition: background 0.12s ease;
+}
+
+.item:hover {
+  background: var(--accent-tint);
+}
+
+body.dark .item:hover {
+  background: var(--accent-tint);
+}
+
+.item.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.item.disabled:hover {
+  background: transparent;
+}
+
+.item.submenu {
+  /* submenu items have same styling as regular items */
+}
+
+.label {
+  flex: 1;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.shortcut {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.arrow {
+  color: var(--text-secondary);
+  font-size: 10px;
+  margin-left: 8px;
+}
+
+.separator {
+  height: 1px;
+  background: var(--stroke-divider);
+  margin: 4px 8px;
+}
+
+body.dark .separator {
+  background: var(--stroke-divider);
+}

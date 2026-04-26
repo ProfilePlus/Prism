@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prism Win11 Icon Concepts</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --page: #f2f0ec;
+            --surface: rgba(255, 255, 255, 0.76);
+            --surface-strong: #ffffff;
+            --surface-soft: rgba(255, 255, 255, 0.52);
+            --text: #22211f;
+            --muted: #68645d;
+            --quiet: #8d887f;
+            --line: rgba(31, 35, 40, 0.1);
+            --shadow-1: 0 16px 42px rgba(45, 42, 37, 0.1), 0 2px 7px rgba(45, 42, 37, 0.05);
+            --shadow-2: 0 8px 20px rgba(45, 42, 37, 0.1), 0 1px 3px rgba(45, 42, 37, 0.08);
+            --focus: #7a5a2f;
+            --radius-card: 8px;
+            --radius-control: 8px;
+            --ease: cubic-bezier(.2, .8, .2, 1);
+        }
+
+        [data-theme="dark"] {
+            color-scheme: dark;
+            --page: #191918;
+            --surface: rgba(40, 40, 38, 0.84);
+            --surface-strong: #292927;
+            --surface-soft: rgba(52, 51, 48, 0.56);
+            --text: #f5f2ec;
+            --muted: #cac3b8;
+            --quiet: #9e978c;
+            --line: rgba(255, 255, 255, 0.11);
+            --shadow-1: 0 20px 54px rgba(0, 0, 0, 0.36), 0 2px 8px rgba(0, 0, 0, 0.24);
+            --shadow-2: 0 10px 26px rgba(0, 0, 0, 0.32), 0 1px 4px rgba(0, 0, 0, 0.26);
+            --focus: #d5a65f;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            background: var(--page);
+        }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+            color: var(--text);
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0) 280px),
+                var(--page);
+            font-family: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", sans-serif;
+            font-size: 15px;
+            line-height: 1.45;
+            text-wrap: pretty;
+        }
+
+        [data-theme="dark"] body {
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 300px),
+                var(--page);
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        .page {
+            width: min(1760px, calc(100% - 40px));
+            margin: 0 auto;
+            padding: 30px 0 42px;
+        }
+
+        .topbar {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .eyebrow {
+            margin: 0 0 6px;
+            color: var(--quiet);
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 650;
+            letter-spacing: 0;
+        }
+
+        .subtitle {
+            max-width: 760px;
+            margin: 10px 0 0;
+            color: var(--muted);
+            font-size: 15px;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .segmented {
+            display: inline-grid;
+            grid-auto-flow: column;
+            gap: 3px;
+            padding: 4px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius-control);
+            background: var(--surface-soft);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
+        }
+
+        .segmented button {
+            min-width: 44px;
+            height: 32px;
+            padding: 0 12px;
+            border: 0;
+            border-radius: 6px;
+            color: var(--muted);
+            background: transparent;
+            cursor: pointer;
+            transition: background 160ms var(--ease), color 160ms var(--ease), box-shadow 160ms var(--ease);
+        }
+
+        .segmented button:hover,
+        .segmented button:focus-visible {
+            color: var(--text);
+            outline: none;
+        }
+
+        .segmented button.is-active {
+            color: var(--text);
+            background: var(--surface-strong);
+            box-shadow: var(--shadow-2);
+        }
+
+        .taskbar {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 18px;
+            align-items: center;
+            min-height: 72px;
+            margin-bottom: 20px;
+            padding: 14px 18px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius-card);
+            background: var(--surface);
+            box-shadow: var(--shadow-1);
+            backdrop-filter: blur(18px);
+        }
+
+        .taskbar-title {
+            display: grid;
+            gap: 2px;
+        }
+
+        .taskbar-title strong {
+            font-size: 14px;
+            font-weight: 650;
+        }
+
+        .taskbar-title span {
+            color: var(--quiet);
+            font-size: 12px;
+        }
+
+        .taskbar-icons {
+            display: flex;
+            justify-content: center;
+            gap: 18px;
+            min-width: 0;
+        }
+
+        .taskbar-icon {
+            position: relative;
+            display: grid;
+            place-items: center;
+            width: 42px;
+            height: 42px;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            background: transparent;
+            cursor: pointer;
+            transition: transform 160ms var(--ease), background 160ms var(--ease), border-color 160ms var(--ease);
+        }
+
+        .taskbar-icon:hover,
+        .taskbar-icon:focus-visible {
+            transform: translateY(-2px);
+            border-color: var(--line);
+            background: rgba(255, 255, 255, 0.42);
+            outline: none;
+        }
+
+        [data-theme="dark"] .taskbar-icon:hover,
+        [data-theme="dark"] .taskbar-icon:focus-visible {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .taskbar-icon.is-selected {
+            border-color: rgba(37, 99, 235, 0.34);
+            background: rgba(37, 99, 235, 0.12);
+        }
+
+        .taskbar-icon.is-selected::after {
+            content: "";
+            position: absolute;
+            width: 18px;
+            height: 3px;
+            margin-top: 40px;
+            border-radius: 999px;
+            background: var(--focus);
+        }
+
+        .taskbar-icon svg {
+            width: 36px;
+            height: 36px;
+        }
+
+        .metric {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--quiet);
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .metric::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #22c55e;
+            box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.12);
+        }
+
+        .concept-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(220px, 1fr));
+            gap: 16px;
+        }
+
+        .concept {
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            gap: 16px;
+            min-width: 0;
+            padding: 16px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius-card);
+            background: var(--surface);
+            box-shadow: var(--shadow-1);
+            backdrop-filter: blur(18px);
+            cursor: pointer;
+            transition: transform 180ms var(--ease), border-color 180ms var(--ease), box-shadow 180ms var(--ease);
+        }
+
+        .concept:hover,
+        .concept:focus-within,
+        .concept.is-selected {
+            transform: translateY(-3px);
+            border-color: rgba(37, 99, 235, 0.36);
+            box-shadow: 0 24px 60px rgba(24, 32, 44, 0.14), 0 2px 8px rgba(24, 32, 44, 0.08);
+        }
+
+        [data-theme="dark"] .concept:hover,
+        [data-theme="dark"] .concept:focus-within,
+        [data-theme="dark"] .concept.is-selected {
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.48), 0 2px 8px rgba(0, 0, 0, 0.28);
+        }
+
+        .concept-head {
+            display: grid;
+            gap: 6px;
+        }
+
+        .concept-index {
+            color: var(--quiet);
+            font-size: 12px;
+            font-weight: 650;
+        }
+
+        .concept h2 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 650;
+            letter-spacing: 0;
+        }
+
+        .concept p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .stage {
+            display: grid;
+            place-items: center;
+            min-height: 292px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius-card);
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.34)),
+                linear-gradient(135deg, rgba(222, 227, 234, 0.5), rgba(255, 255, 255, 0.2));
+            overflow: hidden;
+        }
+
+        [data-theme="dark"] .stage {
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+                linear-gradient(135deg, rgba(91, 98, 111, 0.22), rgba(255, 255, 255, 0.02));
+        }
+
+        [data-bg="dark"] .stage {
+            background: #23262d;
+        }
+
+        [data-bg="clear"] .stage {
+            background:
+                linear-gradient(45deg, rgba(145, 153, 164, 0.18) 25%, transparent 25%),
+                linear-gradient(-45deg, rgba(145, 153, 164, 0.18) 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, rgba(145, 153, 164, 0.18) 75%),
+                linear-gradient(-45deg, transparent 75%, rgba(145, 153, 164, 0.18) 75%),
+                var(--surface-strong);
+            background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+            background-size: 24px 24px;
+        }
+
+        .icon-large {
+            width: 236px;
+            height: 236px;
+            overflow: visible;
+        }
+
+        .previews {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .sizes {
+            display: flex;
+            align-items: end;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .size-sample {
+            display: grid;
+            gap: 6px;
+            justify-items: center;
+            color: var(--quiet);
+            font-size: 11px;
+        }
+
+        .size-sample svg {
+            display: block;
+        }
+
+        .pick {
+            min-width: 74px;
+            height: 34px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius-control);
+            color: var(--text);
+            background: var(--surface-strong);
+            cursor: pointer;
+            transition: transform 140ms var(--ease), border-color 140ms var(--ease), background 140ms var(--ease);
+        }
+
+        .pick:hover,
+        .pick:focus-visible {
+            transform: translateY(-1px);
+            border-color: rgba(37, 99, 235, 0.42);
+            outline: none;
+        }
+
+        .concept.is-selected .pick {
+            border-color: rgba(37, 99, 235, 0.42);
+            background: rgba(37, 99, 235, 0.12);
+        }
+
+        .notes {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 18px;
+        }
+
+        .note {
+            padding: 12px 14px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius-card);
+            color: var(--muted);
+            background: var(--surface-soft);
+            font-size: 13px;
+        }
+
+        .note strong {
+            display: block;
+            margin-bottom: 3px;
+            color: var(--text);
+            font-size: 13px;
+        }
+
+        .icon-svg {
+            overflow: visible;
+            shape-rendering: geometricPrecision;
+        }
+
+        @media (max-width: 1320px) {
+            .concept-grid {
+                grid-template-columns: repeat(2, minmax(280px, 1fr));
+            }
+
+            .concept:last-child {
+                grid-column: 1 / -1;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .page {
+                width: min(100% - 24px, 560px);
+                padding-top: 18px;
+            }
+
+            .topbar,
+            .taskbar,
+            .notes {
+                grid-template-columns: 1fr;
+            }
+
+            .toolbar {
+                justify-content: flex-start;
+            }
+
+            .taskbar-icons {
+                justify-content: flex-start;
+                overflow-x: auto;
+                padding-bottom: 4px;
+            }
+
+            .concept-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .concept:last-child {
+                grid-column: auto;
+            }
+
+            .stage {
+                min-height: 252px;
+            }
+
+            .icon-large {
+                width: 210px;
+                height: 210px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                transition-duration: 1ms !important;
+                animation-duration: 1ms !important;
+                animation-iteration-count: 1 !important;
+            }
+        }
+    </style>
+</head>
+<body data-theme="light" data-bg="soft">
+    <template id="icon-prism-doc">
+        <svg class="icon-svg" viewBox="0 0 256 256" role="img" aria-label="Prism document icon">
+            <defs>
+                <filter id="pd-shadow" x="-30%" y="-30%" width="160%" height="170%">
+                    <feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#203047" flood-opacity=".18"/>
+                    <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#203047" flood-opacity=".14"/>
+                </filter>
+                <linearGradient id="pd-doc" x1="72" y1="45" x2="172" y2="190" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#ffffff"/>
+                    <stop offset=".72" stop-color="#e8eef5"/>
+                    <stop offset="1" stop-color="#cad6e3"/>
+                </linearGradient>
+                <linearGradient id="pd-fold" x1="153" y1="48" x2="190" y2="87" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#f8fbff"/>
+                    <stop offset="1" stop-color="#b9c8d7"/>
+                </linearGradient>
+                <linearGradient id="pd-a" x1="82" y1="74" x2="169" y2="190" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#8cecff"/>
+                    <stop offset=".58" stop-color="#26a9d4"/>
+                    <stop offset="1" stop-color="#20718f"/>
+                </linearGradient>
+                <linearGradient id="pd-b" x1="130" y1="54" x2="195" y2="181" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#dff8ff" stop-opacity=".95"/>
+                    <stop offset=".48" stop-color="#4bc3e7" stop-opacity=".9"/>
+                    <stop offset="1" stop-color="#2f4858"/>
+                </linearGradient>
+                <linearGradient id="pd-edge" x1="78" y1="155" x2="190" y2="170" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#f1748f"/>
+                    <stop offset=".52" stop-color="#8edcff"/>
+                    <stop offset="1" stop-color="#2d4659"/>
+                </linearGradient>
+            </defs>
+            <g filter="url(#pd-shadow)">
+                <path d="M72 42h86l38 38v118c0 9-7 16-16 16H72c-9 0-16-7-16-16V58c0-9 7-16 16-16Z" fill="url(#pd-doc)"/>
+                <path d="M158 42v28c0 7 6 13 13 13h25L158 42Z" fill="url(#pd-fold)"/>
+                <path d="M84 172 124 66c3-8 15-8 18 0l42 106c3 7-3 14-10 14H94c-7 0-12-7-10-14Z" fill="url(#pd-a)"/>
+                <path d="M132 62v124h42c7 0 13-7 10-14L142 66c-2-4-5-6-10-4Z" fill="url(#pd-b)" opacity=".94"/>
+                <path d="M91 158h87l8 21c2 4-2 8-6 8H88c-4 0-7-4-6-8l9-21Z" fill="url(#pd-edge)" opacity=".9"/>
+                <path d="M126 75 99 151h58L126 75Z" fill="#f7fdff" opacity=".28"/>
+                <path d="M132 66v118" stroke="#f5feff" stroke-width="4" stroke-linecap="round" opacity=".32"/>
+            </g>
+        </svg>
+    </template>
+
+    <template id="icon-split-diamond">
+        <svg class="icon-svg" viewBox="0 0 256 256" role="img" aria-label="Split preview icon">
+            <defs>
+                <filter id="sd-shadow" x="-30%" y="-30%" width="160%" height="170%">
+                    <feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#17263b" flood-opacity=".2"/>
+                    <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#17263b" flood-opacity=".12"/>
+                </filter>
+                <linearGradient id="sd-left" x1="58" y1="44" x2="121" y2="213" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#e9fbff"/>
+                    <stop offset=".5" stop-color="#79d7cf"/>
+                    <stop offset="1" stop-color="#1d7f87"/>
+                </linearGradient>
+                <linearGradient id="sd-right" x1="127" y1="45" x2="205" y2="213" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#f6f8fb"/>
+                    <stop offset=".42" stop-color="#8fa4ba"/>
+                    <stop offset="1" stop-color="#223859"/>
+                </linearGradient>
+                <linearGradient id="sd-core" x1="96" y1="72" x2="165" y2="182" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#ffffff" stop-opacity=".86"/>
+                    <stop offset=".43" stop-color="#aaf4ff" stop-opacity=".58"/>
+                    <stop offset="1" stop-color="#123b64" stop-opacity=".28"/>
+                </linearGradient>
+            </defs>
+            <g filter="url(#sd-shadow)">
+                <path d="M65 45h56c8 0 14 6 14 14v138c0 8-6 14-14 14H65c-8 0-14-6-14-14V59c0-8 6-14 14-14Z" fill="url(#sd-left)"/>
+                <path d="M135 59c0-8 6-14 14-14h42c8 0 14 6 14 14v138c0 8-6 14-14 14h-42c-8 0-14-6-14-14V59Z" fill="url(#sd-right)"/>
+                <path d="M128 66 177 128 128 190 79 128 128 66Z" fill="url(#sd-core)"/>
+                <path d="M128 66v124M79 128h98" stroke="#ffffff" stroke-width="5" stroke-linecap="round" opacity=".32"/>
+                <path d="M70 72h33M70 91h42M70 110h29" stroke="#ffffff" stroke-width="8" stroke-linecap="round" opacity=".34"/>
+                <path d="M158 83h23M158 103h31M158 123h20" stroke="#e9f5ff" stroke-width="8" stroke-linecap="round" opacity=".32"/>
+            </g>
+        </svg>
+    </template>
+
+    <template id="icon-pen-prism">
+        <svg class="icon-svg" viewBox="0 0 256 256" role="img" aria-label="Pen prism icon">
+            <defs>
+                <filter id="pp-shadow" x="-30%" y="-30%" width="160%" height="170%">
+                    <feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#2e2516" flood-opacity=".2"/>
+                    <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#2e2516" flood-opacity=".13"/>
+                </filter>
+                <linearGradient id="pp-body" x1="81" y1="34" x2="181" y2="207" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#ffe4a1"/>
+                    <stop offset=".52" stop-color="#d89a2c"/>
+                    <stop offset="1" stop-color="#6f4d1e"/>
+                </linearGradient>
+                <linearGradient id="pp-dark" x1="118" y1="53" x2="183" y2="214" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#3f4854"/>
+                    <stop offset="1" stop-color="#15191f"/>
+                </linearGradient>
+                <linearGradient id="pp-blue" x1="83" y1="80" x2="178" y2="170" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#82d9ff"/>
+                    <stop offset=".55" stop-color="#247ac1"/>
+                    <stop offset="1" stop-color="#123657"/>
+                </linearGradient>
+                <linearGradient id="pp-tip" x1="108" y1="168" x2="146" y2="218" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#fff6d8"/>
+                    <stop offset="1" stop-color="#bf8423"/>
+                </linearGradient>
+            </defs>
+            <g filter="url(#pp-shadow)">
+                <path d="M128 33c8 0 15 4 19 11l58 98c4 8 3 17-4 23l-73 67-73-67c-6-6-8-15-4-23l58-98c4-7 11-11 19-11Z" fill="url(#pp-body)"/>
+                <path d="M128 33c8 0 15 4 19 11l58 98c4 8 3 17-4 23l-73 67V33Z" fill="url(#pp-dark)" opacity=".9"/>
+                <path d="M90 126 128 59l38 67-38 35-38-35Z" fill="url(#pp-blue)"/>
+                <path d="M128 59v102l38-35-38-67Z" fill="#d7fbff" opacity=".16"/>
+                <path d="M96 173h64l-32 59-32-59Z" fill="url(#pp-tip)"/>
+                <circle cx="128" cy="128" r="11" fill="#f8fbff" opacity=".9"/>
+                <path d="M128 139v73" stroke="#2c2f36" stroke-width="7" stroke-linecap="round" opacity=".58"/>
+                <path d="M128 43 70 148c-2 4-1 9 3 12l45 41" stroke="#ffffff" stroke-width="5" stroke-linecap="round" opacity=".2"/>
+            </g>
+        </svg>
+    </template>
+
+    <template id="icon-layered-pages">
+        <svg class="icon-svg" viewBox="0 0 256 256" role="img" aria-label="Layered pages icon">
+            <defs>
+                <filter id="lp-shadow" x="-30%" y="-30%" width="160%" height="170%">
+                    <feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#173126" flood-opacity=".19"/>
+                    <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#173126" flood-opacity=".12"/>
+                </filter>
+                <linearGradient id="lp-back" x1="74" y1="48" x2="156" y2="205" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#d8f3e8"/>
+                    <stop offset=".62" stop-color="#3b9d75"/>
+                    <stop offset="1" stop-color="#14523d"/>
+                </linearGradient>
+                <linearGradient id="lp-mid" x1="88" y1="37" x2="174" y2="203" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#fffdf7"/>
+                    <stop offset=".68" stop-color="#e5e2d8"/>
+                    <stop offset="1" stop-color="#b9b3a4"/>
+                </linearGradient>
+                <linearGradient id="lp-front" x1="101" y1="54" x2="198" y2="212" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#ffffff"/>
+                    <stop offset=".64" stop-color="#f1efe6"/>
+                    <stop offset="1" stop-color="#d1ccbd"/>
+                </linearGradient>
+                <linearGradient id="lp-rim" x1="98" y1="153" x2="204" y2="166" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#195b46"/>
+                    <stop offset=".46" stop-color="#36d6b6"/>
+                    <stop offset="1" stop-color="#f0b86c"/>
+                </linearGradient>
+            </defs>
+            <g filter="url(#lp-shadow)">
+                <path d="M65 58h78c9 0 16 7 16 16v105c0 9-7 16-16 16H65c-9 0-16-7-16-16V74c0-9 7-16 16-16Z" fill="url(#lp-back)"/>
+                <path d="M82 42h83c9 0 16 7 16 16v123c0 9-7 16-16 16H82c-9 0-16-7-16-16V58c0-9 7-16 16-16Z" fill="url(#lp-mid)"/>
+                <path d="M103 58h86c9 0 16 7 16 16v124c0 9-7 16-16 16h-86c-9 0-16-7-16-16V74c0-9 7-16 16-16Z" fill="url(#lp-front)"/>
+                <path d="M87 153h118v34c0 15-12 27-27 27h-64c-15 0-27-12-27-27v-34Z" fill="url(#lp-rim)" opacity=".94"/>
+                <path d="M108 87h56M108 109h70M108 131h48" stroke="#1e332d" stroke-width="9" stroke-linecap="round" opacity=".15"/>
+                <path d="M174 58v28c0 8 6 14 14 14h17L174 58Z" fill="#dcd6c8" opacity=".92"/>
+                <path d="M100 70v111c0 8 6 14 14 14h68" stroke="#ffffff" stroke-width="5" stroke-linecap="round" opacity=".32"/>
+            </g>
+        </svg>
+    </template>
+
+    <template id="icon-prism-mark">
+        <svg class="icon-svg" viewBox="0 0 256 256" role="img" aria-label="Prism mark icon">
+            <defs>
+                <filter id="pm-shadow" x="-30%" y="-30%" width="160%" height="170%">
+                    <feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#201b33" flood-opacity=".22"/>
+                    <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#201b33" flood-opacity=".13"/>
+                </filter>
+                <linearGradient id="pm-main" x1="77" y1="34" x2="189" y2="214" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#ffffff"/>
+                    <stop offset=".36" stop-color="#e7f2ff"/>
+                    <stop offset="1" stop-color="#a8b6c8"/>
+                </linearGradient>
+                <linearGradient id="pm-blue" x1="77" y1="74" x2="186" y2="172" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#70f2ff"/>
+                    <stop offset=".55" stop-color="#357dff"/>
+                    <stop offset="1" stop-color="#192a52"/>
+                </linearGradient>
+                <linearGradient id="pm-mag" x1="68" y1="137" x2="181" y2="210" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#ff6bbd"/>
+                    <stop offset=".62" stop-color="#a947ff"/>
+                    <stop offset="1" stop-color="#2b2440"/>
+                </linearGradient>
+                <linearGradient id="pm-dark" x1="141" y1="48" x2="199" y2="207" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#3d4051"/>
+                    <stop offset="1" stop-color="#10131d"/>
+                </linearGradient>
+            </defs>
+            <g filter="url(#pm-shadow)">
+                <path d="M82 43h70c31 0 56 25 56 56s-25 56-56 56h-25l-30 55c-5 9-19 6-19-5V47c0-2 2-4 4-4Z" fill="url(#pm-main)"/>
+                <path d="M116 77h36c12 0 22 10 22 22s-10 22-22 22h-36V77Z" fill="url(#pm-blue)"/>
+                <path d="M78 140h74c16 0 32-7 42-18-8 20-27 33-50 33h-17l-30 55c-5 9-19 6-19-5v-65Z" fill="url(#pm-mag)" opacity=".95"/>
+                <path d="M152 43c31 0 56 25 56 56s-25 56-56 56h-24V43h24Z" fill="url(#pm-dark)" opacity=".84"/>
+                <path d="M128 76h24c12 0 22 10 22 22s-10 22-22 22h-24V76Z" fill="#ffffff" opacity=".14"/>
+                <path d="M94 59v132" stroke="#ffffff" stroke-width="5" stroke-linecap="round" opacity=".34"/>
+                <path d="M119 145 80 199" stroke="#ffffff" stroke-width="5" stroke-linecap="round" opacity=".18"/>
+            </g>
+        </svg>
+    </template>
+
+    <template id="icon-light-slit">
+        <svg class="icon-svg" viewBox="0 0 256 256" role="img" aria-label="Paper light slit icon">
+            <defs>
+                <filter id="ls-cast" x="-30%" y="-30%" width="160%" height="170%">
+                    <feDropShadow dx="0" dy="14" stdDeviation="13" flood-color="#403b32" flood-opacity=".18"/>
+                    <feDropShadow dx="0" dy="2" stdDeviation="2.6" flood-color="#403b32" flood-opacity=".12"/>
+                </filter>
+                <linearGradient id="ls-paper" x1="77" y1="38" x2="181" y2="213" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#fffdf8"/>
+                    <stop offset=".62" stop-color="#ede9df"/>
+                    <stop offset="1" stop-color="#cfc7b7"/>
+                </linearGradient>
+                <linearGradient id="ls-slit" x1="110" y1="54" x2="154" y2="200" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#eafff8"/>
+                    <stop offset=".36" stop-color="#79c9be"/>
+                    <stop offset=".64" stop-color="#334a47"/>
+                    <stop offset="1" stop-color="#181d1c"/>
+                </linearGradient>
+                <linearGradient id="ls-ray" x1="92" y1="143" x2="198" y2="161" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#e05b3f"/>
+                    <stop offset=".42" stop-color="#d7b15f"/>
+                    <stop offset=".72" stop-color="#63b9b2"/>
+                    <stop offset="1" stop-color="#2d4e81"/>
+                </linearGradient>
+            </defs>
+            <g>
+                <path d="M75 39h80c9 0 17 4 23 11l31 39c5 6 7 12 7 20v77c0 18-14 32-32 32H81c-18 0-32-14-32-32V65c0-14 12-26 26-26Z" fill="#272a2a" opacity=".18" transform="translate(5 4) rotate(2 132 128)"/>
+                <path d="M73 38h80c9 0 17 4 23 11l31 39c5 6 7 12 7 20v77c0 18-14 32-32 32H79c-18 0-32-14-32-32V64c0-14 12-26 26-26Z" fill="url(#ls-paper)" stroke="#8e8677" stroke-width="4" transform="rotate(-4 130 128)"/>
+                <path d="M153 39v38c0 11 9 20 20 20h39L153 39Z" fill="#d8d1c3" opacity=".9" transform="rotate(-4 130 128)"/>
+                <path d="M118 58 158 190c2 8-3 15-11 16l-35 3c-7 1-12-6-10-13l28-129c1-7 9-10 15-6l-27-3Z" fill="url(#ls-slit)" stroke="#263231" stroke-width="3" transform="rotate(-4 130 128)"/>
+                <path d="M102 147h94c7 0 11 8 7 14l-17 25c-4 5-10 7-16 4l-72-29c-8-3-5-14 4-14Z" fill="url(#ls-ray)" opacity=".96" transform="rotate(-4 130 128)"/>
+                <path d="M131 72 114 193" stroke="#fffaf2" stroke-width="5" stroke-linecap="round" opacity=".48" transform="rotate(-4 130 128)"/>
+                <path d="M80 58h54" stroke="#3f3b35" stroke-width="8" stroke-linecap="round" opacity=".12" transform="rotate(-4 130 128)"/>
+            </g>
+        </svg>
+    </template>
+
+    <template id="icon-reading-aperture">
+        <svg class="icon-svg" viewBox="0 0 256 256" role="img" aria-label="Reading aperture icon">
+            <defs>
+                <filter id="ra-cast" x="-30%" y="-30%" width="160%" height="170%">
+                    <feDropShadow dx="0" dy="14" stdDeviation="13" flood-color="#1f2b27" flood-opacity=".2"/>
+                    <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1f2b27" flood-opacity=".12"/>
+                </filter>
+                <radialGradient id="ra-disk" cx="34%" cy="28%" r="78%">
+                    <stop stop-color="#dce8dc"/>
+                    <stop offset=".45" stop-color="#789178"/>
+                    <stop offset="1" stop-color="#21342e"/>
+                </radialGradient>
+                <linearGradient id="ra-page" x1="97" y1="48" x2="163" y2="203" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#fbf5ea"/>
+                    <stop offset="1" stop-color="#c9bdad"/>
+                </linearGradient>
+                <linearGradient id="ra-copper" x1="76" y1="91" x2="191" y2="162" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#c75d38"/>
+                    <stop offset=".46" stop-color="#d7aa61"/>
+                    <stop offset="1" stop-color="#5f3b2f"/>
+                </linearGradient>
+            </defs>
+            <g>
+                <circle cx="128" cy="128" r="91" fill="url(#ra-disk)" stroke="#26382f" stroke-width="9"/>
+                <circle cx="128" cy="128" r="53" fill="#f2f0ec" stroke="#28372f" stroke-width="4"/>
+                <path d="M101 53h54c7 0 13 6 13 13v124c0 7-6 13-13 13h-54c-7 0-13-6-13-13V66c0-7 6-13 13-13Z" fill="url(#ra-page)" transform="rotate(8 128 128)"/>
+                <path d="M74 124c33-16 75-16 108 0 6 3 6 11 0 14-33 16-75 16-108 0-6-3-6-11 0-14Z" fill="url(#ra-copper)" stroke="#5a382d" stroke-width="3" opacity=".98"/>
+                <path d="M94 128c21-9 47-9 68 0-21 10-47 10-68 0Z" fill="#f2f0ec"/>
+                <path d="M76 128h104" stroke="#fff7ec" stroke-width="4" stroke-linecap="round" opacity=".34"/>
+                <path d="M94 74h40M96 93h50" stroke="#2d342f" stroke-width="7" stroke-linecap="round" opacity=".14" transform="rotate(8 128 128)"/>
+                <path d="M179 73c14 15 22 34 22 55" stroke="#fff7ec" stroke-width="7" stroke-linecap="round" opacity=".24"/>
+            </g>
+        </svg>
+    </template>
+
+    <template id="icon-editor-compass">
+        <svg class="icon-svg" viewBox="0 0 256 256" role="img" aria-label="Editorial compass icon">
+            <defs>
+                <filter id="ec-cast" x="-30%" y="-30%" width="160%" height="170%">
+                    <feDropShadow dx="0" dy="14" stdDeviation="13" flood-color="#263342" flood-opacity=".18"/>
+                    <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#263342" flood-opacity=".12"/>
+                </filter>
+                <linearGradient id="ec-blue" x1="75" y1="51" x2="186" y2="207" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#c9d7e4"/>
+                    <stop offset=".52" stop-color="#486680"/>
+                    <stop offset="1" stop-color="#1e2b3d"/>
+                </linearGradient>
+                <linearGradient id="ec-rust" x1="77" y1="126" x2="198" y2="187" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#e0a55d"/>
+                    <stop offset=".55" stop-color="#a74d3b"/>
+                    <stop offset="1" stop-color="#442826"/>
+                </linearGradient>
+                <linearGradient id="ec-ivory" x1="87" y1="63" x2="148" y2="172" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#fff9ec"/>
+                    <stop offset="1" stop-color="#d8c9ae"/>
+                </linearGradient>
+            </defs>
+            <g>
+                <path d="M71 49h117c12 0 20 13 15 24l-68 135c-6 13-25 12-30-2L55 70c-4-10 4-21 16-21Z" fill="url(#ec-blue)" stroke="#172338" stroke-width="6" transform="rotate(-5 128 128)"/>
+                <path d="M89 78h72c6 0 10 7 7 13l-38 74c-3 7-13 6-16-1L81 89c-2-5 2-11 8-11Z" fill="#f2f0ec" opacity=".94" transform="rotate(-5 128 128)"/>
+                <path d="M86 158h111c10 0 15 12 8 19l-47 42c-8 7-20 4-25-5l-57-41c-5-6 1-15 10-15Z" fill="url(#ec-rust)" stroke="#4a2926" stroke-width="4" transform="rotate(-5 128 128)"/>
+                <path d="M96 78h64L127 142 96 78Z" fill="url(#ec-ivory)" opacity=".9" transform="rotate(-5 128 128)"/>
+                <path d="M127 68v138M80 162h111" stroke="#fffaf0" stroke-width="5" stroke-linecap="round" opacity=".38" transform="rotate(-5 128 128)"/>
+                <path d="M69 68h42M78 91h23" stroke="#152335" stroke-width="7" stroke-linecap="round" opacity=".18" transform="rotate(-5 128 128)"/>
+                <circle cx="127" cy="147" r="10" fill="#253142" opacity=".86"/>
+            </g>
+        </svg>
+    </template>
+
+    <template id="icon-bookmark-orbit">
+        <svg class="icon-svg" viewBox="0 0 256 256" role="img" aria-label="Bookmark orbit icon">
+            <defs>
+                <filter id="bo-cast" x="-30%" y="-30%" width="160%" height="170%">
+                    <feDropShadow dx="0" dy="14" stdDeviation="13" flood-color="#3a2e27" flood-opacity=".2"/>
+                    <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#3a2e27" flood-opacity=".13"/>
+                </filter>
+                <linearGradient id="bo-page" x1="85" y1="40" x2="170" y2="206" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#fbf6ed"/>
+                    <stop offset=".68" stop-color="#d8d0c1"/>
+                    <stop offset="1" stop-color="#aaa090"/>
+                </linearGradient>
+                <linearGradient id="bo-ribbon" x1="62" y1="100" x2="196" y2="188" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#bd4f3b"/>
+                    <stop offset=".48" stop-color="#e0b268"/>
+                    <stop offset="1" stop-color="#66714b"/>
+                </linearGradient>
+                <linearGradient id="bo-prism" x1="112" y1="73" x2="165" y2="151" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#e9f5ef"/>
+                    <stop offset=".5" stop-color="#7e9b84"/>
+                    <stop offset="1" stop-color="#29352c"/>
+                </linearGradient>
+            </defs>
+            <g>
+                <path d="M93 39h73c15 0 27 12 27 27v119c0 15-12 27-27 27H93c-15 0-27-12-27-27V66c0-15 12-27 27-27Z" fill="url(#bo-page)" stroke="#6d665b" stroke-width="5" transform="rotate(3 128 128)"/>
+                <path d="M149 39v37c0 9 7 16 16 16h28L149 39Z" fill="#c8beaf" opacity=".9" transform="rotate(3 128 128)"/>
+                <path d="M54 140c36 36 90 47 136 28 15-6 29 9 20 24-10 18-33 30-60 31-41 1-83-18-110-50-12-14 0-47 14-33Z" fill="url(#bo-ribbon)" stroke="#5f3c2f" stroke-width="4"/>
+                <path d="M102 92 139 65l36 48-37 50-42-30 6-41Z" fill="url(#bo-prism)" transform="rotate(3 128 128)"/>
+                <path d="M139 65v98l36-50-36-48Z" fill="#fffdf5" opacity=".18" transform="rotate(3 128 128)"/>
+                <path d="M89 82h38M88 105h24" stroke="#2d312b" stroke-width="8" stroke-linecap="round" opacity=".13" transform="rotate(3 128 128)"/>
+                <path d="M68 154c38 29 84 34 126 17" stroke="#fff8eb" stroke-width="5" stroke-linecap="round" opacity=".34"/>
+            </g>
+        </svg>
+    </template>
+
+    <template id="icon-black-ice-cursor">
+        <svg class="icon-svg" viewBox="0 0 256 256" role="img" aria-label="Black ice cursor icon">
+            <defs>
+                <filter id="bi-cast" x="-30%" y="-30%" width="160%" height="170%">
+                    <feDropShadow dx="0" dy="15" stdDeviation="13" flood-color="#111318" flood-opacity=".28"/>
+                    <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#111318" flood-opacity=".2"/>
+                </filter>
+                <linearGradient id="bi-body" x1="71" y1="39" x2="190" y2="215" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#5d656b"/>
+                    <stop offset=".42" stop-color="#20242a"/>
+                    <stop offset="1" stop-color="#0d0f13"/>
+                </linearGradient>
+                <linearGradient id="bi-edge" x1="81" y1="61" x2="182" y2="185" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#f8f2df"/>
+                    <stop offset=".42" stop-color="#94d5d1"/>
+                    <stop offset="1" stop-color="#4a6f99"/>
+                </linearGradient>
+                <linearGradient id="bi-warm" x1="112" y1="139" x2="185" y2="194" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#f0c16d"/>
+                    <stop offset="1" stop-color="#9b563a"/>
+                </linearGradient>
+            </defs>
+            <g>
+                <path d="M92 35h71c7 0 13 4 17 10l38 76c3 7 3 14-1 20l-46 75c-4 6-10 10-17 10H84c-8 0-15-5-18-13L39 136c-2-5-2-11 1-16l34-73c3-7 10-12 18-12Z" fill="url(#bi-body)" stroke="#08090c" stroke-width="6"/>
+                <path d="M93 35 128 129 84 226c-8 0-15-5-18-13L39 136c-2-5-2-11 1-16l34-73c3-7 10-12 19-12Z" fill="#f4efe3" opacity=".1"/>
+                <path d="M128 55 169 128 128 202 88 128 128 55Z" fill="url(#bi-edge)" stroke="#f5ecda" stroke-width="3" opacity=".94"/>
+                <path d="M128 55v147l41-74-41-73Z" fill="#101319" opacity=".34"/>
+                <path d="M111 91 150 128 111 165v-26H88v-22h23V91Z" fill="#f8f1df"/>
+                <path d="M118 167h52c8 0 12 9 7 15l-18 25c-5 7-15 7-20 0l-25-30c-3-4 0-10 4-10Z" fill="url(#bi-warm)" opacity=".88"/>
+                <path d="M93 51 52 131" stroke="#ffffff" stroke-width="5" stroke-linecap="round" opacity=".18"/>
+            </g>
+        </svg>
+    </template>
+
+    <main class="page">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Prism / Windows 11 Icon Study</p>
+                <h1>5 个 Win11 风格图标设计方案</h1>
+                <p class="subtitle">这版故意避开常见 AI 图标套路：少用通用玻璃渐变，多用物件隐喻、负形、克制色块和一点“不对称的手感”。</p>
+            </div>
+            <div class="toolbar" aria-label="预览控制">
+                <div class="segmented" role="group" aria-label="背景">
+                    <button class="is-active" type="button" data-bg-choice="soft">浅色</button>
+                    <button type="button" data-bg-choice="dark">深色</button>
+                    <button type="button" data-bg-choice="clear">透明</button>
+                </div>
+                <div class="segmented" role="group" aria-label="主题">
+                    <button class="is-active" type="button" data-theme-choice="light">Light</button>
+                    <button type="button" data-theme-choice="dark">Dark</button>
+                </div>
+            </div>
+        </header>
+
+        <section class="taskbar" aria-label="任务栏尺寸预览">
+            <div class="taskbar-title">
+                <strong>任务栏尺寸</strong>
+                <span>32px 快速识别测试</span>
+            </div>
+            <div class="taskbar-icons" id="taskbarIcons"></div>
+            <div class="metric">点击任一方案可高亮</div>
+        </section>
+
+        <section class="concept-grid" id="conceptGrid" aria-label="图标方案对比"></section>
+
+        <section class="notes" aria-label="设计检查点">
+            <div class="note">
+                <strong>设计师感</strong>
+                每个方向都从一个具体物件或动作出发，而不是把棱镜、文档和渐变直接叠在一起。
+            </div>
+            <div class="note">
+                <strong>创造力测试</strong>
+                看哪个符号在任务栏里仍然能留下记忆点，再决定是否继续精修。
+            </div>
+            <div class="note">
+                <strong>后续落地</strong>
+                选中方向后再做 16-256px 分级重绘，不直接把大图粗暴缩小。
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const iconConcepts = [
+            {
+                id: "light-slit",
+                template: "icon-light-slit",
+                title: "纸面光隙",
+                description: "从“编辑时纸面被光切开”的瞬间出发，安静但有一条强记忆点。"
+            },
+            {
+                id: "reading-aperture",
+                template: "icon-reading-aperture",
+                title: "阅读孔径",
+                description: "像镜头光圈，也像读者的视线；把预览、聚焦和折射合成一个圆形符号。"
+            },
+            {
+                id: "editor-compass",
+                template: "icon-editor-compass",
+                title: "编辑罗盘",
+                description: "把写作工具想象成建筑师的三角尺，强调结构、校准和专业感。"
+            },
+            {
+                id: "bookmark-orbit",
+                template: "icon-bookmark-orbit",
+                title: "书签轨迹",
+                description: "一条书签像轨道绕过页面，动态一点，适合更有生命力的 Prism。"
+            },
+            {
+                id: "black-ice-cursor",
+                template: "icon-black-ice-cursor",
+                title: "黑冰光标",
+                description: "更激进的开发者工具方向：黑色晶体、负形光标和一小块暖色反差。"
+            }
+        ];
+
+        const conceptGrid = document.querySelector("#conceptGrid");
+        const taskbarIcons = document.querySelector("#taskbarIcons");
+
+        function cloneIcon(templateId, className, size) {
+            const template = document.querySelector(`#${templateId}`);
+            const icon = template.content.firstElementChild.cloneNode(true);
+            const suffix = `${templateId}-${Math.random().toString(36).slice(2)}`;
+            const idMap = new Map();
+            icon.querySelectorAll("[id]").forEach((node) => {
+                const oldId = node.id;
+                const newId = `${oldId}-${suffix}`;
+                idMap.set(oldId, newId);
+                node.id = newId;
+            });
+            icon.querySelectorAll("*").forEach((node) => {
+                Array.from(node.attributes).forEach((attribute) => {
+                    let value = attribute.value;
+                    idMap.forEach((newId, oldId) => {
+                        value = value.replaceAll(`url(#${oldId})`, `url(#${newId})`);
+                        value = value.replaceAll(`#${oldId}`, `#${newId}`);
+                    });
+                    if (value !== attribute.value) {
+                        node.setAttribute(attribute.name, value);
+                    }
+                });
+            });
+            if (className) {
+                icon.classList.add(className);
+            }
+            if (size) {
+                icon.style.width = `${size}px`;
+                icon.style.height = `${size}px`;
+            }
+            return icon;
+        }
+
+        function setSelected(id) {
+            document.querySelectorAll("[data-concept]").forEach((element) => {
+                element.classList.toggle("is-selected", element.dataset.concept === id);
+            });
+        }
+
+        iconConcepts.forEach((concept, index) => {
+            const card = document.createElement("article");
+            card.className = "concept";
+            card.tabIndex = 0;
+            card.dataset.concept = concept.id;
+            card.innerHTML = `
+                <div class="concept-head">
+                    <div class="concept-index">方案 ${String(index + 1).padStart(2, "0")}</div>
+                    <h2>${concept.title}</h2>
+                    <p>${concept.description}</p>
+                </div>
+                <div class="stage" aria-hidden="true"></div>
+                <div class="previews">
+                    <div class="sizes">
+                        <div class="size-sample" data-size="48"><span>48</span></div>
+                        <div class="size-sample" data-size="32"><span>32</span></div>
+                        <div class="size-sample" data-size="24"><span>24</span></div>
+                    </div>
+                    <button class="pick" type="button">选择</button>
+                </div>
+            `;
+
+            card.querySelector(".stage").appendChild(cloneIcon(concept.template, "icon-large"));
+            card.querySelectorAll(".size-sample").forEach((sample) => {
+                sample.prepend(cloneIcon(concept.template, "", Number(sample.dataset.size)));
+            });
+            card.addEventListener("click", () => setSelected(concept.id));
+            card.addEventListener("keydown", (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setSelected(concept.id);
+                }
+            });
+            conceptGrid.appendChild(card);
+
+            const taskbarButton = document.createElement("button");
+            taskbarButton.className = "taskbar-icon";
+            taskbarButton.type = "button";
+            taskbarButton.title = concept.title;
+            taskbarButton.dataset.concept = concept.id;
+            taskbarButton.appendChild(cloneIcon(concept.template, "", 32));
+            taskbarButton.addEventListener("click", () => setSelected(concept.id));
+            taskbarIcons.appendChild(taskbarButton);
+        });
+
+        setSelected("light-slit");
+
+        document.querySelectorAll("[data-bg-choice]").forEach((button) => {
+            button.addEventListener("click", () => {
+                document.body.dataset.bg = button.dataset.bgChoice;
+                document.querySelectorAll("[data-bg-choice]").forEach((item) => {
+                    item.classList.toggle("is-active", item === button);
+                });
+            });
+        });
+
+        document.querySelectorAll("[data-theme-choice]").forEach((button) => {
+            button.addEventListener("click", () => {
+                document.body.dataset.theme = button.dataset.themeChoice;
+                document.querySelectorAll("[data-theme-choice]").forEach((item) => {
+                    item.classList.toggle("is-active", item === button);
+                });
+            });
+        });
+    </script>
+</body>
+</html>

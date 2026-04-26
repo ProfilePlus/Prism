@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prism - Icon Refinement V7 (Color Tuning)</title>
+    <style>
+        :root {
+            --win11-bg: #f8fafc;
+            --win11-taskbar: rgba(255, 255, 255, 0.85);
+            --win11-text: #334155;
+            --win11-border: rgba(0, 0, 0, 0.05);
+            --win11-shadow: 0 12px 40px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.03);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --win11-bg: #0f172a;
+                --win11-taskbar: rgba(30, 41, 59, 0.85);
+                --win11-text: #f8fafc;
+                --win11-border: rgba(255, 255, 255, 0.05);
+            }
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--win11-bg);
+            color: var(--win11-text);
+            padding: 64px 24px;
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(14, 165, 233, 0.03), transparent 30%),
+                radial-gradient(circle at 85% 30%, rgba(16, 185, 129, 0.03), transparent 30%);
+        }
+
+        header { text-align: center; margin-bottom: 64px; }
+        h1 { font-size: 40px; font-weight: 700; margin-bottom: 16px; letter-spacing: -0.03em; color: #1e293b; }
+        p.subtitle { font-size: 18px; color: #64748b; max-width: 650px; margin: 0 auto; line-height: 1.6; }
+        
+        @media (prefers-color-scheme: dark) {
+            h1 { color: #f8fafc; }
+            p.subtitle { color: #94a3b8; }
+        }
+
+        .variants-container {
+            display: flex;
+            flex-direction: column;
+            gap: 64px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .variant-row {
+            background: rgba(255, 255, 255, 0.6);
+            border: 1px solid var(--win11-border);
+            border-radius: 32px;
+            padding: 56px;
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            box-shadow: var(--win11-shadow);
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 48px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .variant-row { background: rgba(30, 41, 59, 0.4); }
+        }
+
+        .variant-info { text-align: center; max-width: 800px; margin: 0 auto; }
+        .variant-info h2 { font-size: 32px; font-weight: 700; margin-bottom: 12px; letter-spacing: -0.02em; color: #334155; }
+        .variant-info .meta { font-size: 14px; text-transform: uppercase; letter-spacing: 0.15em; font-weight: 700; color: #14b8a6; margin-bottom: 16px; display: block; }
+        .variant-info p { font-size: 17px; color: #64748b; line-height: 1.7; }
+        
+        @media (prefers-color-scheme: dark) {
+            .variant-info h2 { color: #f1f5f9; }
+            .variant-info p { color: #94a3b8; }
+            .variant-info .meta { color: #2dd4bf; }
+        }
+
+        .variant-contexts {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            gap: 80px;
+            flex-wrap: wrap;
+            padding-top: 40px;
+            border-top: 1px solid var(--win11-border);
+        }
+
+        .context-col { display: flex; flex-direction: column; align-items: center; gap: 24px; }
+        .context-label { font-size: 14px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; }
+
+        .icon-container { display: flex; justify-content: center; align-items: center; }
+        .size-hero { width: 220px; height: 220px; }
+        .size-hero svg { filter: drop-shadow(0 20px 40px rgba(0,0,0,0.06)); }
+        .size-start { width: 48px; height: 48px; }
+        .size-taskbar { width: 24px; height: 24px; }
+
+        .mock-start-icon-wrap {
+            width: 84px; height: 84px; border-radius: 12px;
+            display: flex; justify-content: center; align-items: center;
+            transition: background 0.1s;
+        }
+        .mock-start-icon-wrap:hover { background: rgba(0, 0, 0, 0.03); }
+        @media (prefers-color-scheme: dark) { .mock-start-icon-wrap:hover { background: rgba(255, 255, 255, 0.05); } }
+        
+        .mock-taskbar {
+            background: var(--win11-taskbar);
+            height: 56px; border-radius: 8px;
+            display: flex; align-items: center; padding: 0 16px; gap: 16px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+        }
+        .taskbar-item {
+            width: 40px; height: 40px; border-radius: 6px;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .taskbar-item:hover { background: rgba(0, 0, 0, 0.03); }
+        @media (prefers-color-scheme: dark) { .taskbar-item:hover { background: rgba(255, 255, 255, 0.05); } }
+        .taskbar-item.active { position: relative; }
+        .taskbar-item.active::after {
+            content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%);
+            width: 16px; height: 4px; background: #14b8a6; border-radius: 4px;
+        }
+
+        .refinements-list {
+            margin-top: 32px;
+            text-align: left;
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.5);
+            padding: 32px 40px;
+            border-radius: 16px;
+            font-size: 15px;
+            border: 1px solid rgba(255,255,255,0.8);
+        }
+        @media (prefers-color-scheme: dark) { 
+            .refinements-list { background: rgba(15, 23, 42, 0.4); border-color: rgba(255,255,255,0.03); } 
+        }
+        .refinements-list ul { margin-left: 24px; color: #64748b; margin-top: 12px; }
+        @media (prefers-color-scheme: dark) { .refinements-list ul { color: #94a3b8; } }
+        .refinements-list li { margin-bottom: 12px; }
+        .refinements-list strong { color: var(--win11-text); font-size: 16px; display: inline-block; margin-bottom: 4px;}
+
+        @media (max-width: 900px) {
+            .variant-row { padding: 40px 24px; }
+            .variant-contexts { gap: 40px; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Prism - Color Tuning</h1>
+        <p class="subtitle">Locking in the shapes you love, while fixing the specific color contrast issues. Creating clear visual hierarchy with exactly 3 harmonious colors.</p>
+    </header>
+
+    <svg width="0" height="0" style="position:absolute; width:0; height:0;">
+        <defs>
+            <!-- Very soft, low-contrast drop shadows -->
+            <filter id="soft-shadow-heavy" x="-30%" y="-30%" width="160%" height="160%">
+                <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#0f172a" flood-opacity="0.08" />
+                <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000000" flood-opacity="0.04" />
+            </filter>
+            
+            <filter id="soft-shadow-light" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#000000" flood-opacity="0.08" />
+            </filter>
+
+            <filter id="glow-soft" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="6" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+
+            <filter id="glass-edge-soft">
+                <feComponentTransfer in="SourceAlpha"><feFuncA type="linear" slope="0.5"/></feComponentTransfer>
+                <feGaussianBlur stdDeviation="2" result="blur"/>
+                <feOffset dy="1.5" dx="-1"/>
+                <feComposite operator="out" in2="SourceAlpha"/>
+                <feComposite operator="in" in2="SourceGraphic"/>
+                <feBlend mode="screen" in2="SourceGraphic"/>
+            </filter>
+
+            <!-- ==============================================
+                 REFINED CONCEPT 1: Icy Prism on Warm Sand
+                 Colors: 1. Sand/Cream (Base), 2. Icy Cyan (Glass), 3. Coral/Peach (Light)
+                 ============================================== -->
+            
+            <!-- Base: Warm, soft Sand/Cream (Provides contrast against the cool glass) -->
+            <linearGradient id="r1-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#ffffff" />
+                <stop offset="100%" stop-color="#f5f5f4" /> <!-- Soft warm grey/cream -->
+            </linearGradient>
+            
+            <!-- Prism Glass: Cool, icy translucent Cyan (Clearly separates from the warm base) -->
+            <linearGradient id="r1-prism-left" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#bae6fd" stop-opacity="0.6" /> <!-- Light Sky Blue -->
+                <stop offset="100%" stop-color="#e0f2fe" stop-opacity="0.9" />
+            </linearGradient>
+            <linearGradient id="r1-prism-right" x1="100%" y1="0%" x2="0%" y2="0%">
+                <stop offset="0%" stop-color="#7dd3fc" stop-opacity="0.4" />
+                <stop offset="100%" stop-color="#f0f9ff" stop-opacity="0.8" />
+            </linearGradient>
+            
+            <!-- Elegant Light Ribbon (Coral / Peach) -->
+            <linearGradient id="r1-ribbon" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#fb7185" /> <!-- Rose/Coral -->
+                <stop offset="100%" stop-color="#fca5a5" /> <!-- Soft Peach -->
+            </linearGradient>
+            
+            <g id="refined-concept-1">
+                <!-- Squircle Base (Warm Cream) -->
+                <rect x="8" y="12" width="84" height="84" rx="24" fill="url(#r1-bg)" filter="url(#soft-shadow-heavy)" />
+                <!-- Very subtle border to define the base -->
+                <rect x="8" y="12" width="84" height="84" rx="24" fill="none" stroke="#e7e5e4" stroke-width="1.5" />
+                
+                <!-- Fluid, elegant ribbon (Back) -->
+                <path d="M 0 65 C 25 65, 30 45, 50 45 L 50 55 C 35 55, 30 75, 0 75 Z" fill="url(#r1-ribbon)" opacity="0.6" filter="url(#glow-soft)" />
+                <path d="M 0 65 C 25 65, 30 45, 50 45 L 50 55 C 35 55, 30 75, 0 75 Z" fill="url(#r1-ribbon)" opacity="0.9" />
+
+                <!-- The Glass Prism (Icy Cool Cyan) -->
+                <path d="M 50 16 L 78 74 L 22 74 Z" fill="#0284c7" opacity="0.08" filter="url(#soft-shadow-light)" transform="translate(0, 6)"/>
+                
+                <path d="M 50 16 L 50 74 L 22 74 Z" fill="url(#r1-prism-left)" filter="url(#glass-edge-soft)"/>
+                <path d="M 50 16 L 78 74 L 50 74 Z" fill="url(#r1-prism-right)" filter="url(#glass-edge-soft)"/>
+                
+                <!-- Sharp Edge Highlights to define the 3D shape clearly -->
+                <path d="M 50 16 L 22 74" stroke="#ffffff" stroke-width="2" fill="none" stroke-linecap="round"/>
+                <path d="M 50 16 L 78 74" stroke="#ffffff" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.9"/>
+                <path d="M 50 16 L 50 74" stroke="#ffffff" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+                <path d="M 22 74 L 78 74" stroke="#ffffff" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.7"/>
+
+                <!-- Fluid, elegant ribbon (Front) -->
+                <path d="M 50 45 C 70 45, 75 60, 100 60 L 100 70 C 70 70, 65 55, 50 55 Z" fill="url(#r1-ribbon)" filter="url(#soft-shadow-light)" />
+            </g>
+
+
+            <!-- ==============================================
+                 REFINED CONCEPT 5: Mint & Indigo Layers
+                 Colors: 1. Soft Sage/Mint (Base), 2. Clean White (Glass), 3. Deep Indigo (Accent)
+                 ============================================== -->
+            
+            <!-- Base Layer - Soft, fresh Sage/Mint Green (Modern, natural, lively) -->
+            <linearGradient id="r5-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#d1fae5" /> <!-- Very Light Mint -->
+                <stop offset="100%" stop-color="#a7f3d0" /> <!-- Soft Sage -->
+            </linearGradient>
+
+            <!-- Frosted Glass Layer - Pure white -->
+            <linearGradient id="r5-glass" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95" />
+                <stop offset="100%" stop-color="#ffffff" stop-opacity="0.5" />
+            </linearGradient>
+
+            <!-- Deep Indigo for the logo to provide perfect, elegant contrast against Mint -->
+            <linearGradient id="r5-logo" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#4f46e5" />
+                <stop offset="100%" stop-color="#4338ca" />
+            </linearGradient>
+
+            <g id="refined-concept-5">
+                <!-- Layer 1: Soft Mint Base -->
+                <rect x="12" y="12" width="60" height="60" rx="20" fill="url(#r5-bg)" filter="url(#soft-shadow-heavy)" />
+                <rect x="12" y="12" width="60" height="60" rx="20" fill="none" stroke="#ffffff" stroke-width="2" stroke-opacity="0.6" />
+
+                <!-- Layer 2: Clean White Frosted Glass -->
+                <rect x="28" y="28" width="60" height="60" rx="20" fill="#047857" opacity="0.12" filter="url(#soft-shadow-light)" />
+                <rect x="28" y="28" width="60" height="60" rx="20" fill="url(#r5-glass)" />
+                <rect x="28" y="28" width="60" height="60" rx="20" fill="none" stroke="#ffffff" stroke-width="2" />
+                <!-- Subtle inner shadow for the glass -->
+                <rect x="28" y="28" width="60" height="60" rx="20" fill="none" stroke="#000000" stroke-width="0.5" stroke-opacity="0.04" />
+
+                <!-- Layer 3: Airy Monogram (Deep Indigo for elegant contrast) -->
+                <g transform="translate(40, 44) scale(0.7)" filter="url(#soft-shadow-light)">
+                    <!-- Custom 'M' in Deep Indigo -->
+                    <path d="M 12 40 L 12 16 C 12 11 16 8 20 8 C 24 8 26 11 26 16 L 26 40" fill="none" stroke="url(#r5-logo)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M 26 16 C 26 11 30 8 34 8 C 38 8 42 11 42 16 L 42 40" fill="none" stroke="url(#r5-logo)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+                    
+                    <!-- Center integrated Arrow (Matching Indigo to keep it strictly 3 colors) -->
+                    <path d="M 27 24 L 27 48" fill="none" stroke="url(#r5-logo)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M 19 40 L 27 48 L 35 40" fill="none" stroke="url(#r5-logo)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+                </g>
+            </g>
+
+        </defs>
+    </svg>
+
+    <div class="variants-container">
+
+        <!-- Concept 1 Refined -->
+        <div class="variant-row">
+            <div class="variant-info">
+                <span class="meta">Warm vs Cool Contrast</span>
+                <h2>The Ethereal Refractor</h2>
+                <p>We solved the "white-on-white" issue by using temperature contrast instead of harsh dark/light contrast. The base plate is now a warm, soft Sand/Cream color. The glass prism is cast in a cool, icy Cyan tint. This immediately creates beautiful 3D depth and hierarchy, while the flowing Coral ribbon adds the lively energy.</p>
+                
+                <div class="refinements-list">
+                    <strong>The 3-Color Palette:</strong>
+                    <ul>
+                        <li><strong>1. Warm Sand (Base):</strong> A soft, grounded off-white that prevents the icon from looking like an empty PNG background.</li>
+                        <li><strong>2. Icy Cyan (Glass):</strong> Gives the prism a distinct physical volume and a beautiful cool/warm contrast against the base.</li>
+                        <li><strong>3. Coral / Peach (Light):</strong> A highly energetic but soft accent color for the dynamic ribbon.</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="variant-contexts">
+                <div class="context-col">
+                    <span class="context-label">Hero (256px)</span>
+                    <div class="icon-container size-hero"><svg viewBox="0 0 100 100" width="100%" height="100%"><use href="#refined-concept-1" /></svg></div>
+                </div>
+                <div class="context-col">
+                    <span class="context-label">Start Menu</span>
+                    <div class="mock-start-icon-wrap">
+                        <div class="icon-container size-start"><svg viewBox="0 0 100 100" width="100%" height="100%"><use href="#refined-concept-1" /></svg></div>
+                    </div>
+                </div>
+                <div class="context-col">
+                    <span class="context-label">Taskbar</span>
+                    <div class="mock-taskbar">
+                        <div class="taskbar-item active">
+                            <div class="icon-container size-taskbar"><svg viewBox="0 0 100 100" width="100%" height="100%"><use href="#refined-concept-1" /></svg></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Concept 5 Refined -->
+        <div class="variant-row">
+            <div class="variant-info">
+                <span class="meta">Fresh Botanical Tech</span>
+                <h2>Soft Mint & Indigo Layers</h2>
+                <p>We completely dropped the purple background. Purple and white can often feel dated. Instead, we moved to an extremely fresh, modern "Soft Mint/Sage" background. To ensure the delicate thin-line logo stands out beautifully on the white glass, we colored it a deep, rich Indigo. It feels airy, natural, yet highly technical.</p>
+                
+                <div class="refinements-list">
+                    <strong>The 3-Color Palette:</strong>
+                    <ul>
+                        <li><strong>1. Soft Mint / Sage (Base):</strong> A lively, breathing color that feels modern, fresh, and completely non-artificial.</li>
+                        <li><strong>2. Clean White (Glass):</strong> The frosted glass layer provides a pure canvas.</li>
+                        <li><strong>3. Deep Indigo (Logo):</strong> An elegant, dark contrasting color for the airy monoline strokes, ensuring perfect legibility without resorting to harsh black.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="variant-contexts">
+                <div class="context-col">
+                    <span class="context-label">Hero (256px)</span>
+                    <div class="icon-container size-hero"><svg viewBox="0 0 100 100" width="100%" height="100%"><use href="#refined-concept-5" /></svg></div>
+                </div>
+                <div class="context-col">
+                    <span class="context-label">Start Menu</span>
+                    <div class="mock-start-icon-wrap">
+                        <div class="icon-container size-start"><svg viewBox="0 0 100 100" width="100%" height="100%"><use href="#refined-concept-5" /></svg></div>
+                    </div>
+                </div>
+                <div class="context-col">
+                    <span class="context-label">Taskbar</span>
+                    <div class="mock-taskbar">
+                        <div class="taskbar-item active">
+                            <div class="icon-container size-taskbar"><svg viewBox="0 0 100 100" width="100%" height="100%"><use href="#refined-concept-5" /></svg></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</body>
+</html>

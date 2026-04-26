@@ -1,0 +1,58 @@
+.titlebar {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  padding-left: 14px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  user-select: none;
+  border-bottom: 1px solid var(--stroke-surface);
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+body.dark .titlebar {
+  border-bottom-color: var(--stroke-surface);
+}
+
+.title {
+  flex: 1;
+  pointer-events: none;
+}
+
+.controls {
+  display: flex;
+  margin-left: auto;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.btn {
+  width: 46px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 10px;
+  font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets', sans-serif;
+  transition: background 0.08s ease;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.btn:hover {
+  background: var(--accent-tint);
+}
+
+body.dark .btn:hover {
+  background: var(--accent-tint);
+}
+
+.btn.close:hover {
+  background: #C42B1C;
+  color: #fff;
+}

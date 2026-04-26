@@ -1,0 +1,45 @@
+.menubar {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 10px;
+  user-select: none;
+  position: relative;
+  border-bottom: 1px solid var(--stroke-surface);
+  background: transparent;
+}
+
+body.dark .menubar {
+  border-bottom-color: var(--stroke-surface);
+}
+
+.menuItemWrapper {
+  position: relative;
+}
+
+.menuItem {
+  padding: 5px 11px;
+  font-size: 13px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: background 0.12s ease;
+}
+
+.menuItem:hover {
+  background: var(--accent-tint);
+}
+
+body.dark .menuItem:hover {
+  background: var(--accent-tint);
+}
+
+.menuItem.active {
+  background: var(--accent-tint-strong);
+  color: var(--accent);
+}
+
+body.dark .menuItem.active {
+  background: var(--accent-tint-strong);
+  color: var(--accent);
+}

@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prism - Markdown Editor</title>
+    <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --accent: #0067C0;
+            --accent-hover: #0078D4;
+            --accent-tint: rgba(0, 103, 192, 0.08);
+            --accent-tint-strong: rgba(0, 103, 192, 0.16);
+            --mica-bg: #F3F3F3;
+            --layer-1: rgba(255, 255, 255, 0.72);
+            --layer-2: rgba(255, 255, 255, 0.88);
+            --solid-surface: #FBFBFB;
+            --card: #FFFFFF;
+            --text-primary: #1A1A1A;
+            --text-secondary: #5C5C5C;
+            --stroke-surface: rgba(0, 0, 0, 0.0578);
+            --stroke-divider: rgba(0, 0, 0, 0.0803);
+            --stroke-control: rgba(0, 0, 0, 0.14);
+            --stroke-card: rgba(0, 0, 0, 0.06);
+            --elevation-flyout: 0 8px 16px rgba(0, 0, 0, 0.14), 0 0 1px rgba(0, 0, 0, 0.06);
+            --elevation-card: 0 2px 4px rgba(0, 0, 0, 0.04), 0 0 1px rgba(0, 0, 0, 0.06);
+            --radius-sm: 4px;
+            --radius-md: 7px;
+            --radius-lg: 8px;
+            --radius-xl: 12px;
+        }
+
+        body.dark {
+            --accent: #60CDFF;
+            --accent-hover: #99EBFF;
+            --accent-tint: rgba(96, 205, 255, 0.10);
+            --accent-tint-strong: rgba(96, 205, 255, 0.20);
+            --mica-bg: #202020;
+            --layer-1: rgba(43, 43, 43, 0.72);
+            --layer-2: rgba(44, 44, 44, 0.88);
+            --solid-surface: #282828;
+            --card: #2D2D2D;
+            --text-primary: #FFFFFF;
+            --text-secondary: #C8C8C8;
+            --stroke-surface: rgba(255, 255, 255, 0.0837);
+            --stroke-divider: rgba(255, 255, 255, 0.0837);
+            --stroke-control: rgba(255, 255, 255, 0.14);
+            --stroke-card: rgba(255, 255, 255, 0.08);
+            --elevation-flyout: 0 8px 20px rgba(0, 0, 0, 0.48), 0 0 1px rgba(0, 0, 0, 0.60);
+            --elevation-card: 0 2px 4px rgba(0, 0, 0, 0.28), 0 0 1px rgba(0, 0, 0, 0.40);
+        }
+
+        body {
+            font-family: 'Segoe UI Variable', 'Segoe UI', -apple-system, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            background:
+                radial-gradient(1200px 600px at 15% 0%, rgba(0, 103, 192, 0.08), transparent 60%),
+                radial-gradient(900px 500px at 100% 100%, rgba(138, 43, 226, 0.06), transparent 55%),
+                var(--mica-bg);
+            color: var(--text-primary);
+            font-size: 14px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body.dark {
+            background:
+                radial-gradient(1200px 600px at 15% 0%, rgba(96, 205, 255, 0.08), transparent 60%),
+                radial-gradient(900px 500px at 100% 100%, rgba(138, 43, 226, 0.08), transparent 55%),
+                var(--mica-bg);
+        }
+
+        #root {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .window-shell {
+            margin: 12px;
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid var(--stroke-surface);
+            box-shadow: 0 18px 42px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
+            background: var(--layer-1);
+            backdrop-filter: blur(40px) saturate(160%);
+            -webkit-backdrop-filter: blur(40px) saturate(160%);
+            display: flex;
+            flex-direction: column;
+            min-height: calc(100vh - 24px);
+        }
+
+        .titlebar {
+            height: 32px;
+            display: flex;
+            align-items: center;
+            padding-left: 14px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            -webkit-app-region: drag;
+            user-select: none;
+            border-bottom: 1px solid var(--stroke-surface);
+        }
+
+        .titlebar-controls {
+            margin-left: auto;
+            display: flex;
+            -webkit-app-region: no-drag;
+        }
+
+        .titlebar-btn {
+            width: 46px;
+            height: 32px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            background: transparent;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 10px;
+            font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets', sans-serif;
+            transition: background 0.08s ease;
+        }
+        .titlebar-btn:hover { background: rgba(0,0,0,0.05); }
+        body.dark .titlebar-btn:hover { background: rgba(255,255,255,0.06); }
+        .titlebar-btn.close:hover { background: #C42B1C; color: #fff; }
+
+        .menubar {
+            display: flex;
+            align-items: center;
+            height: 36px;
+            padding: 0 10px;
+            user-select: none;
+            position: relative;
+            border-bottom: 1px solid var(--stroke-surface);
+            background: transparent;
+        }
+
+        .menu-item {
+            padding: 5px 11px;
+            font-size: 13px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            position: relative;
+            color: var(--text-primary);
+            transition: background 0.12s ease;
+        }
+        .menu-item:hover { background: var(--accent-tint); }
+        .menu-item.active {
+            background: var(--accent-tint-strong);
+            color: var(--accent);
+        }
+
+        .menu-dropdown {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            min-width: 300px;
+            padding: 4px;
+            border-radius: var(--radius-lg);
+            background: var(--layer-2);
+            border: 1px solid var(--stroke-control);
+            box-shadow: var(--elevation-flyout);
+            backdrop-filter: blur(40px) saturate(180%);
+            -webkit-backdrop-filter: blur(40px) saturate(180%);
+            z-index: 1000;
+            animation: flyoutIn 0.18s cubic-bezier(0.17, 0.67, 0.3, 0.99);
+        }
+
+        @keyframes flyoutIn {
+            from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .menu-dropdown-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            font-size: 13px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            gap: 24px;
+            color: var(--text-primary);
+        }
+        .menu-dropdown-item:hover { background: var(--accent-tint); }
+        .menu-dropdown-item.disabled { opacity: 0.4; cursor: not-allowed; }
+        .menu-dropdown-item.disabled:hover { background: transparent; }
+        .menu-shortcut { color: var(--text-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
+        .menu-separator { height: 1px; background: var(--stroke-divider); margin: 4px 8px; }
+        .menu-submenu-arrow { color: var(--text-secondary); font-size: 10px; }
+
+        .quickbar-btn {
+            width: 32px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid transparent;
+            background: transparent;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--text-primary);
+            transition: all 0.12s ease;
+        }
+        .quickbar-btn:hover {
+            background: var(--accent-tint);
+            border-color: var(--stroke-surface);
+        }
+        .quickbar-btn:active { transform: scale(0.96); }
+
+        .floating-toolbar {
+            position: fixed;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            padding: 4px;
+            background: var(--layer-2);
+            border: 1px solid var(--stroke-control);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--elevation-flyout);
+            backdrop-filter: blur(40px) saturate(180%);
+            -webkit-backdrop-filter: blur(40px) saturate(180%);
+            z-index: 2000;
+            animation: flyoutIn 0.14s cubic-bezier(0.17, 0.67, 0.3, 0.99);
+            transform: translateX(-50%);
+        }
+        .floating-toolbar::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%) rotate(45deg);
+            width: 10px;
+            height: 10px;
+            background: var(--layer-2);
+            border-right: 1px solid var(--stroke-control);
+            border-bottom: 1px solid var(--stroke-control);
+        }
+        .ft-btn {
+            min-width: 32px;
+            height: 30px;
+            padding: 0 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            background: transparent;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            color: var(--text-primary);
+            font-size: 13px;
+            font-family: inherit;
+        }
+        .ft-btn:hover { background: var(--accent-tint); }
+        .ft-btn:active { background: var(--accent-tint-strong); transform: scale(0.96); }
+        .ft-btn .lbl { margin-left: 6px; font-size: 12px; color: var(--text-secondary); }
+        .ft-divider {
+            width: 1px;
+            height: 18px;
+            background: var(--stroke-divider);
+            margin: 0 2px;
+        }
+
+        .workspace {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 280px;
+            display: flex;
+            flex-direction: column;
+            background: var(--layer-1);
+            backdrop-filter: blur(30px) saturate(150%);
+            -webkit-backdrop-filter: blur(30px) saturate(150%);
+            border-right: 1px solid var(--stroke-surface);
+        }
+
+        .sidebar-tab {
+            flex: 1;
+            padding: 10px 6px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            color: var(--text-secondary);
+            position: relative;
+        }
+        .sidebar-tab:hover { color: var(--text-primary); }
+        .sidebar-tab.active {
+            color: var(--accent);
+            font-weight: 600;
+        }
+        .sidebar-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 20px;
+            height: 3px;
+            border-radius: 2px;
+            background: var(--accent);
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 10px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            cursor: pointer;
+            color: var(--text-primary);
+            position: relative;
+            transition: all 0.12s ease;
+        }
+        .file-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 0;
+            border-radius: 0 2px 2px 0;
+            background: rgba(0, 0, 0, 0.5);
+            transition: height 0.15s ease;
+        }
+        body.dark .file-item::before {
+            background: rgba(255, 255, 255, 0.6);
+        }
+        .file-item:hover {
+            background: rgba(0, 0, 0, 0.04);
+        }
+        body.dark .file-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .file-item.active {
+            background: rgba(0, 0, 0, 0.06);
+            color: var(--text-primary);
+            font-weight: 600;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+        body.dark .file-item.active {
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+        .file-item.active::before {
+            height: 16px;
+        }
+
+        .outline-item {
+            padding: 5px 10px;
+            font-size: 13px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            line-height: 1.45;
+            color: var(--text-secondary);
+        }
+        .outline-item:hover {
+            background: var(--accent-tint);
+            color: var(--text-primary);
+        }
+
+        .editor-shell {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: transparent;
+        }
+
+        .content-surface {
+            flex: 1;
+            overflow: hidden;
+            background: rgba(255,255,255,0.22);
+            display: flex;
+            padding: 32px 8%;
+        }
+        body.dark .content-surface { background: rgba(0,0,0,0.10); }
+
+        .content-surface-edit {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .content-surface-split {
+            flex-direction: row;
+        }
+
+        .editor-frame {
+            flex: 1;
+            display: flex;
+            align-items: stretch;
+            justify-content: center;
+            min-height: 0;
+        }
+
+        .split-editor,
+        .split-preview {
+            min-width: 0;
+            height: 100%;
+        }
+
+        .split-editor {
+            flex: 1;
+            border-right: 1px solid var(--stroke-surface);
+            background: rgba(255,255,255,0.12);
+            display: flex;
+            align-items: stretch;
+            justify-content: center;
+            padding: 32px 6%;
+            min-height: 0;
+        }
+        body.dark .split-editor { background: rgba(255,255,255,0.02); }
+
+        .split-preview {
+            flex: 1.05;
+            overflow: auto;
+        }
+
+        .preview-scroll {
+            flex: 1;
+            overflow: auto;
+            padding: 32px 15%;
+            transition: padding 0.3s ease;
+        }
+
+        .preview-card {
+            max-width: 880px;
+            margin: 0 auto;
+            background: var(--card);
+            border: 1px solid var(--stroke-card);
+            border-radius: 18px;
+            box-shadow: var(--elevation-card);
+            padding: 40px 48px;
+        }
+
+        textarea.editor {
+            flex: 1;
+            width: 100%;
+            max-width: 880px;
+            margin: 0 auto;
+            padding: 40px 48px;
+            border: none;
+            outline: none;
+            resize: none;
+            font-family: 'Cascadia Code', 'Cascadia Mono', Consolas, monospace;
+            font-size: 14px;
+            line-height: 1.75;
+            letter-spacing: 0.01em;
+            background: var(--card);
+            color: var(--text-primary);
+            border-radius: 18px;
+            box-shadow: var(--elevation-card);
+            border: 1px solid var(--stroke-card);
+            overflow: auto;
+        }
+        textarea.editor::selection { background: var(--accent-tint-strong); }
+
+        .markdown-preview {
+            font-family: 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
+            color: var(--text-primary);
+        }
+        .markdown-preview h1,
+        .markdown-preview h2,
+        .markdown-preview h3 {
+            margin: 1.5em 0 0.55em;
+            line-height: 1.2;
+            letter-spacing: -0.01em;
+            text-wrap: pretty;
+        }
+        .markdown-preview h1 { font-size: clamp(2rem, 3vw, 2.75rem); font-weight: 650; }
+        .markdown-preview h2 { font-size: clamp(1.4rem, 2.2vw, 1.85rem); font-weight: 600; }
+        .markdown-preview h3 { font-size: 1.25rem; font-weight: 600; }
+        .markdown-preview p,
+        .markdown-preview li,
+        .markdown-preview blockquote {
+            font-size: 15px;
+            line-height: 1.7;
+            text-wrap: pretty;
+        }
+        .markdown-preview p,
+        .markdown-preview ul,
+        .markdown-preview ol,
+        .markdown-preview blockquote,
+        .markdown-preview pre { margin: 0.85em 0; }
+        .markdown-preview code {
+            padding: 0.15em 0.45em;
+            border-radius: var(--radius-sm);
+            font-family: 'Cascadia Code', 'Cascadia Mono', Consolas, monospace;
+            font-size: 0.9em;
+            background: var(--accent-tint);
+            color: var(--accent);
+            border: 1px solid var(--stroke-surface);
+        }
+        .markdown-preview pre {
+            padding: 18px 22px;
+            border-radius: var(--radius-lg);
+            overflow: auto;
+            background: var(--solid-surface);
+            border: 1px solid var(--stroke-card);
+            box-shadow: var(--elevation-card);
+        }
+        .markdown-preview pre code {
+            padding: 0;
+            background: transparent;
+            color: inherit;
+            border: none;
+        }
+        .markdown-preview blockquote {
+            padding: 14px 18px;
+            border-left: 3px solid var(--accent);
+            background: var(--accent-tint);
+            border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+            color: var(--text-secondary);
+        }
+        .markdown-preview a { color: var(--accent); text-decoration: none; }
+        .markdown-preview a:hover { text-decoration: underline; }
+        .markdown-preview table {
+            border-collapse: collapse;
+            margin: 1em 0;
+            width: 100%;
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            border: 1px solid var(--stroke-card);
+        }
+        .markdown-preview th, .markdown-preview td {
+            border-bottom: 1px solid var(--stroke-divider);
+            padding: 10px 14px;
+            text-align: left;
+        }
+        .markdown-preview th { background: var(--solid-surface); font-weight: 600; }
+        .markdown-preview tr:last-child td { border-bottom: none; }
+
+        .fluent-input {
+            width: 100%;
+            padding: 8px 12px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--stroke-control);
+            border-bottom: 1px solid var(--text-secondary);
+            background: var(--card);
+            color: var(--text-primary);
+            outline: none;
+            font-size: 13px;
+            font-family: inherit;
+        }
+        .fluent-input:focus {
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 7px;
+        }
+
+        .statusbar {
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 14px;
+            background: var(--layer-1);
+            backdrop-filter: blur(30px) saturate(150%);
+            -webkit-backdrop-filter: blur(30px) saturate(150%);
+            border-top: 1px solid var(--stroke-surface);
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .statusbar-btn {
+            padding: 3px 10px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .statusbar-btn:hover {
+            background: var(--accent-tint);
+            color: var(--text-primary);
+        }
+        .statusbar-btn.active {
+            background: var(--accent-tint-strong);
+            color: var(--accent);
+        }
+
+        button { font-family: inherit; }
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0,0,0,0.15);
+            border-radius: 5px;
+            border: 2px solid transparent;
+            background-clip: content-box;
+        }
+        body.dark ::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            background-clip: content-box;
+            border: 2px solid transparent;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const menuData = {
+            '文件': [
+                { label: '新建', shortcut: 'Ctrl+N', action: 'new' },
+                { label: '新建窗口', shortcut: 'Ctrl+Shift+N', action: 'newWindow' },
+                { type: 'separator' },
+                { label: '打开...', shortcut: 'Ctrl+O', action: 'open' },
+                { label: '打开文件夹...', action: 'openFolder' },
+                { label: '快速打开...', shortcut: 'Ctrl+P', action: 'quickOpen' },
+                { label: '打开最近文件', submenu: true },
+                { type: 'separator' },
+                { label: '保存', shortcut: 'Ctrl+S', action: 'save' },
+                { label: '另存为...', shortcut: 'Ctrl+Shift+S', action: 'saveAs' },
+                { label: '移动到...', action: 'moveTo' },
+                { label: '保存全部打开的文件...', action: 'saveAll' },
+                { type: 'separator' },
+                { label: '导入...', action: 'import' },
+                { label: '导出', submenu: true },
+                { type: 'separator' },
+                { label: '打印...', shortcut: 'Alt+Shift+P', action: 'print' },
+                { type: 'separator' },
+                { label: '属性', action: 'properties' },
+                { label: '偏好设置...', shortcut: 'Ctrl+,', action: 'preferences' },
+            ],
+            '编辑': [
+                { label: '撤销', shortcut: 'Ctrl+Z', action: 'undo' },
+                { label: '重做', shortcut: 'Ctrl+Y', action: 'redo' },
+                { type: 'separator' },
+                { label: '剪切', shortcut: 'Ctrl+X', action: 'cut' },
+                { label: '复制', shortcut: 'Ctrl+C', action: 'copy' },
+                { label: '粘贴', shortcut: 'Ctrl+V', action: 'paste' },
+                { label: '拼贴图片', action: 'pasteImage' },
+                { type: 'separator' },
+                { label: '复制为纯文本', action: 'copyPlain' },
+                { label: '复制为 Markdown', shortcut: 'Ctrl+Shift+C', action: 'copyMd' },
+                { label: '复制为 HTML 代码', action: 'copyHtml' },
+                { label: '复制为其他格式', submenu: true },
+                { type: 'separator' },
+                { label: '粘贴为文本', shortcut: 'Ctrl+Shift+V', action: 'pastePlain' },
+                { type: 'separator' },
+                { label: '选择', submenu: true },
+                { type: 'separator' },
+                { label: '删除', submenu: true },
+                { type: 'separator' },
+                { label: '查找替换', submenu: true },
+                { type: 'separator' },
+                { label: '数字工具', submenu: true },
+                { label: '智能标点', submenu: true },
+                { label: '换行符', submenu: true },
+                { label: '拼写检查...', action: 'spellCheck' },
+                { type: 'separator' },
+                { label: '查找对应模块', shortcut: 'Ctrl+Shift+L', action: 'findBlock' },
+                { label: '表情与符号', shortcut: 'Win键+句号', action: 'emoji' },
+            ],
+            '段落': [
+                { label: '一级标题', shortcut: 'Ctrl+1', action: 'h1' },
+                { label: '二级标题', shortcut: 'Ctrl+2', action: 'h2' },
+                { label: '三级标题', shortcut: 'Ctrl+3', action: 'h3' },
+                { label: '四级标题', shortcut: 'Ctrl+4', action: 'h4' },
+                { label: '五级标题', shortcut: 'Ctrl+5', action: 'h5' },
+                { label: '六级标题', shortcut: 'Ctrl+6', action: 'h6' },
+                { type: 'separator' },
+                { label: '段落', shortcut: 'Ctrl+0', action: 'paragraph' },
+                { type: 'separator' },
+                { label: '提升标题级别', shortcut: 'Ctrl+=', action: 'increaseHeading' },
+                { label: '降低标题级别', shortcut: 'Ctrl+-', action: 'decreaseHeading' },
+                { type: 'separator' },
+                { label: '表格', submenu: true },
+                { label: '公式块', shortcut: 'Ctrl+Shift+M', action: 'mathBlock' },
+                { label: '代码块', shortcut: 'Ctrl+Shift+K', action: 'codeBlock' },
+                { label: '代码工具', submenu: true },
+                { label: '警告框', submenu: true },
+                { label: '引用', shortcut: 'Ctrl+Shift+Q', action: 'quote' },
+                { type: 'separator' },
+                { label: '有序列表', shortcut: 'Ctrl+Shift+[', action: 'orderedList' },
+                { label: '无序列表', shortcut: 'Ctrl+Shift+]', action: 'unorderedList' },
+                { label: '任务列表', shortcut: 'Ctrl+Shift+X', action: 'taskList' },
+                { label: '任务状态', submenu: true },
+                { label: '列表缩进', submenu: true },
+                { type: 'separator' },
+                { label: '在上方插入段落', action: 'insertAbove' },
+                { label: '在下方插入段落', action: 'insertBelow' },
+                { type: 'separator' },
+                { label: '链接引用', action: 'linkReference' },
+                { label: '脚注', action: 'footnote' },
+                { type: 'separator' },
+                { label: '水平分割线', action: 'hr' },
+                { label: '内容目录', action: 'toc' },
+                { label: 'YAML Front Matter', action: 'yaml' },
+            ],
+            '格式': [
+                { label: '加粗', shortcut: 'Ctrl+B', action: 'bold' },
+                { label: '斜体', shortcut: 'Ctrl+I', action: 'italic' },
+                { label: '下划线', shortcut: 'Ctrl+U', action: 'underline' },
+                { label: '代码', shortcut: 'Ctrl+Shift+`', action: 'inlineCode' },
+                { type: 'separator' },
+                { label: '删除线', shortcut: 'Alt+Shift+5', action: 'strikethrough' },
+                { label: '注释', action: 'comment' },
+                { type: 'separator' },
+                { label: '超链接', shortcut: 'Ctrl+K', action: 'link' },
+                { label: '链接操作', submenu: true },
+                { label: '图像', submenu: true },
+                { type: 'separator' },
+                { label: '清除样式', shortcut: 'Ctrl+\\', action: 'clearFormat' },
+            ],
+            '视图': [
+                { label: '显示 / 隐藏侧边栏', shortcut: 'Ctrl+Shift+L', action: 'toggleSidebar' },
+                { label: '大纲', shortcut: 'Ctrl+Shift+1', action: 'showOutline' },
+                { label: '文档列表', shortcut: 'Ctrl+Shift+2', action: 'showDocs' },
+                { label: '文件树', shortcut: 'Ctrl+Shift+3', action: 'showFiles' },
+                { label: '搜索', shortcut: 'Ctrl+Shift+F', action: 'showSearch' },
+                { type: 'separator' },
+                { label: '源代码模式', shortcut: 'Ctrl+/', action: 'sourceMode' },
+                { type: 'separator' },
+                { label: '专注模式', shortcut: 'F8', action: 'focusMode' },
+                { label: '打字机模式', shortcut: 'F9', action: 'typewriterMode' },
+                { label: '显示状态栏', action: 'statusBar' },
+                { label: '字数统计窗口', action: 'wordCountWindow' },
+                { type: 'separator' },
+                { label: '切换全屏', shortcut: 'F11', action: 'fullscreen' },
+                { label: '保持窗口在最前端', action: 'alwaysOnTop' },
+                { type: 'separator' },
+                { label: '实际大小', shortcut: 'Ctrl+Shift+9', action: 'actualSize' },
+                { label: '放大', shortcut: 'Ctrl+Shift+=', action: 'zoomIn' },
+                { label: '缩小', shortcut: 'Ctrl+Shift+-', action: 'zoomOut' },
+                { type: 'separator' },
+                { label: '应用内窗口切换', shortcut: 'Ctrl+Tab 键', action: 'switchWindow' },
+                { label: '开发者工具', shortcut: 'Shift+F12', action: 'devTools' },
+            ],
+            '主题': [
+                { label: 'Github', action: 'themeGithub' },
+                { label: 'Newsprint', action: 'themeNewsprint' },
+                { label: 'Night', action: 'themeNight' },
+                { label: 'Pixyll', action: 'themePixyll' },
+                { label: 'Whitey', action: 'themeWhitey' },
+            ],
+            '帮助': [
+                { label: "What's New...", action: 'whatsNew' },
+                { type: 'separator' },
+                { label: 'Quick Start', action: 'quickStart' },
+                { label: 'Markdown Reference', action: 'mdReference' },
+                { label: 'Install and Use Pandoc', action: 'pandoc' },
+                { label: 'Custom Themes', action: 'customThemes' },
+                { label: 'Use Images in Typora', action: 'useImages' },
+                { label: 'Data Recovery and Version Control', action: 'dataRecovery' },
+                { label: 'More Topics...', action: 'moreTopics' },
+                { type: 'separator' },
+                { label: '鸣谢', action: 'thanks' },
+                { label: '更新日志', action: 'changelog' },
+                { label: '隐私条款', action: 'privacy' },
+                { label: '官方网站', action: 'website' },
+                { label: '反馈', action: 'feedback' },
+                { type: 'separator' },
+                { label: '检查更新...', action: 'checkUpdate' },
+                { label: '我的许可证...', action: 'myLicense' },
+                { label: '关于', action: 'about' },
+            ],
+        };
+
+        function App() {
+            const [darkMode, setDarkMode] = useState(false);
+            const [sidebarOpen, setSidebarOpen] = useState(true);
+            const [sidebarTab, setSidebarTab] = useState('files');
+            const [viewMode, setViewMode] = useState('split'); // 'edit' | 'split' | 'preview'
+            const [focusMode, setFocusMode] = useState(false);
+            const [fullscreen, setFullscreen] = useState(false);
+            const [activeMenu, setActiveMenu] = useState(null);
+            const [markdown, setMarkdown] = useState(`# 欢迎使用 Prism\n\n一个现代化的 **Windows 11 风格** Markdown 编辑器。\n\n## 核心特性\n\n- 三种编辑模式（编辑 / 分栏 / 预览）\n- 选中文本浮动工具栏\n- Fluent Design 视觉语言\n- 完整的菜单系统与快捷键\n- 侧边栏文件树、大纲、搜索\n\n> Prism 保留了 Typora 的功能架构，但采用了更现代的 Windows 11 视觉风格。\n\n### 示例代码\n\n\`\`\`javascript\nfunction hello() {\n  console.log('Hello Prism');\n}\n\`\`\`\n\n### 示例表格\n\n| 功能 | 快捷键 | 说明 |\n|------|--------|------|\n| 加粗 | Ctrl+B | 加粗文本 |\n| 斜体 | Ctrl+I | 斜体文本 |\n| 保存 | Ctrl+S | 保存文件 |\n\n[了解更多](#)`);
+            const [cursor, setCursor] = useState({ line: 1, column: 1 });
+            const [floatingToolbar, setFloatingToolbar] = useState({ show: false, x: 0, y: 0 });
+            const editorRef = useRef(null);
+
+            useEffect(() => {
+                document.body.className = darkMode ? 'dark' : '';
+            }, [darkMode]);
+
+            useEffect(() => {
+                const editor = editorRef.current;
+                if (!editor) return;
+                const updateCursor = () => {
+                    const pos = editor.selectionStart;
+                    const textBefore = markdown.slice(0, pos);
+                    const lines = textBefore.split('\n');
+                    setCursor({ line: lines.length, column: lines[lines.length - 1].length + 1 });
+                };
+                const handleSelection = () => {
+                    const start = editor.selectionStart;
+                    const end = editor.selectionEnd;
+                    if (end > start && viewMode !== 'preview') {
+                        const rect = editor.getBoundingClientRect();
+                        const lineHeight = 24;
+                        const textBefore = markdown.slice(0, start);
+                        const lines = textBefore.split('\n');
+                        const lineIndex = lines.length - 1;
+                        const y = rect.top + lineIndex * lineHeight - editor.scrollTop - 50;
+                        const x = rect.left + rect.width / 2;
+                        setFloatingToolbar({ show: true, x, y });
+                    } else {
+                        setFloatingToolbar({ show: false, x: 0, y: 0 });
+                    }
+                };
+                editor.addEventListener('keyup', updateCursor);
+                editor.addEventListener('click', updateCursor);
+                editor.addEventListener('mouseup', handleSelection);
+                editor.addEventListener('keyup', handleSelection);
+                return () => {
+                    editor.removeEventListener('keyup', updateCursor);
+                    editor.removeEventListener('click', updateCursor);
+                    editor.removeEventListener('mouseup', handleSelection);
+                    editor.removeEventListener('keyup', handleSelection);
+                };
+            }, [markdown, viewMode]);
+
+            const wordCount = markdown.replace(/[#*`\-\[\]()]/g, '').trim().split(/\s+/).filter(Boolean).length;
+
+            const formatText = (prefix, suffix = prefix) => {
+                const editor = editorRef.current;
+                if (!editor) return;
+                const start = editor.selectionStart;
+                const end = editor.selectionEnd;
+                const selected = markdown.slice(start, end);
+                const before = markdown.slice(0, start);
+                const after = markdown.slice(end);
+                const newText = before + prefix + selected + suffix + after;
+                setMarkdown(newText);
+                setTimeout(() => {
+                    editor.focus();
+                    editor.setSelectionRange(start + prefix.length, end + prefix.length);
+                }, 0);
+            };
+
+            const handleMenuAction = (action) => {
+                setActiveMenu(null);
+                switch (action) {
+                    case 'bold': formatText('**'); break;
+                    case 'italic': formatText('*'); break;
+                    case 'underline': formatText('<u>', '</u>'); break;
+                    case 'inlineCode': formatText('`'); break;
+                    case 'strikethrough': formatText('~~'); break;
+                    case 'link': formatText('[', '](url)'); break;
+                    case 'image': formatText('![描述](', ')'); break;
+                    case 'h1': formatText('# ', ''); break;
+                    case 'h2': formatText('## ', ''); break;
+                    case 'h3': formatText('### ', ''); break;
+                    case 'h4': formatText('#### ', ''); break;
+                    case 'h5': formatText('##### ', ''); break;
+                    case 'h6': formatText('###### ', ''); break;
+                    case 'quote': formatText('> ', ''); break;
+                    case 'codeBlock': formatText('```\n', '\n```'); break;
+                    case 'orderedList': formatText('1. ', ''); break;
+                    case 'unorderedList': formatText('- ', ''); break;
+                    case 'taskList': formatText('- [ ] ', ''); break;
+                    case 'hr': formatText('\n---\n', ''); break;
+                    case 'sourceMode': setViewMode(viewMode === 'edit' ? 'split' : 'edit'); break;
+                    case 'focusMode': setFocusMode(!focusMode); break;
+                    case 'fullscreen': setFullscreen(!fullscreen); break;
+                    case 'toggleSidebar': setSidebarOpen(!sidebarOpen); break;
+                    case 'showOutline': setSidebarOpen(true); setSidebarTab('outline'); break;
+                    case 'showDocs': setSidebarOpen(true); setSidebarTab('files'); break;
+                    case 'showFiles': setSidebarOpen(true); setSidebarTab('files'); break;
+                    case 'showSearch': setSidebarOpen(true); setSidebarTab('search'); break;
+                    case 'themeNight': setDarkMode(true); break;
+                    case 'themeGithub': setDarkMode(false); break;
+                    default: console.log('Action:', action);
+                }
+            };
+
+            const outlineItems = markdown
+                .split('\n')
+                .filter((line) => line.startsWith('#'))
+                .map((line, idx) => {
+                    const level = line.match(/^#+/)[0].length;
+                    const text = line.replace(/^#+\s*/, '');
+                    return { level, text, key: idx };
+                });
+
+            return (
+                <div className="window-shell" style={fullscreen ? { margin: 0, borderRadius: 0, minHeight: '100vh' } : {}}>
+                    {!fullscreen && (
+                        <div className="titlebar">
+                            Prism
+                            <div className="titlebar-controls">
+                                <button className="titlebar-btn">&#xE921;</button>
+                                <button className="titlebar-btn">&#xE922;</button>
+                                <button className="titlebar-btn close">&#xE8BB;</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {!fullscreen && (
+                        <div className="menubar">
+                            {Object.keys(menuData).map((menuName) => (
+                                <MenuBarItem
+                                    key={menuName}
+                                    label={menuName}
+                                    items={menuData[menuName]}
+                                    active={activeMenu === menuName}
+                                    onToggle={() => setActiveMenu(activeMenu === menuName ? null : menuName)}
+                                    onAction={handleMenuAction}
+                                />
+                            ))}
+                        </div>
+                    )}
+
+                    <div className="workspace">
+                        {floatingToolbar.show && (
+                            <div className="floating-toolbar" style={{ left: floatingToolbar.x, top: Math.max(54, floatingToolbar.y) }}>
+                                <button className="ft-btn" onMouseDown={(e) => e.preventDefault()} onClick={() => handleMenuAction('bold')} title="加粗">B</button>
+                                <button className="ft-btn" onMouseDown={(e) => e.preventDefault()} onClick={() => handleMenuAction('italic')} title="斜体">I</button>
+                                <button className="ft-btn" onMouseDown={(e) => e.preventDefault()} onClick={() => handleMenuAction('inlineCode')} title="行内代码">&lt;/&gt;</button>
+                                <div className="ft-divider" />
+                                <button className="ft-btn" onMouseDown={(e) => e.preventDefault()} onClick={() => handleMenuAction('link')} title="插入链接">⌁</button>
+                                <button className="ft-btn" onMouseDown={(e) => e.preventDefault()} onClick={() => handleMenuAction('quote')} title="引用">❝</button>
+                            </div>
+                        )}
+                        {sidebarOpen && !fullscreen && (
+                            <div className="sidebar">
+                                <div style={{ display: 'flex', borderBottom: '1px solid var(--stroke-surface)' }}>
+                                    <div className={`sidebar-tab ${sidebarTab === 'files' ? 'active' : ''}`} onClick={() => setSidebarTab('files')}>文件树</div>
+                                    <div className={`sidebar-tab ${sidebarTab === 'outline' ? 'active' : ''}`} onClick={() => setSidebarTab('outline')}>大纲</div>
+                                    <div className={`sidebar-tab ${sidebarTab === 'search' ? 'active' : ''}`} onClick={() => setSidebarTab('search')}>搜索</div>
+                                </div>
+                                <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
+                                    {sidebarTab === 'files' && (
+                                        <div>
+                                            <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase' }}>最近文件</div>
+                                            {[
+                                                { name: '我的文档.md', active: true },
+                                                { name: '会议记录.md' },
+                                                { name: '学习笔记.md' },
+                                                { name: '项目计划.md' },
+                                            ].map((file) => (
+                                                <div key={file.name} className={`file-item ${file.active ? 'active' : ''}`}>
+                                                    <span style={{ fontFamily: 'Segoe Fluent Icons, Segoe MDL2 Assets', fontSize: 16, opacity: 0.7 }}>&#xE8A5;</span>
+                                                    <span>{file.name}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {sidebarTab === 'outline' && (
+                                        <div>
+                                            {outlineItems.length === 0 ? (
+                                                <div style={{ opacity: 0.5, fontSize: 13, textAlign: 'center', marginTop: 40 }}>暂无标题</div>
+                                            ) : (
+                                                outlineItems.map((item) => (
+                                                    <div key={item.key} className="outline-item" style={{ paddingLeft: (item.level - 1) * 16 + 10 }}>
+                                                        {item.text}
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
+                                    {sidebarTab === 'search' && (
+                                        <div>
+                                            <input className="fluent-input" placeholder="搜索文档内容..." />
+                                            <div style={{ opacity: 0.5, fontSize: 13, textAlign: 'center', marginTop: 24 }}>输入关键字开始搜索</div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="editor-shell">
+                            <div className={`content-surface ${viewMode === 'split' ? 'content-surface-split' : 'content-surface-edit'}`}>
+                                {viewMode === 'edit' && (
+                                    <div className="editor-frame">
+                                        <textarea
+                                            ref={editorRef}
+                                            className="editor"
+                                            value={markdown}
+                                            onChange={(e) => setMarkdown(e.target.value)}
+                                            style={{ padding: focusMode ? '10vh 20vw' : '40px 48px' }}
+                                        />
+                                    </div>
+                                )}
+                                {viewMode === 'split' && (
+                                    <>
+                                        <div className="split-editor">
+                                            <textarea
+                                                ref={editorRef}
+                                                className="editor"
+                                                value={markdown}
+                                                onChange={(e) => setMarkdown(e.target.value)}
+                                                style={{ padding: '32px 36px' }}
+                                            />
+                                        </div>
+                                        <div className="split-preview">
+                                            <div className="preview-scroll" style={{ padding: '32px 8%' }}>
+                                                <div className="preview-card" style={{ padding: '32px 36px' }}>
+                                                    <div className="markdown-preview" dangerouslySetInnerHTML={{ __html: marked.parse(markdown) }} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                                {viewMode === 'preview' && (
+                                    <div className="preview-scroll" style={{ padding: focusMode ? '10vh 20vw' : '32px 15%' }}>
+                                        <div className="preview-card">
+                                            <div className="markdown-preview" dangerouslySetInnerHTML={{ __html: marked.parse(markdown) }} />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {!fullscreen && (
+                        <div className="statusbar">
+                            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                                <div style={{ display: 'flex', gap: 2, padding: 2, background: 'var(--accent-tint)', borderRadius: 'var(--radius-sm)' }}>
+                                    <button className={`statusbar-btn ${viewMode === 'edit' ? 'active' : ''}`} onClick={() => setViewMode('edit')} title="仅编辑（Markdown 源码）">编辑</button>
+                                    <button className={`statusbar-btn ${viewMode === 'split' ? 'active' : ''}`} onClick={() => setViewMode('split')} title="编辑 + 实时预览">分栏</button>
+                                    <button className={`statusbar-btn ${viewMode === 'preview' ? 'active' : ''}`} onClick={() => setViewMode('preview')} title="仅预览（只读）">预览</button>
+                                </div>
+                                <span>{wordCount} 词</span>
+                                <span>Ln {cursor.line}, Col {cursor.column}</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <button className="statusbar-btn" onClick={() => setFocusMode(!focusMode)}>
+                                    {focusMode ? '退出专注' : '专注模式'}
+                                </button>
+                                <button className="statusbar-btn" onClick={() => setDarkMode(!darkMode)}>
+                                    {darkMode ? '亮色主题' : '暗色主题'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function MenuBarItem({ label, items, active, onToggle, onAction }) {
+            const ref = useRef(null);
+
+            useEffect(() => {
+                if (!active) return;
+                const handleClick = (e) => {
+                    if (ref.current && !ref.current.contains(e.target)) {
+                        onToggle();
+                    }
+                };
+                document.addEventListener('mousedown', handleClick);
+                return () => document.removeEventListener('mousedown', handleClick);
+            }, [active, onToggle]);
+
+            return (
+                <div ref={ref} style={{ position: 'relative' }}>
+                    <div className={`menu-item ${active ? 'active' : ''}`} onClick={onToggle}>{label}</div>
+                    {active && (
+                        <div className="menu-dropdown">
+                            {items.map((item, idx) => {
+                                if (item.type === 'separator') {
+                                    return <div key={idx} className="menu-separator" />;
+                                }
+                                return (
+                                    <div
+                                        key={idx}
+                                        className={`menu-dropdown-item ${item.disabled ? 'disabled' : ''}`}
+                                        onClick={() => !item.disabled && !item.submenu && onAction(item.action)}
+                                    >
+                                        <span>{item.label}</span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                            {item.shortcut && <span className="menu-shortcut">{item.shortcut}</span>}
+                                            {item.submenu && <span className="menu-submenu-arrow">▸</span>}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>

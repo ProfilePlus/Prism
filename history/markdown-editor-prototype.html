@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown 编辑器原型</title>
+    <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* Typora 风格 - 浅色 */
+            --typora-primary: #0078D4;
+            --typora-bg-light: #F3F3F3;
+            --typora-surface-light: #FFFFFF;
+            --typora-text-light: #1F1F1F;
+            --typora-border-light: #E0E0E0;
+            --typora-shadow-light: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+            /* Typora 风格 - 深色 */
+            --typora-bg-dark: #1E1E1E;
+            --typora-surface-dark: #2D2D2D;
+            --typora-text-dark: #E1E1E1;
+            --typora-border-dark: #3F3F3F;
+            --typora-shadow-dark: 0 2px 8px rgba(0, 0, 0, 0.3);
+
+            /* Notion 风格 - 浅色 */
+            --notion-primary: #2383E2;
+            --notion-bg-light: #FFFFFF;
+            --notion-surface-light: #FAFAFA;
+            --notion-text-light: #37352F;
+            --notion-border-light: #E9E9E7;
+            --notion-shadow-light: 0 1px 3px rgba(0, 0, 0, 0.12);
+
+            /* Notion 风格 - 深色 */
+            --notion-bg-dark: #191919;
+            --notion-surface-dark: #252525;
+            --notion-text-dark: #E9E9E7;
+            --notion-border-dark: #373737;
+            --notion-shadow-dark: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        #root {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .markdown-preview h1,
+        .markdown-preview h2,
+        .markdown-preview h3 {
+            margin: 1.4em 0 0.6em;
+            line-height: 1.25;
+            text-wrap: pretty;
+        }
+
+        .markdown-preview h1 {
+            font-size: clamp(2rem, 3vw, 2.8rem);
+            font-weight: 700;
+        }
+
+        .markdown-preview h2 {
+            font-size: clamp(1.4rem, 2.2vw, 2rem);
+            font-weight: 650;
+        }
+
+        .markdown-preview p,
+        .markdown-preview li,
+        .markdown-preview blockquote {
+            font-size: 16px;
+            line-height: 1.8;
+            text-wrap: pretty;
+        }
+
+        .markdown-preview p,
+        .markdown-preview ul,
+        .markdown-preview ol,
+        .markdown-preview blockquote,
+        .markdown-preview pre {
+            margin: 0.9em 0;
+        }
+
+        .markdown-preview code {
+            padding: 0.18em 0.45em;
+            border-radius: 6px;
+            font-family: 'Cascadia Code', Consolas, monospace;
+            font-size: 0.92em;
+            background: rgba(127, 127, 127, 0.14);
+        }
+
+        .markdown-preview pre {
+            padding: 18px 20px;
+            border-radius: 14px;
+            overflow: auto;
+            background: rgba(127, 127, 127, 0.1);
+        }
+
+        .markdown-preview pre code {
+            padding: 0;
+            background: transparent;
+        }
+
+        .markdown-preview blockquote {
+            padding: 12px 16px;
+            border-left: 3px solid rgba(0, 120, 212, 0.45);
+            background: rgba(127, 127, 127, 0.08);
+            border-radius: 0 12px 12px 0;
+        }
+
+        .markdown-preview a {
+            color: #2383E2;
+            text-decoration: none;
+        }
+
+        .markdown-preview a:hover {
+            text-decoration: underline;
+        }
+
+        button {
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            opacity: 0.85;
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // 设计系统配置
+        const themes = {
+            typora: {
+                light: {
+                    bg: '#F3F3F3',
+                    surface: '#FFFFFF',
+                    text: '#1F1F1F',
+                    border: '#E0E0E0',
+                    primary: '#0078D4',
+                    shadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                },
+                dark: {
+                    bg: '#1E1E1E',
+                    surface: '#2D2D2D',
+                    text: '#E1E1E1',
+                    border: '#3F3F3F',
+                    primary: '#0078D4',
+                    shadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+                }
+            },
+            notion: {
+                light: {
+                    bg: '#FFFFFF',
+                    surface: '#FAFAFA',
+                    text: '#37352F',
+                    border: '#E9E9E7',
+                    primary: '#2383E2',
+                    shadow: '0 1px 3px rgba(0, 0, 0, 0.12)',
+                },
+                dark: {
+                    bg: '#191919',
+                    surface: '#252525',
+                    text: '#E9E9E7',
+                    border: '#373737',
+                    primary: '#2383E2',
+                    shadow: '0 1px 3px rgba(0, 0, 0, 0.3)',
+                }
+            }
+        };
+
+        function App() {
+            const [variant, setVariant] = useState('typora');
+            const [darkMode, setDarkMode] = useState(false);
+            const [sidebarOpen, setSidebarOpen] = useState(true);
+            const [previewMode, setPreviewMode] = useState('split');
+            const [fullscreen, setFullscreen] = useState(false);
+            const [dividerPos, setDividerPos] = useState(50);
+            const [markdown, setMarkdown] = useState(`# 欢迎使用 Markdown 编辑器\n\n这是一个**Windows 11 风格**的 Markdown 编辑器原型。\n\n## 主要特性\n\n- 新手友好的工具栏\n- 实时预览与分栏模式\n- 可折叠文件树\n- 亮色 / 暗色主题\n- Fluent Design 视觉风格\n\n> 这个原型展示了两种设计方向：功能丰富型和现代办公风。\n\n### 示例代码\n\n\`\`\`javascript\nfunction hello() {\n  console.log('Hello Markdown');\n}\n\`\`\`\n\n[了解更多](#)`);
+            const [cursor, setCursor] = useState({ line: 1, column: 1 });
+            const [showTweaks, setShowTweaks] = useState(true);
+            const editorRef = useRef(null);
+            const currentTheme = themes[variant][darkMode ? 'dark' : 'light'];
+
+            useEffect(() => {
+                const editor = editorRef.current;
+                if (!editor) return;
+
+                const updateCursor = () => {
+                    const pos = editor.selectionStart;
+                    const textBefore = markdown.slice(0, pos);
+                    const lines = textBefore.split('\n');
+                    setCursor({
+                        line: lines.length,
+                        column: lines[lines.length - 1].length + 1,
+                    });
+                };
+
+                editor.addEventListener('keyup', updateCursor);
+                editor.addEventListener('click', updateCursor);
+                return () => {
+                    editor.removeEventListener('keyup', updateCursor);
+                    editor.removeEventListener('click', updateCursor);
+                };
+            }, [markdown]);
+
+            const wordCount = markdown.replace(/[#*`\-\[\]()]/g, '').trim().split(/\s+/).filter(Boolean).length;
+
+            const formatText = (prefix, suffix = prefix) => {
+                const editor = editorRef.current;
+                if (!editor) return;
+
+                const start = editor.selectionStart;
+                const end = editor.selectionEnd;
+                const selected = markdown.slice(start, end);
+                const before = markdown.slice(0, start);
+                const after = markdown.slice(end);
+                const newText = before + prefix + selected + suffix + after;
+                setMarkdown(newText);
+
+                setTimeout(() => {
+                    editor.focus();
+                    editor.setSelectionRange(start + prefix.length, end + prefix.length);
+                }, 0);
+            };
+
+            const toolbarButtons = [
+                { label: '加粗', icon: 'B', action: () => formatText('**') },
+                { label: '斜体', icon: 'I', action: () => formatText('*') },
+                { label: '标题', icon: 'H', action: () => formatText('## ', '') },
+                { label: '列表', icon: '•', action: () => formatText('- ', '') },
+                { label: '链接', icon: '🔗', action: () => formatText('[', '](url)') },
+                { label: '图片', icon: '🖼', action: () => formatText('![描述](', ')') },
+                { label: '代码', icon: '</>', action: () => formatText('`') },
+                { label: '引用', icon: '"', action: () => formatText('> ', '') },
+            ];
+
+            const appStyles = {
+                root: {
+                    height: '100vh',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    background: currentTheme.bg,
+                    color: currentTheme.text,
+                    transition: 'all 0.3s ease',
+                },
+                toolbar: {
+                    height: 56,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '0 16px',
+                    background: variant === 'typora'
+                        ? (darkMode ? 'rgba(45, 45, 45, 0.85)' : 'rgba(255, 255, 255, 0.85)')
+                        : currentTheme.surface,
+                    backdropFilter: variant === 'typora' ? 'blur(20px)' : 'none',
+                    borderBottom: `1px solid ${currentTheme.border}`,
+                    boxShadow: currentTheme.shadow,
+                    zIndex: 100,
+                },
+                sidebar: {
+                    width: sidebarOpen ? 260 : 0,
+                    background: variant === 'typora'
+                        ? (darkMode ? 'rgba(45, 45, 45, 0.7)' : 'rgba(255, 255, 255, 0.7)')
+                        : currentTheme.surface,
+                    backdropFilter: variant === 'typora' ? 'blur(20px)' : 'none',
+                    borderRight: sidebarOpen ? `1px solid ${currentTheme.border}` : 'none',
+                    overflow: 'hidden',
+                    transition: 'width 0.3s ease',
+                    display: 'flex',
+                    flexDirection: 'column',
+                },
+                main: {
+                    flex: 1,
+                    display: 'flex',
+                    overflow: 'hidden',
+                },
+                editorPane: {
+                    width: previewMode === 'split' ? `${dividerPos}%` : '100%',
+                    display: previewMode === 'preview' ? 'none' : 'flex',
+                    flexDirection: 'column',
+                    background: variant === 'notion' ? currentTheme.bg : currentTheme.surface,
+                },
+                previewPane: {
+                    width: previewMode === 'split' ? `${100 - dividerPos}%` : '100%',
+                    display: previewMode === 'edit' ? 'none' : 'block',
+                    background: variant === 'notion' ? currentTheme.bg : currentTheme.surface,
+                    borderLeft: previewMode === 'split' ? `1px solid ${currentTheme.border}` : 'none',
+                    overflow: 'auto',
+                },
+                editor: {
+                    flex: 1,
+                    width: '100%',
+                    padding: variant === 'typora' ? '32px' : '48px 64px',
+                    border: 'none',
+                    outline: 'none',
+                    resize: 'none',
+                    fontFamily: variant === 'typora' ? 'Cascadia Code, Consolas, monospace' : 'Segoe UI, sans-serif',
+                    fontSize: 16,
+                    lineHeight: 1.7,
+                    background: 'transparent',
+                    color: currentTheme.text,
+                },
+                preview: {
+                    padding: variant === 'typora' ? '32px' : '48px 64px',
+                    maxWidth: variant === 'notion' ? 860 : 'none',
+                    margin: variant === 'notion' ? '0 auto' : '0',
+                    lineHeight: 1.7,
+                },
+                statusbar: {
+                    height: 32,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0 16px',
+                    background: currentTheme.surface,
+                    borderTop: `1px solid ${currentTheme.border}`,
+                    fontSize: 12,
+                },
+                divider: {
+                    width: 6,
+                    cursor: 'col-resize',
+                    background: previewMode === 'split' ? currentTheme.border : 'transparent',
+                    transition: 'background 0.2s ease',
+                },
+            };
+
+            return (
+                <div style={appStyles.root}>
+                    {!fullscreen && (
+                        <div style={appStyles.toolbar}>
+                            <button onClick={() => setSidebarOpen(!sidebarOpen)} style={buttonStyle(currentTheme, variant)}>
+                                ☰
+                            </button>
+                            <div style={{ width: 1, height: 24, background: currentTheme.border, margin: '0 4px' }} />
+                            {toolbarButtons.map((button) => (
+                                <button key={button.label} onClick={button.action} style={buttonStyle(currentTheme, variant)} title={button.label}>
+                                    <span style={{ fontWeight: button.label === '加粗' ? 700 : 500 }}>{button.icon}</span>
+                                    {variant === 'typora' && <span style={{ marginLeft: 6 }}>{button.label}</span>}
+                                </button>
+                            ))}
+                            <div style={{ flex: 1 }} />
+                            <button onClick={() => setPreviewMode(previewMode === 'split' ? 'edit' : previewMode === 'edit' ? 'preview' : 'split')} style={buttonStyle(currentTheme, variant)}>
+                                {previewMode === 'split' ? '分栏' : previewMode === 'edit' ? '编辑' : '预览'}
+                            </button>
+                            <button onClick={() => setDarkMode(!darkMode)} style={buttonStyle(currentTheme, variant)}>
+                                {darkMode ? '☀' : '☾'}
+                            </button>
+                            <button onClick={() => setFullscreen(!fullscreen)} style={buttonStyle(currentTheme, variant)}>
+                                ⛶
+                            </button>
+                        </div>
+                    )}
+
+                    <div style={appStyles.main}>
+                        <div style={appStyles.sidebar}>
+                            <div style={{ padding: '16px', borderBottom: `1px solid ${currentTheme.border}`, fontWeight: 600 }}>
+                                文件导航
+                            </div>
+                            <div style={{ padding: '12px' }}>
+                                <FileTree currentTheme={currentTheme} variant={variant} />
+                            </div>
+                        </div>
+
+                        <div style={appStyles.editorPane}>
+                            <textarea
+                                ref={editorRef}
+                                value={markdown}
+                                onChange={(e) => setMarkdown(e.target.value)}
+                                style={appStyles.editor}
+                                placeholder="开始编写 Markdown..."
+                            />
+                        </div>
+
+                        {previewMode === 'split' && <div style={appStyles.divider} />}
+
+                        <div style={appStyles.previewPane}>
+                            <div style={appStyles.preview}>
+                                <MarkdownPreview content={markdown} currentTheme={currentTheme} variant={variant} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {!fullscreen && (
+                        <div style={appStyles.statusbar}>
+                            <div style={{ display: 'flex', gap: 16 }}>
+                                <span>{wordCount} 词</span>
+                                <span>Ln {cursor.line}, Col {cursor.column}</span>
+                                <span>{previewMode === 'split' ? '分栏模式' : previewMode === 'edit' ? '编辑模式' : '预览模式'}</span>
+                            </div>
+                            <div>
+                                {variant === 'typora' ? '功能丰富型' : '现代办公风'} · {darkMode ? '暗色' : '亮色'}
+                            </div>
+                        </div>
+                    )}
+
+                    {showTweaks && (
+                        <TweaksPanel
+                            variant={variant}
+                            setVariant={setVariant}
+                            darkMode={darkMode}
+                            setDarkMode={setDarkMode}
+                            previewMode={previewMode}
+                            setPreviewMode={setPreviewMode}
+                            sidebarOpen={sidebarOpen}
+                            setSidebarOpen={setSidebarOpen}
+                            fullscreen={fullscreen}
+                            setFullscreen={setFullscreen}
+                            dividerPos={dividerPos}
+                            setDividerPos={setDividerPos}
+                            currentTheme={currentTheme}
+                            onClose={() => setShowTweaks(false)}
+                        />
+                    )}
+                    {!showTweaks && (
+                        <button
+                            onClick={() => setShowTweaks(true)}
+                            style={{
+                                position: 'fixed',
+                                bottom: 20,
+                                right: 20,
+                                padding: '10px 14px',
+                                borderRadius: 12,
+                                border: `1px solid ${currentTheme.border}`,
+                                background: currentTheme.surface,
+                                color: currentTheme.text,
+                                boxShadow: currentTheme.shadow,
+                                cursor: 'pointer',
+                                zIndex: 999,
+                            }}
+                        >
+                            Tweaks
+                        </button>
+                    )}
+                </div>
+            );
+        }
+
+        function FileTree({ currentTheme, variant }) {
+            const fileTreeStyles = {
+                item: {
+                    padding: '8px 12px',
+                    borderRadius: variant === 'typora' ? 8 : 6,
+                    cursor: 'pointer',
+                    marginBottom: 4,
+                    fontSize: 14,
+                    transition: 'all 0.2s ease',
+                }
+            };
+
+            const files = [
+                { name: '我的文档.md', active: true },
+                { name: '会议记录.md' },
+                { name: '学习笔记.md' },
+                { name: '项目计划.md' },
+            ];
+
+            return (
+                <div>
+                    <div style={{ marginBottom: 12, color: currentTheme.text, opacity: 0.7, fontSize: 12 }}>最近文件</div>
+                    {files.map((file) => (
+                        <div
+                            key={file.name}
+                            style={{
+                                ...fileTreeStyles.item,
+                                background: file.active ? currentTheme.primary + '20' : 'transparent',
+                                color: file.active ? currentTheme.primary : currentTheme.text,
+                                fontWeight: file.active ? 600 : 400,
+                            }}
+                        >
+                            📄 {file.name}
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        function MarkdownPreview({ content, currentTheme, variant }) {
+            const html = marked.parse(content);
+            return (
+                <div
+                    className="markdown-preview"
+                    style={{
+                        color: currentTheme.text,
+                        fontFamily: 'Segoe UI, sans-serif',
+                    }}
+                    dangerouslySetInnerHTML={{ __html: html }}
+                />
+            );
+        }
+
+        function TweaksPanel(props) {
+            const tweaksStyles = {
+                panel: {
+                    position: 'fixed',
+                    bottom: 20,
+                    right: 20,
+                    width: 280,
+                    padding: 20,
+                    borderRadius: 16,
+                    background: props.currentTheme.surface,
+                    border: `1px solid ${props.currentTheme.border}`,
+                    boxShadow: props.currentTheme.shadow,
+                    backdropFilter: 'blur(20px)',
+                    zIndex: 1000,
+                },
+                row: {
+                    marginBottom: 16,
+                },
+                label: {
+                    display: 'block',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    marginBottom: 8,
+                },
+                select: {
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: 10,
+                    border: `1px solid ${props.currentTheme.border}`,
+                    background: props.currentTheme.bg,
+                    color: props.currentTheme.text,
+                }
+            };
+
+            return (
+                <div style={tweaksStyles.panel}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                        <div style={{ fontWeight: 700 }}>Tweaks</div>
+                        <button onClick={props.onClose} style={{ border: 'none', background: 'none', color: props.currentTheme.text, cursor: 'pointer' }}>✕</button>
+                    </div>
+
+                    <div style={tweaksStyles.row}>
+                        <label style={tweaksStyles.label}>设计版本</label>
+                        <select value={props.variant} onChange={(e) => props.setVariant(e.target.value)} style={tweaksStyles.select}>
+                            <option value="typora">版本 1 - 功能丰富型</option>
+                            <option value="notion">版本 2 - 现代办公风</option>
+                        </select>
+                    </div>
+
+                    <div style={tweaksStyles.row}>
+                        <label style={tweaksStyles.label}>预览模式</label>
+                        <select value={props.previewMode} onChange={(e) => props.setPreviewMode(e.target.value)} style={tweaksStyles.select}>
+                            <option value="split">编辑 + 预览</option>
+                            <option value="edit">仅编辑</option>
+                            <option value="preview">仅预览</option>
+                        </select>
+                    </div>
+
+                    <div style={tweaksStyles.row}>
+                        <label style={tweaksStyles.label}>分栏比例 ({props.dividerPos}% / {100 - props.dividerPos}%)</label>
+                        <input
+                            type="range"
+                            min="30"
+                            max="70"
+                            value={props.dividerPos}
+                            onChange={(e) => props.setDividerPos(Number(e.target.value))}
+                            style={{ width: '100%' }}
+                        />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <button onClick={() => props.setDarkMode(!props.darkMode)} style={buttonStyle(props.currentTheme, props.variant)}>
+                            {props.darkMode ? '切换亮色' : '切换暗色'}
+                        </button>
+                        <button onClick={() => props.setSidebarOpen(!props.sidebarOpen)} style={buttonStyle(props.currentTheme, props.variant)}>
+                            {props.sidebarOpen ? '隐藏侧栏' : '显示侧栏'}
+                        </button>
+                        <button onClick={() => props.setFullscreen(!props.fullscreen)} style={buttonStyle(props.currentTheme, props.variant)}>
+                            {props.fullscreen ? '退出全屏' : '进入全屏'}
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        function buttonStyle(currentTheme, variant) {
+            return {
+                padding: variant === 'typora' ? '8px 12px' : '8px 10px',
+                borderRadius: variant === 'typora' ? 10 : 8,
+                border: `1px solid ${currentTheme.border}`,
+                background: currentTheme.surface,
+                color: currentTheme.text,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: 13,
+                transition: 'all 0.2s ease',
+            };
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
