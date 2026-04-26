@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Prism Final Showcase - Ultra Smooth</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; background: #000; color: #fff; font-family: 'Plus Jakarta Sans', sans-serif; overflow: hidden; }
+        .canvas { width: 1920px; height: 1080px; position: relative; overflow: hidden; background: #050505; }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+        }
+        .cursor { display: inline-block; width: 2px; height: 28px; background: #3b82f6; vertical-align: middle; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const interpolate = (val, start, end, from, to) => {
+            if (val < start) return from;
+            if (val > end) return to;
+            const p = (val - start) / (end - start);
+            return from + (to - from) * p;
+        };
+
+        const useTime = () => {
+            const [time, setTime] = useState(0);
+            useEffect(() => {
+                let start = performance.now();
+                const frame = (now) => {
+                    setTime((now - start) / 1000);
+                    requestAnimationFrame(frame);
+                };
+                requestAnimationFrame(frame);
+                window.__ready = true;
+            }, []);
+            return time;
+        };
+
+        // --- 100% 还原 Segment Iris 组件 ---
+        const SegmentIris = ({ color = "white", strokeWidth = 1.6, scale = 1, opacity = 1 }) => (
+            <svg width="100%" height="100%" viewBox="0 0 100 100" fill="none" style={{ opacity }}>
+                <g transform={`translate(50 50) scale(${scale}) translate(-50 -50)`}>
+                    <g stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+                        {[0, 60, 120, 180, 240, 300].map(deg => (
+                            <path key={deg} d="M50 50 L50 20 L70 35 Z" transform={`rotate(${deg} 50 50)`} />
+                        ))}
+                    </g>
+                    <circle cx="50" cy="50" r="10" fill={color} opacity="0.1" />
+                </g>
+            </svg>
+        );
+
+        const App = () => {
+            const t = useTime();
+
+            return (
+                <div className="canvas">
+                    {/* 背景光斑：移除模糊以防止卡顿 */}
+                    <div style={{ 
+                        position: 'absolute', inset: 0, 
+                        background: `radial-gradient(circle at center, #1e3a8a ${interpolate(t, 0, 10, 0, 30)}%, transparent 70%)`,
+                        opacity: 0.2
+                    }} />
+
+                    {/* 0-4s: 折射开场 */}
+                    <div style={{ 
+                        position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        opacity: interpolate(t, 3, 4, 1, 0),
+                        transform: `scale(${interpolate(t, 0, 4, 2, 1.8)})`,
+                        pointerEvents: 'none'
+                    }}>
+                        <div style={{ width: 120, height: 120 }}>
+                            <SegmentIris color="white" strokeWidth={1} />
+                        </div>
+                    </div>
+
+                    {/* 4-22s: 主功能窗口 */}
+                    <div style={{ 
+                        position: 'absolute', left: 160, right: 160, top: interpolate(t, 3.5, 4.5, 1200, 140), 
+                        height: 800, opacity: interpolate(t, 3.5, 4.5, 0, 1) 
+                    }} className="glass-panel flex overflow-hidden">
+                        
+                        {/* 侧边栏 */}
+                        <div style={{ 
+                            width: interpolate(t, 10, 11.5, 0, 300), 
+                            borderRight: '1px solid rgba(255,255,255,0.1)',
+                            opacity: interpolate(t, 10, 10.5, 0, 1)
+                        }} className="p-10 shrink-0">
+                            <div className="text-zinc-500 text-[10px] font-bold tracking-[0.2em] mb-10">LIBRARY</div>
+                            {[1, 2, 3, 4, 5].map(i => (
+                                <div key={i} className="h-3 bg-white/10 rounded-full mb-8" style={{ width: 140 + (i % 2) * 40 }} />
+                            ))}
+                        </div>
+
+                        {/* 编辑区 */}
+                        <div className="flex-1 p-20 relative">
+                             <div style={{ position: 'absolute', top: 32, left: 32, width: 32, height: 32, opacity: 0.3 }}>
+                                <SegmentIris color="white" strokeWidth={3} />
+                             </div>
+
+                             <div className="max-w-3xl">
+                                <h2 className="text-5xl font-bold mb-10">
+                                    {t > 5 ? "Simplicity is the " : ""}
+                                    {t > 5.5 ? <span className="text-blue-400 italic">ultimate</span> : ""}
+                                    {t > 6 ? " sophistication." : ""}
+                                </h2>
+                                <p className="text-2xl text-zinc-400 leading-relaxed mb-10">
+                                    {t > 7 ? "Focus on your words, let Prism handle the " : ""}
+                                    {t > 8 ? <span className="bg-white/10 px-2 rounded">structure.</span> : ""}
+                                </p>
+                                {t > 15 && (
+                                    <div className="p-8 bg-black/40 rounded-2xl border-l-4 border-blue-500 font-mono text-xl text-blue-100" style={{
+                                        opacity: interpolate(t, 15, 16, 0, 1),
+                                        transform: `translateX(${interpolate(t, 15, 16, 20, 0)}px)`
+                                    }}>
+                                        &gt; prism init --focus-mode
+                                    </div>
+                                )}
+                                {t > 4.5 && t < 22.5 && <div className="cursor animate-pulse ml-2" />}
+                             </div>
+
+                             {/* 专注模式进入 */}
+                             <div style={{ 
+                                position: 'absolute', inset: 0, background: '#000', 
+                                opacity: interpolate(t, 18, 19.5, 0, 0.9), pointerEvents: 'none' 
+                             }} />
+                        </div>
+                    </div>
+
+                    {/* 23-25s: 终极品牌定格 (100% 方案4还原) */}
+                    <div style={{ 
+                        position: 'absolute', inset: 0, background: '#fff', 
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                        opacity: interpolate(t, 22.5, 23.5, 0, 1), zIndex: 500
+                    }}>
+                        <div style={{ 
+                            width: 160, height: 160, background: '#fff', borderRadius: '22%', 
+                            padding: 20, boxShadow: '0 20px 60px rgba(0,0,0,0.1)',
+                            border: '1px solid rgba(0,0,0,0.05)'
+                        }}>
+                            <SegmentIris color="black" strokeWidth={1.6} scale={1.05} />
+                        </div>
+                        <h1 className="mt-12 text-black text-5xl font-extrabold tracking-[0.4em]">PRISM</h1>
+                        <p className="mt-4 text-zinc-400 text-sm font-medium uppercase tracking-[0.2em]">Focused Writing Environment</p>
+                    </div>
+
+                    <div style={{ position: 'absolute', bottom: 48, right: 64, fontSize: 12, color: 'rgba(255,255,255,0.1)', letterSpacing: '0.2em' }}>CREATED BY HUASHU-DESIGN</div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

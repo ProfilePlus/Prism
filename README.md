@@ -6,6 +6,8 @@
 
 **A modern Markdown desktop editor with Windows 11 Fluent Design**
 
+https://github.com/ProfilePlus/Prism/raw/main/docs/assets/brand/Prism_Ultimate_Launch.mp4
+
 [![Tauri](https://img.shields.io/badge/Tauri-2.x-blue?logo=tauri)](https://tauri.app)
 [![React](https://img.shields.io/badge/React-18-61dafb?logo=react)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript)](https://typescriptlang.org)
@@ -27,6 +29,7 @@ Prism 是一款基于 **Tauri 2 + React + TypeScript** 构建的 Markdown 桌面
 
 **编辑体验**
 - 三种视图模式：纯编辑、分栏、纯预览
+- **专注模式 (F8)**：沉浸式暗场写作环境
 - 选中文本浮动工具栏（加粗、斜体、行内代码、链接、引用）
 - KaTeX 数学公式渲染
 - Mermaid 流程图 / 时序图渲染
@@ -35,16 +38,18 @@ Prism 是一款基于 **Tauri 2 + React + TypeScript** 构建的 Markdown 桌面
 - 自动保存
 
 **界面与外壳**
-- Windows 11 Fluent Design 视觉
-- 自定义无边框窗口（Mica 背景渐变）
+- **品牌设计**：采用 Segment Iris（分瓣光圈）原创图标体系
+- **分裂地基状态栏**：具备物理滑出感与动态唤醒（Hover Reveal）逻辑的精细底座
+- Windows 11 Fluent Design 视觉（Mica 背景渐变）
 - 深 / 浅双主题
 - 完整菜单栏与下拉菜单
 - 侧边栏（文件树 / 大纲 / 搜索）
-- 状态栏（视图模式、字数、光标位置、专注按钮、主题切换、HTML 导出）
+- 深度交互统计（字数、字符数、行数、阅读时长）
 
 **文件操作**
+- **系统级接管菜单**：在资源管理器中显示、复制完整路径、创建副本等
+- 最近文件夹快捷访问
 - 打开 / 保存 / 另存为 / 新建文档
-- 打开文件夹（侧边栏文件树）
 - HTML 导出
 - 命令行 / 关联打开文件
 
