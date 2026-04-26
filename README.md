@@ -6,7 +6,7 @@
 
 **A modern Markdown desktop editor with Windows 11 Fluent Design**
 
-https://github.com/ProfilePlus/Prism/raw/main/docs/assets/brand/Prism_Ultimate_Launch.mp4
+<video src="https://github.com/ProfilePlus/Prism/raw/main/docs/assets/brand/Prism_Ultimate_Launch.mp4" width="100%" controls autoplay muted loop></video>
 
 [![Tauri](https://img.shields.io/badge/Tauri-2.x-blue?logo=tauri)](https://tauri.app)
 [![React](https://img.shields.io/badge/React-18-61dafb?logo=react)](https://react.dev)
