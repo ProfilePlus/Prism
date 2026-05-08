@@ -89,3 +89,19 @@
 .button[name="code"]::before { content: "\E943"; font-size: 14px; }
 .button[name="link"]::before { content: "\E71B"; font-size: 14px; }
 .button[name="quote"]::before { content: "\E9B1"; font-size: 14px; }
+
+/* 操作反馈动画 */
+.button.active {
+  background: var(--accent-tint) !important;
+  color: var(--accent) !important;
+  animation: buttonPulse 0.3s ease;
+}
+
+@keyframes buttonPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+}

@@ -1,4 +1,5 @@
 import styles from './FloatingToolbar.module.css';
+import { useState } from 'react';
 
 interface FloatingToolbarProps {
   visible: boolean;
@@ -17,7 +18,15 @@ interface FloatingToolbarProps {
 }
 
 export function FloatingToolbar({ visible, x, y, onFormat }: FloatingToolbarProps) {
+  const [activeButton, setActiveButton] = useState<string | null>(null);
+
   if (!visible) return null;
+
+  const handleFormat = (format: Parameters<typeof onFormat>[0], buttonName: string) => {
+    onFormat(format);
+    setActiveButton(buttonName);
+    setTimeout(() => setActiveButton(null), 300);
+  };
 
   // 边界检测：避免工具栏超出窗口
   const toolbarWidth = 280; // 工具栏大致宽度
@@ -41,26 +50,66 @@ export function FloatingToolbar({ visible, x, y, onFormat }: FloatingToolbarProp
     >
       {/* 组 1：基础文本装饰 */}
       <div className={styles.group}>
-        <button className={styles.button} onClick={() => onFormat('bold')} title="加粗 (Ctrl+B)" name="bold">B</button>
-        <button className={styles.button} onClick={() => onFormat('italic')} title="斜体 (Ctrl+I)" name="italic">I</button>
-        <button className={styles.button} onClick={() => onFormat('underline')} title="下划线 (Ctrl+U)" name="underline">U</button>
-        <button className={styles.button} onClick={() => onFormat('strikethrough')} title="删除线 (Alt+Shift+5)" name="strikethrough"></button>
+        <button
+          className={`${styles.button} ${activeButton === 'bold' ? styles.active : ''}`}
+          onClick={() => handleFormat('bold', 'bold')}
+          title="加粗 (Ctrl+B)"
+          name="bold"
+        >B</button>
+        <button
+          className={`${styles.button} ${activeButton === 'italic' ? styles.active : ''}`}
+          onClick={() => handleFormat('italic', 'italic')}
+          title="斜体 (Ctrl+I)"
+          name="italic"
+        >I</button>
+        <button
+          className={`${styles.button} ${activeButton === 'underline' ? styles.active : ''}`}
+          onClick={() => handleFormat('underline', 'underline')}
+          title="下划线 (Ctrl+U)"
+          name="underline"
+        >U</button>
+        <button
+          className={`${styles.button} ${activeButton === 'strikethrough' ? styles.active : ''}`}
+          onClick={() => handleFormat('strikethrough', 'strikethrough')}
+          title="删除线 (Alt+Shift+5)"
+          name="strikethrough"
+        ></button>
       </div>
 
       <div className={styles.divider}></div>
 
       {/* 组 2：视觉与功能增强 */}
       <div className={styles.group}>
-        <button className={styles.button} onClick={() => onFormat('highlight')} title="高亮" name="highlight"></button>
-        <button className={styles.button} onClick={() => onFormat('code')} title="行内代码" name="code"></button>
+        <button
+          className={`${styles.button} ${activeButton === 'highlight' ? styles.active : ''}`}
+          onClick={() => handleFormat('highlight', 'highlight')}
+          title="高亮"
+          name="highlight"
+        ></button>
+        <button
+          className={`${styles.button} ${activeButton === 'code' ? styles.active : ''}`}
+          onClick={() => handleFormat('code', 'code')}
+          title="行内代码"
+          name="code"
+        ></button>
       </div>
 
       <div className={styles.divider}></div>
 
       {/* 组 3：链接与引用 */}
       <div className={styles.group}>
-        <button className={styles.button} onClick={() => onFormat('link')} title="插入链接" name="link"></button>
-        <button className={styles.button} onClick={() => onFormat('quote')} title="引用" name="quote"></button>
+        <button
+          className={`${styles.button} ${activeButton === 'link' ? styles.active : ''}`}
+          onClick={() => handleFormat('link', 'link')}
+          title="插入链接"
+          name="link"
+        ></button>
+        <button
+          className={`${styles.button} ${activeButton === 'quote' ? styles.active : ''}`}
+          onClick={() => handleFormat('quote', 'quote')}
+          title="引用"
+          name="quote"
+        ></button>
       </div>
     </div>
   );
