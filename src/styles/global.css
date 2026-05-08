@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Lora:ital,wght@0,400;0,700;1,400&family=Quicksand:wght@400;600;700&family=Merriweather:wght@400;700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 
 * {
   margin: 0;
@@ -40,7 +41,7 @@
   --radius-xl: 12px;
   --radius-window: 14px;
 
-  /* 强调色 */
+  /* 强调�?*/
   --accent: #0067C0;
   --accent-hover: #0078D4;
   --accent-tint: rgba(0, 103, 192, 0.08);
@@ -57,6 +58,15 @@
   --text-lg: 16px;
   --text-xl: 18px;
   --text-2xl: 24px;
+
+  /* 动画与过�?*/
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+  --spring-easing: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --app-zoom: 1;
 }
 
 body {
@@ -85,8 +95,6 @@ body.dark {
   --text-primary: #ECECEC;
   --text-secondary: #A3A3A3;
   --text-tertiary: #737373;
-  --accent: #60A5FA;
-  --accent-hover: #93C5FD;
 
   /* Fluent Design tokens - dark */
   --mica-bg: #202020;
@@ -101,7 +109,7 @@ body.dark {
   --elevation-card: 0 2px 4px rgba(0, 0, 0, 0.28), 0 0 1px rgba(0, 0, 0, 0.40);
   --elevation-window: 0 18px 42px rgba(0, 0, 0, 0.20), 0 2px 8px rgba(0, 0, 0, 0.12);
 
-  /* 强调色 - dark */
+  /* 强调�?- dark */
   --accent: #60CDFF;
   --accent-hover: #99EBFF;
   --accent-tint: rgba(96, 205, 255, 0.10);
@@ -179,6 +187,56 @@ body.dark {
   margin: 1em 0;
 }
 
+/* Mac 窗口风格代码�?*/
+.markdown-preview pre {
+  padding: 46px 16px 16px;
+  border-radius: 10px;
+  overflow: auto;
+  background-color: var(--mac-bg, #282c34) !important;
+  border: 1px solid var(--mac-border, rgba(0,0,0,0.2)) !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15) !important;
+  position: relative;
+  color: var(--mac-text, #abb2bf) !important;
+}
+
+/* Mac 窗口控制�?*/
+.markdown-preview pre::before {
+  content: '';
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #ff5f56;
+  box-shadow: 19px 0 0 #ffbd2e, 38px 0 0 #27c93f;
+  z-index: 2;
+}
+
+/* �������������� */
+.markdown-preview pre::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: #21252b;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  z-index: 1;
+}
+
+.markdown-preview pre code {
+  padding: 0;
+  background: transparent !important;
+  color: inherit !important;
+  font-weight: 400;
+  line-height: 1.6;
+  position: relative;
+  z-index: 3;
+  display: block;
+}
+
 .markdown-preview ul,
 .markdown-preview ol {
   padding-left: 1.75em;
@@ -186,9 +244,9 @@ body.dark {
 
 .markdown-preview code {
   padding: 0.2em 0.4em;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-family: var(--font-mono);
-  font-size: 0.9em;
+  font-size: 0.85em;
   background: var(--bg-hover);
   color: var(--accent);
   font-weight: 500;
@@ -196,24 +254,19 @@ body.dark {
 
 .markdown-preview pre {
   padding: 1rem 1.25rem;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   overflow: auto;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
 }
 
-.markdown-preview pre code {
-  padding: 0;
-  background: transparent;
-  color: var(--text-primary);
-  font-weight: 400;
-}
+
 
 .markdown-preview blockquote {
   padding: 0.75rem 1rem;
   border-left: 3px solid var(--accent);
   background: var(--bg-hover);
-  border-radius: 0 6px 6px 0;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
   color: var(--text-secondary);
 }
 
@@ -221,7 +274,7 @@ body.dark {
   color: var(--accent);
   text-decoration: none;
   font-weight: 500;
-  transition: color 0.15s ease;
+  transition: color var(--duration-fast) var(--ease-out);
 }
 
 .markdown-preview a:hover {
@@ -258,30 +311,42 @@ body.dark {
 .markdown-preview img {
   max-width: 100%;
   height: auto;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 button {
-  transition: all 0.15s ease;
+  transition: all var(--duration-fast) var(--ease-out);
   color: inherit;
   font-family: var(--font-ui);
   font-weight: 500;
   font-size: var(--text-sm);
+  outline: none;
 }
 
 button:hover {
   background: var(--bg-hover);
 }
 
-/* Typora 风格的细滚动条 */
+button:active {
+  transform: scale(0.96);
+  background: var(--bg-active);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Fluent 风格的自适应滚动�?*/
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--text-tertiary) transparent;
 }
 
 *::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 12px;
+  height: 12px;
+  background: transparent;
 }
 
 *::-webkit-scrollbar-track {
@@ -289,22 +354,877 @@ button:hover {
 }
 
 *::-webkit-scrollbar-thumb {
-  background: var(--text-tertiary);
-  border-radius: 3px;
+  background-color: var(--text-tertiary);
+  border: 4px solid transparent;
+  background-clip: padding-box;
+  border-radius: 8px;
   opacity: 0.4;
 }
 
-body.dark .markdown-preview h1,
-body.dark .markdown-preview h2,
-body.dark .markdown-preview h3,
-body.dark .markdown-preview h4,
-body.dark .markdown-preview h5,
-body.dark .markdown-preview h6 {
-  color: #E5E5E5;
+*::-webkit-scrollbar-thumb:hover {
+  border: 2px solid transparent;
+  background-color: var(--text-secondary);
 }
 
-body.dark .markdown-preview p,
-body.dark .markdown-preview li,
-body.dark .markdown-preview blockquote {
-  color: #D4D4D4;
+/* Windows 11 Notepad Style Search Panel (Ctrl+F) */
+.notepad-search-panel {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  animation: notepadFlyoutIn 0.25s var(--ease-out);
 }
+
+@keyframes notepadFlyoutIn {
+  from { opacity: 0; transform: translate(-50%, -12px) scale(0.98); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+.notepad-search-container {
+  background: var(--layer-2);
+  backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid var(--stroke-control);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-flyout);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  min-width: 420px;
+}
+
+.notepad-search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+}
+
+.notepad-search-row.expanded-row {
+  margin-top: 4px;
+  padding-left: 36px; /* Offset to align with the main input */
+}
+
+/* Expander Button (Chevron) */
+.notepad-search-btn.expander {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.notepad-search-btn.expander::before {
+  content: "\E70D"; /* ChevronRight */
+  font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets';
+  font-size: 10px;
+  transition: transform 0.2s var(--ease-out);
+}
+
+.notepad-search-btn.expander.is-expanded::before {
+  transform: rotate(90deg);
+}
+
+/* Input Wrapper & Field */
+.notepad-search-input-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.notepad-search-input {
+  width: 100%;
+  height: 32px;
+  background: var(--bg-surface-solid);
+  border: 1px solid var(--stroke-control);
+  border-bottom: 1px solid var(--text-tertiary);
+  border-radius: var(--radius-sm);
+  padding: 0 32px 0 10px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text-primary);
+  outline: none;
+  transition: all var(--duration-fast);
+}
+
+.notepad-search-input:focus {
+  background: var(--bg-surface);
+  border-color: var(--accent);
+  border-bottom: 2px solid var(--accent);
+}
+
+.notepad-search-icon-inside {
+  position: absolute;
+  right: 10px;
+  pointer-events: none;
+  color: var(--text-tertiary);
+}
+
+.notepad-search-icon-inside::before {
+  content: "\E721"; /* Search */
+  font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets';
+  font-size: 12px;
+}
+
+/* Separator Line */
+.notepad-search-separator {
+  width: 1px;
+  height: 20px;
+  background: var(--stroke-divider);
+  margin: 0 4px;
+}
+
+/* Icon Buttons Controls */
+.notepad-search-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.notepad-search-btn.icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets';
+}
+
+.notepad-search-btn.icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.notepad-search-btn.icon-btn:active {
+  background: var(--bg-active);
+  transform: scale(0.9);
+}
+
+.notepad-search-btn.icon-btn[name="prev"]::before { content: "\E74A"; font-size: 14px; }
+.notepad-search-btn.icon-btn[name="next"]::before { content: "\E74B"; font-size: 14px; }
+.notepad-search-btn.icon-btn.options-toggle::before { content: "\E713"; font-size: 14px; } /* Settings/Sliders */
+.notepad-search-btn.icon-btn.close-btn::before { content: "\E711"; font-size: 10px; }
+
+.notepad-search-btn.icon-btn.options-toggle.is-active {
+  background: var(--bg-active);
+  color: var(--accent);
+}
+
+.notepad-search-btn.icon-btn.close-btn:hover {
+  background: #C42B1C;
+  color: white;
+}
+
+/* Options Dropdown Menu */
+.notepad-search-options-container {
+  position: relative;
+}
+
+.notepad-search-options-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: var(--layer-2);
+  border: 1px solid var(--stroke-control);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elevation-flyout);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  z-index: 10000;
+  animation: notepadMenuIn 0.15s var(--ease-out);
+}
+
+@keyframes notepadMenuIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.notepad-menu-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  gap: 8px;
+}
+
+.notepad-menu-item:hover {
+  background: var(--bg-hover);
+}
+
+.notepad-menu-separator {
+  height: 1px;
+  background: var(--stroke-divider);
+  margin: 4px 0;
+}
+
+.notepad-menu-item.is-disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.notepad-menu-item input { display: none; }
+
+.notepad-menu-check {
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notepad-menu-item:has(input:checked) .notepad-menu-check::before {
+  content: "\E73E"; /* CheckMark */
+  font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets';
+  font-size: 10px;
+  color: var(--accent);
+}
+
+/* Text Buttons for Replace */
+.notepad-search-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.notepad-text-btn {
+  height: 32px;
+  padding: 0 16px;
+  background: var(--bg-surface-solid);
+  border: 1px solid var(--stroke-control);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+
+.notepad-text-btn:hover {
+  background: var(--bg-hover);
+}
+
+.notepad-text-btn:active {
+  background: var(--bg-active);
+  transform: scale(0.96);
+}
+
+/* ══════════════════════════════════════════════════════════
+   内容主题系统 (Content Themes) - 深度全局重构
+   ══════════════════════════════════════════════════════════ */
+
+/* 核心逻辑：当 data-content-theme 激活时，接管整�?App 的主背景 */
+[data-content-theme] #root,
+[data-content-theme] .app,
+[data-content-theme] .sidebar,
+[data-content-theme] .markdown-preview,
+[data-content-theme] .cm-editor,
+[data-content-theme] .cm-scroller {
+  background-color: var(--preview-bg) !important;
+  color: var(--preview-text) !important;
+  transition: background-color 0.3s var(--ease-out), color 0.3s var(--ease-out);
+}
+
+/* 移除容器间的硬边分割�?*/
+[data-content-theme] .sidebar {
+  border-right: 1px solid var(--theme-divider, var(--stroke-surface)) !important;
+  backdrop-filter: none !important;
+}
+
+[data-content-theme] .notepad-search-container {
+  background-color: var(--preview-bg);
+}
+
+/* 1. Github Theme (默认) */
+[data-content-theme="github"] {
+  --preview-bg: #FFFFFF;
+  --preview-text: #24292e;
+  --preview-font: var(--font-ui);
+  --theme-divider: #e1e4e8;
+}
+
+/* 2. Whitey Theme (极致纯白) */
+[data-content-theme="whitey"] {
+  --preview-bg: #FFFFFF;
+  --preview-text: #1a1a1a;
+  --preview-font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --theme-divider: #f0f0f0;
+}
+[data-content-theme="whitey"] .markdown-preview h1,
+[data-content-theme="whitey"] .markdown-preview h2 {
+  border-bottom: 1px solid #eeeeee;
+  padding-bottom: 0.3em;
+}
+
+/* 3. Newsprint Theme (复古报纸 - 深度优化) */
+[data-content-theme="newsprint"] {
+  --preview-bg: #F4F1EA;
+  --preview-text: #333333;
+  --preview-font: 'Georgia', 'Times New Roman', serif;
+  --theme-divider: #E0DDD5;
+}
+[data-content-theme="newsprint"] .markdown-preview {
+  line-height: 1.8;
+  max-width: 840px !important;
+}
+[data-content-theme="newsprint"] .markdown-preview h1,
+[data-content-theme="newsprint"] .markdown-preview h2 {
+  font-family: 'Times New Roman', serif;
+  text-align: center;
+  border-bottom: 1px solid #d0d0d0;
+  padding-bottom: 0.5em;
+  margin-top: 1.5em;
+}
+[data-content-theme="newsprint"] .markdown-preview blockquote {
+  font-style: italic;
+  border: 1px solid #d0d0d0;
+  border-left: 0; border-right: 0;
+  padding: 2em;
+  background: rgba(0,0,0,0.01);
+  text-align: center;
+}
+
+/* 4. Pixyll Theme (极简排版 - 深度优化) */
+[data-content-theme="pixyll"] {
+  --preview-bg: #FFFFFF;
+  --preview-text: #333333;
+  --preview-font: 'Merriweather', 'Georgia', serif;
+  --theme-divider: #f5f5f5;
+}
+[data-content-theme="pixyll"] .markdown-preview {
+  max-width: 740px !important;
+  line-height: 2.0;
+}
+[data-content-theme="pixyll"] .markdown-preview h1,
+[data-content-theme="pixyll"] .markdown-preview h2 {
+  text-align: center;
+  margin-top: 2.5em;
+}
+
+/* 5. Night Theme (深色夜间) */
+[data-content-theme="night"] {
+  --preview-bg: #1e1e1e;
+  --preview-text: #bdbdbd;
+  --preview-font: var(--font-ui);
+  --theme-divider: #333333;
+}
+[data-content-theme="night"] .markdown-preview h1,
+[data-content-theme="night"] .markdown-preview h2 {
+  color: #eeeeee;
+}
+[data-content-theme="night"] .markdown-preview code {
+  background: rgba(255, 255, 255, 0.08);
+  color: #60CDFF;
+}
+
+/* 状态栏适配 - 确保在不同主题下不突兀 */
+[data-content-theme] .status-bar {
+  background-color: var(--preview-bg) !important;
+  border-top: 1px solid var(--theme-divider) !important;
+  color: var(--preview-text) !important;
+  opacity: 0.9;
+}
+[data-content-theme] .status-bar button {
+  color: var(--preview-text) !important;
+}
+
+/* 侧边栏按钮适配 */
+[data-content-theme] .sidebar button:hover {
+  background-color: rgba(0,0,0,0.04) !important;
+}
+body.dark [data-content-theme] .sidebar button:hover {
+  background-color: rgba(255,255,255,0.04) !important;
+}
+
+.markdown-preview {
+  min-height: 100%;
+}
+
+[data-content-theme] .sidebar {
+  background-color: var(--preview-bg) !important;
+  border-right: 1px solid var(--theme-divider) !important;
+  backdrop-filter: none !important;
+}
+
+[data-content-theme] .sidebar-tabs {
+  background-color: transparent !important;
+}
+
+/* Editor Highlight Alignment */
+.cm-searchMatch {
+  background-color: rgba(255, 215, 0, 0.3);
+  border-radius: 1px;
+}
+
+.cm-searchMatch-selected {
+  background-color: var(--accent) !important;
+  color: white !important;
+}/* �T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T
+   ��������ϵͳ (Content Themes) - ����Ӿ�����?
+   �T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T */
+
+/* 1. �����ӹ��߼���ȫ��Ⱦɫ */
+[data-content-theme],
+[data-content-theme] body,
+[data-content-theme] #root,
+[data-content-theme] .app,
+[data-content-theme] .sidebar,
+[data-content-theme] .cm-editor,
+[data-content-theme] .cm-scroller,
+[data-content-theme] .cm-gutters,
+[data-content-theme] .status-bar,
+[data-content-theme] .markdown-preview,
+[data-content-theme] div[style*="flex: 1"],
+[data-content-theme] div[style*="overflow: auto"] {
+  background-color: var(--preview-bg) !important;
+  color: var(--preview-text) !important;
+  transition: all 0.3s var(--ease-out);
+}
+
+[data-content-theme] .markdown-preview {
+  font-family: var(--preview-font) !important;
+  background-color: transparent !important;
+}
+
+/* 2. ע�����������������Ű�Ԫ�� */
+
+/* ����Ⱦɫ������ */
+[data-content-theme] .markdown-preview h1,
+[data-content-theme] .markdown-preview h2,
+[data-content-theme] .markdown-preview h3,
+[data-content-theme] .markdown-preview h4,
+[data-content-theme] .markdown-preview h5,
+[data-content-theme] .markdown-preview h6,
+[data-content-theme] .cm-header,
+[data-content-theme] .cm-heading {
+  color: var(--theme-h-color, var(--preview-text)) !important;
+  font-family: var(--theme-h-font, var(--preview-font)) !important;
+}
+
+/* �������б� */
+[data-content-theme] .markdown-preview p,
+[data-content-theme] .markdown-preview li,
+[data-content-theme] .markdown-preview blockquote {
+  color: var(--preview-text) !important;
+  font-size: var(--theme-p-size, 16px) !important;
+}
+
+/* ������ URL */
+[data-content-theme] .markdown-preview a,
+[data-content-theme] .cm-link, 
+[data-content-theme] .cm-url,
+[data-content-theme] .cm-underline {
+  color: var(--theme-accent) !important;
+  text-decoration-color: var(--theme-accent) !important;
+}
+
+/* �Ӵ����� */
+[data-content-theme] .markdown-preview strong,
+[data-content-theme] .cm-strong {
+  color: var(--theme-strong, var(--preview-text)) !important;
+}
+
+/* 3. �����컯���ⶨ�� */
+
+/* --- 1. Github (���۸�����) --- */
+[data-content-theme="github"] {
+  --preview-bg: #fcfcfc; /* �����ң����ٴ��׷��� */
+  --preview-text: #24292e;
+  --preview-font: var(--font-ui);
+  --theme-divider: #e1e4e8;
+  --theme-accent: #2b5a91; /* �������ȵ�רҵ��ɫ */
+  --theme-strong: #1a1a1a;
+  --theme-h-color: #1f2328; /* ��ұ��⣬��������?*/
+}
+[data-content-theme="github"] .markdown-preview h1 { border-bottom: 1px solid #eaecef; }
+[data-content-theme="github"] .markdown-preview code { background: #f3f3f3; color: #24292e; }
+[data-content-theme="github"] .markdown-preview pre { background: #f6f8fa; border: 1px solid #dfe2e5; }
+
+/* --- 2. Whitey (������) --- */
+[data-content-theme="whitey"] {
+  --preview-bg: #fffbff;
+  --preview-text: #2c3e50;
+  --preview-font: "Inter", sans-serif;
+  --theme-divider: #f0eaf5;
+  --theme-accent: #8e44ad;
+  --theme-h-color: #6c3483;
+  --theme-strong: #1a0633;
+}
+
+/* --- 3. Newsprint (�����? --- */
+[data-content-theme="newsprint"] {
+  --preview-bg: #F4F1EA;
+  --preview-text: #4c4c4c;
+  --preview-font: "Georgia", serif;
+  --theme-divider: #E0DDD5;
+  --theme-accent: #d35400;
+  --theme-strong: #3e2723;
+  --theme-h-color: #5d4037;
+  --theme-p-size: 18px;
+}
+
+/* --- 4. Pixyll (ɭ����) --- */
+[data-content-theme="pixyll"] {
+  --preview-bg: #f9fdf9;
+  --preview-text: #2c3e50;
+  --preview-font: "Merriweather", serif;
+  --theme-divider: #eaf5ea;
+  --theme-accent: #27ae60;
+  --theme-h-color: #1b5e20;
+  --theme-strong: #0a2e0a;
+  --theme-p-size: 19px;
+}
+[data-content-theme="pixyll"] .markdown-preview { max-width: 740px !important; line-height: 2.0; }
+
+/* --- 5. Night (������Ԩ - �߼�����) --- */
+[data-content-theme="night"] {
+  --preview-bg: #0B0E14; 
+  --preview-text: #94A3B8;
+  --preview-font: var(--font-ui);
+  --theme-divider: #1E293B;
+  --theme-accent: #2DD4BF; /* ������ */
+  --theme-strong: #F8FAFC;
+  --theme-h-color: #F8FAFC;
+}
+
+[data-content-theme="night"] .app {
+  background: radial-gradient(circle at 50% -20%, #1E1B4B, #0B0E14 80%) !important;
+}
+
+[data-content-theme="night"] .markdown-preview h1,
+[data-content-theme="night"] .markdown-preview h2 {
+  text-shadow: 0 0 15px rgba(45, 212, 191, 0.1);
+  letter-spacing: -0.01em;
+}
+
+[data-content-theme="night"] .markdown-preview a {
+  text-shadow: 0 0 8px rgba(45, 212, 191, 0.3);
+  font-weight: 600;
+}
+
+[data-content-theme="night"] .markdown-preview code {
+  background: #1E293B;
+  color: #FB7185; /* õ������ */
+  border-radius: 4px;
+}
+
+[data-content-theme="night"] .markdown-preview pre {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid #1E293B;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+[data-content-theme="night"] .markdown-preview blockquote {
+  background: linear-gradient(90deg, rgba(45, 212, 191, 0.05), transparent);
+  border-left: 4px solid #2DD4BF;
+  color: #64748B;
+  font-style: italic;
+}
+
+[data-content-theme="night"] .markdown-preview hr {
+  border-top: 1px solid #1E293B;
+  opacity: 0.5;
+}
+
+
+/* 4. ͳһ�������?*/
+[data-content-theme] .status-bar { border-top: 1px solid var(--theme-divider) !important; }
+[data-content-theme] .sidebar { border-right: 1px solid var(--theme-divider) !important; backdrop-filter: none !important; }
+[data-content-theme] .sidebar button:hover { background-color: rgba(127,127,127,0.1) !important; }
+
+[data-content-theme] .sidebar {
+  background-color: var(--preview-bg) !important;
+  border-right: 1px solid var(--theme-divider) !important;
+  backdrop-filter: none !important;
+}
+
+[data-content-theme] .sidebar-tabs {
+  background-color: transparent !important;
+}
+
+/* Editor Highlight Alignment */
+.cm-searchMatch {
+  background-color: rgba(255, 215, 0, 0.3);
+  border-radius: 1px;
+}
+
+.cm-searchMatch-selected {
+  background-color: var(--accent) !important;
+  color: white !important;
+}
+
+/* �T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T
+   ��������ϵͳ (Content Themes) - ����Ӿ����?(ͳһ�޸���)
+   �T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T */
+
+/* 1. ���Ľӹ��߼���ȫ������ */
+[data-content-theme],
+[data-content-theme] body,
+[data-content-theme] #root,
+[data-content-theme] .app,
+[data-content-theme] .sidebar,
+[data-content-theme] .cm-editor,
+[data-content-theme] .cm-scroller,
+[data-content-theme] .cm-gutters,
+[data-content-theme] .status-bar,
+[data-content-theme] .markdown-preview,
+[data-content-theme] div[style*="flex: 1"],
+[data-content-theme] div[style*="overflow: auto"] {
+  background-color: var(--preview-bg) !important;
+  color: var(--preview-text) !important;
+  transition: background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1), color 0.4s ease;
+}
+
+[data-content-theme] .markdown-preview {
+  font-family: var(--preview-font) !important;
+  background-color: transparent !important;
+  line-height: var(--theme-line-height, 1.7);
+}
+
+[data-content-theme] .cm-content,
+[data-content-theme] .cm-line {
+  font-family: var(--preview-font) !important;
+}
+
+/* 2. Ԫ�ؼ��Ӿ����컯 */
+[data-content-theme] .markdown-preview h1,
+[data-content-theme] .markdown-preview h2,
+[data-content-theme] .markdown-preview h3,
+[data-content-theme] .cm-header,
+[data-content-theme] .cm-heading {
+  color: var(--theme-h-color, var(--preview-text)) !important;
+  font-family: var(--theme-h-font, var(--preview-font)) !important;
+  letter-spacing: var(--theme-h-spacing, normal);
+  font-weight: var(--theme-h-weight, 700);
+}
+
+[data-content-theme] .markdown-preview a,
+[data-content-theme] .cm-link, 
+[data-content-theme] .cm-url {
+  color: var(--theme-accent) !important;
+  text-decoration: var(--theme-link-deco, none);
+  text-underline-offset: 4px;
+}
+
+[data-content-theme] .markdown-preview strong,
+[data-content-theme] .cm-strong {
+  color: var(--theme-strong, var(--preview-text)) !important;
+}
+
+[data-content-theme] .markdown-preview code {
+  background: var(--theme-code-bg, rgba(0,0,0,0.05));
+  color: var(--theme-code-color, var(--theme-accent));
+  border-radius: 4px;
+}
+
+[data-content-theme] .markdown-preview pre {
+  border-radius: var(--theme-radius, 8px);
+  border: 1px solid var(--theme-divider);
+  background: var(--theme-pre-bg, var(--bg-surface));
+}
+
+/* 3. ����ϸ�ڶ��� */
+
+/* --- 1. Github (רҵ����) --- */
+[data-content-theme="github"] {
+  --preview-bg: #ffffff;
+  --preview-text: #1f2328;
+  --preview-font: 'Inter', -apple-system, sans-serif;
+  --theme-divider: #d0d7de;
+  --theme-accent: #0969da;
+  --theme-h-color: #1f2328;
+  --theme-code-bg: #afb8c133; --mac-shadow: 0 4px 12px rgba(0,0,0,0.08); --mac-border: #d0d7de;
+}
+[data-content-theme="github"] .markdown-preview h1,
+[data-content-theme="github"] .markdown-preview h2 { border-bottom: 1px solid #d0d7de; padding-bottom: 0.3em; }
+
+/* --- 2. Whitey (��������) --- */
+[data-content-theme="whitey"] {
+  --preview-bg: #ffffff;
+  --preview-text: #000000;
+  --preview-font: 'Inter', sans-serif;
+  --theme-h-font: 'Playfair Display', serif;
+  --theme-divider: #eeeeee;
+  --theme-accent: #e51400;
+  --theme-h-color: #000000;
+  --theme-h-weight: 800;
+  --theme-h-spacing: -0.02em;
+  --theme-link-deco: underline;
+  --theme-radius: 0; --mac-border: #000000; --mac-shadow: 4px 4px 0px rgba(0,0,0,0.1);
+}
+[data-content-theme="whitey"] .markdown-preview h1 { font-size: 3.5em; text-transform: lowercase; }
+[data-content-theme="whitey"] .markdown-preview h2 { border-top: 4px solid #000; padding-top: 0.5em; margin-top: 2em; }
+[data-content-theme="whitey"] .markdown-preview pre { border: 2px solid #000; background: #fff; }
+
+/* --- 3. Newsprint (��������) --- */
+[data-content-theme="newsprint"] {
+  --preview-bg: #f9f7f2;
+  --preview-text: #1a1a1a;
+  --preview-font: 'Lora', serif;
+  --theme-h-font: 'Playfair Display', serif;
+  --theme-divider: #e5e0d8;
+  --theme-accent: #3b5998;
+  --theme-h-color: #000000;
+  --theme-line-height: 1.85; --mac-bg: #1a1918; --mac-header-bg: #121110; --mac-border: #3b3936; --mac-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+}
+[data-content-theme="newsprint"] .markdown-preview h1 { border-bottom: 2px double #000; text-align: center; padding-bottom: 0.2em; }
+[data-content-theme="newsprint"] .markdown-preview blockquote { border: none; padding: 2em; text-align: center; font-style: italic; border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; background: rgba(0,0,0,0.01); }
+
+/* --- 4. Pixyll (�л�����) --- */
+[data-content-theme="pixyll"] {
+  --preview-bg: #f4f7f4;
+  --preview-text: #2d3436;
+  --preview-font: 'Quicksand', sans-serif;
+  --theme-h-font: 'Quicksand', sans-serif;
+  --theme-divider: #e0eadd;
+  --theme-accent: #00b894;
+  --theme-h-color: #00b894;
+  --theme-h-weight: 700;
+  --theme-radius: 16px;
+  --theme-line-height: 1.9; --mac-shadow: 0 10px 40px rgba(0, 184, 148, 0.1); --mac-border: rgba(0, 184, 148, 0.2);
+}
+[data-content-theme="pixyll"] .markdown-preview { max-width: 700px !important; }
+[data-content-theme="pixyll"] .markdown-preview h1 { text-align: center; margin-bottom: 2em; }
+[data-content-theme="pixyll"] .markdown-preview pre { background: #ffffff; box-shadow: 0 10px 30px rgba(0,0,0,0.03); border: none; }
+
+/* --- 5. Night (�����ǿ�) --- */
+[data-content-theme="night"] {
+  --preview-bg: #050505;
+  --preview-text: #94A3B8;
+  --preview-font: 'Inter', sans-serif;
+  --theme-h-font: 'Inter', sans-serif;
+  --theme-divider: #1e293b;
+  --theme-accent: #2dd4bf;
+  --theme-strong: #f8fafc;
+  --theme-h-color: #f8fafc;
+  --theme-pre-bg: rgba(15, 23, 42, 0.8); --mac-bg: #0a0e14; --mac-header-bg: #05070a; --mac-border: #1e293b; --mac-shadow: 0 0 25px rgba(45, 212, 191, 0.08);
+}
+[data-content-theme="night"] .app { background: radial-gradient(circle at 50% -20%, #1e1b4b, #050505 85%) !important; }
+[data-content-theme="night"] .markdown-preview h1 { text-shadow: 0 0 20px rgba(45, 212, 191, 0.2); }
+[data-content-theme="night"] .markdown-preview code { background: #1e293b; color: #fb7185; }
+
+/* 4. 统一组件适配 */
+[data-content-theme] .status-bar, 
+[data-content-theme] .typora-status-bar,
+[data-content-theme] .typora-status-bar-outer { 
+  background-color: var(--preview-bg) !important; 
+  border-top: none !important;
+}
+
+[data-content-theme] .foundation-editor-part {
+  border-top: 1px solid var(--theme-divider) !important;
+}
+
+[data-content-theme] .sidebar { 
+  border-right: 1px solid var(--theme-divider) !important; 
+  background-color: var(--preview-bg) !important; 
+  backdrop-filter: none !important; 
+}
+
+[data-content-theme] .foundation-sidebar,
+[data-content-theme] .foundation-left {
+  border-right: 1px solid var(--theme-divider) !important;
+}
+
+[data-content-theme] .sidebar button:hover { background-color: rgba(127,127,127,0.05) !important; }
+[data-content-theme] .notepad-search-container { background-color: var(--preview-bg) !important; border: 1px solid var(--theme-divider) !important; }
+
+/* Editor Highlight Alignment */
+.cm-searchMatch {
+  background-color: rgba(255, 215, 0, 0.3);
+  border-radius: 1px;
+}
+
+.cm-searchMatch-selected {
+  background-color: var(--accent) !important;
+  color: white !important;
+}
+/* ǿ��ʹ�� Mac Terminal (One Dark) �������?*/
+[data-content-theme] .markdown-preview pre {
+  background-color: #282c34 !important;
+  border: 1px solid rgba(0,0,0,0.2) !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15) !important;
+  border-radius: 10px !important;
+  padding: 46px 16px 16px !important;
+}
+[data-content-theme] .markdown-preview pre code {
+  color: #abb2bf !important;
+  background: transparent !important;
+}
+/* ==========================================================
+   �﷨����ϵͳ (One Dark / Mac Terminal)
+   ========================================================== */
+
+/* Mac Terminal ���������ṹ (�������������Ĭ�Ͻṹ) */
+[data-content-theme] .markdown-preview pre {
+  margin: 1.5em 0 !important;
+  padding: 40px 16px 16px !important;
+  border-radius: 10px !important;
+  overflow: auto;
+  position: relative;
+  /* ע��ÿ������΢�����ı������Ҳ�������˵� One Dark */
+  background-color: var(--mac-bg, #282c34) !important;
+  border: 1px solid var(--mac-border, rgba(0,0,0,0.2)) !important;
+  box-shadow: var(--mac-shadow, 0 10px 30px rgba(0,0,0,0.15)) !important;
+}
+
+[data-content-theme] .markdown-preview pre::before {
+  content: '';
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--mac-dot-close, #ff5f56);
+  box-shadow: 19px 0 0 var(--mac-dot-min, #ffbd2e), 38px 0 0 var(--mac-dot-max, #27c93f);
+  z-index: 2;
+}
+
+[data-content-theme] .markdown-preview pre::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 40px;
+  background: var(--mac-header-bg, #21252b);
+  border-bottom: 1px solid var(--mac-header-border, rgba(255,255,255,0.05));
+  z-index: 1;
+}
+
+[data-content-theme] .markdown-preview pre code {
+  display: block;
+  position: relative;
+  z-index: 3;
+  padding: 0 !important;
+  background: transparent !important;
+  color: var(--mac-text, #abb2bf) !important;
+  font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* Rehype Highlight.js - One Dark Theme Map */
+.hljs-keyword, .hljs-operator, .hljs-pattern-match { color: #c678dd; }
+.hljs-function, .hljs-title.function_ { color: #61afef; }
+.hljs-string, .hljs-meta .hljs-string { color: #98c379; }
+.hljs-number, .hljs-literal, .hljs-variable, .hljs-template-variable { color: #d19a66; }
+.hljs-type, .hljs-built_in, .hljs-title.class_ { color: #e5c07b; }
+.hljs-comment, .hljs-quote { color: #5c6370; font-style: italic; }
+.hljs-property, .hljs-attr { color: #e06c75; }
+.hljs-params, .hljs-title { color: #abb2bf; }
+.hljs-punctuation, .hljs-tag { color: #abb2bf; }

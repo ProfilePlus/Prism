@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prism Desktop Icon Lab v2 - Experimental Designs</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;700;800&family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background: #020202; 
+            color: #fff; 
+            background-image: 
+                radial-gradient(circle at 50% 0%, #111 0%, transparent 50%),
+                radial-gradient(circle at 100% 100%, #050505 0%, transparent 50%);
+        }
+        .icon-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
+            gap: 40px; 
+            padding: 60px; 
+        }
+        .icon-card { 
+            background: rgba(255,255,255,0.02); 
+            border: 1px solid rgba(255,255,255,0.05); 
+            border-radius: 32px; 
+            padding: 40px; 
+            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            backdrop-filter: blur(20px);
+        }
+        .icon-card:hover { 
+            background: rgba(255,255,255,0.05); 
+            border-color: rgba(255,255,255,0.15); 
+            transform: translateY(-12px);
+            box-shadow: 0 40px 80px rgba(0,0,0,0.6);
+        }
+        .icon-preview {
+            width: 140px;
+            height: 140px;
+            margin-bottom: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .tag {
+            font-family: 'Space Grotesk', monospace;
+            font-size: 10px;
+            letter-spacing: 2px;
+            padding: 4px 12px;
+            border-radius: 100px;
+            background: rgba(255,255,255,0.1);
+            color: rgba(255,255,255,0.6);
+            text-transform: uppercase;
+        }
+        .rainbow-blur {
+            filter: blur(20px);
+            opacity: 0.3;
+            transition: opacity 0.5s;
+        }
+        .icon-card:hover .rainbow-blur { opacity: 0.6; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        const IconSVG = ({ type }) => {
+            const icons = {
+                lightpath: (
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                        <path d="M10 50 H45" stroke="white" strokeWidth="0.8" strokeDasharray="2 1" />
+                        <path d="M45 50 L85 25 M45 50 L85 50 M45 50 L85 75" stroke="white" strokeWidth="0.5" opacity="0.3" />
+                        <path d="M45 30 L60 70 L30 70 Z" fill="none" stroke="white" strokeWidth="2" />
+                        <path d="M85 25 L95 20" stroke="#ff4d4d" strokeWidth="1.5" />
+                        <path d="M85 50 L95 50" stroke="#4dff4d" strokeWidth="1.5" />
+                        <path d="M85 75 L95 80" stroke="#4d4dff" strokeWidth="1.5" />
+                    </svg>
+                ),
+                abyss: (
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                        <defs>
+                            <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+                                <stop offset="0%" stopColor="#4facfe" stopOpacity="0.4" />
+                                <stop offset="100%" stopColor="#4facfe" stopOpacity="0" />
+                            </radialGradient>
+                        </defs>
+                        <circle cx="50%" cy="50%" r="40%" fill="url(#glow)" />
+                        <path d="M50 20 L80 70 H20 Z" fill="#000" stroke="#4facfe" strokeWidth="1.5" />
+                        <path d="M50 20 L50 70" stroke="#4facfe" strokeWidth="0.5" opacity="0.5" />
+                        <circle cx="50" cy="45" r="2" fill="white shadow-lg" />
+                    </svg>
+                ),
+                slice: (
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                        {[0, 1, 2].map(i => (
+                            <path key={i} d={`M${25+i*5} ${60-i*10} L${75-i*5} ${60-i*10} L${50} ${20-i*5} Z`} 
+                                fill="none" stroke={`hsl(${200 + i*40}, 80%, 60%)`} strokeWidth="2" opacity={1 - i*0.3} />
+                        ))}
+                    </svg>
+                ),
+                blueprint: (
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                        <rect x="10" y="10" width="80" height="80" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="0.5" />
+                        <path d="M50 15 L85 75 H15 Z" fill="none" stroke="#60a5fa" strokeWidth="1" />
+                        <circle cx="50" cy="15" r="3" fill="none" stroke="#60a5fa" strokeWidth="0.5" />
+                        <path d="M50 5 V95 M5 50 H95" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
+                        <text x="55" y="25" fill="#60a5fa" fontSize="6" fontFamily="monospace">60°</text>
+                    </svg>
+                ),
+                aperture: (
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                        <defs>
+                            <linearGradient id="arcG" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stopColor="#fff" />
+                                <stop offset="100%" stopColor="rgba(255,255,255,0.1)" />
+                            </linearGradient>
+                        </defs>
+                        {[0, 60, 120, 180, 240, 300].map(deg => (
+                            <path key={deg} d="M50 50 L50 20 L70 35 Z" transform={`rotate(${deg} 50 50)`} fill="none" stroke="url(#arcG)" strokeWidth="1" />
+                        ))}
+                        <circle cx="50" cy="50" r="10" fill="white" opacity="0.1" />
+                    </svg>
+                ),
+                shattered: (
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                        <path d="M50 30 L60 50 L40 50 Z" fill="white" />
+                        <path d="M20 20 L35 45 L15 50 Z" fill="#ff4d4d" opacity="0.6" />
+                        <path d="M80 30 L65 40 L85 55 Z" fill="#4d4dff" opacity="0.6" />
+                        <path d="M50 85 L60 70 L40 70 Z" fill="#4dff4d" opacity="0.6" />
+                        <circle cx="50" cy="50" r="1" fill="white" />
+                    </svg>
+                ),
+                bauhaus: (
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                        <rect x="20" y="20" width="60" height="60" fill="#ffeb3b" />
+                        <circle cx="50" cy="50" r="30" fill="#f44336" style={{mixBlendMode: 'multiply'}} />
+                        <path d="M50 20 L80 80 H20 Z" fill="#2196f3" style={{mixBlendMode: 'screen'}} />
+                    </svg>
+                ),
+                chrome: (
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                        <defs>
+                            <linearGradient id="metG" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#fff" />
+                                <stop offset="50%" stopColor="#888" />
+                                <stop offset="100%" stopColor="#333" />
+                            </linearGradient>
+                        </defs>
+                        <path d="M50 15 L90 85 H10 Z" fill="url(#metG)" stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" />
+                        <path d="M50 15 L50 85" stroke="rgba(255,255,255,0.3)" strokeWidth="2" />
+                        <circle cx="50" cy="50" r="30" fill="none" stroke="white" strokeWidth="0.5" opacity="0.1" />
+                    </svg>
+                ),
+                etched: (
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                        <rect x="15" y="15" width="70" height="70" rx="12" fill="#111" stroke="#333" strokeWidth="4" />
+                        <path d="M35 70 L50 30 L65 70" fill="none" stroke="#222" strokeWidth="8" strokeLinecap="square" />
+                        <path d="M35 70 L50 30 L65 70" fill="none" stroke="white" strokeWidth="1.2" opacity="0.8" />
+                    </svg>
+                ),
+                diffuse: (
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                        <circle cx="40" cy="40" r="25" fill="#ff6b6b" filter="blur(15px)" opacity="0.6" />
+                        <circle cx="60" cy="50" r="25" fill="#48dbfb" filter="blur(15px)" opacity="0.6" />
+                        <circle cx="50" cy="65" r="25" fill="#1dd1a1" filter="blur(15px)" opacity="0.6" />
+                        <path d="M50 35 L65 65 H35 Z" fill="white" opacity="0.9" />
+                    </svg>
+                )
+            };
+            return icons[type] || icons.lightpath;
+        };
+
+        const App = () => {
+            const designs = [
+                { id: 'lightpath', name: 'Light Path', desc: '物理色散轨迹', tag: 'Scientific', note: '还原三棱镜色散的经典物理模型，用虚实线条构建极高精密感。' },
+                { id: 'abyss', name: 'Abyss Core', desc: '幽邃之核', tag: 'Pro', note: '深色环境中的幽蓝微光，象征 Markdown 深度创作时的专注力。' },
+                { id: 'slice', name: 'Holo Slices', desc: '全息横切', tag: 'Layered', note: '将棱镜拆解为发光的色彩切片，强调文档的结构化层级。' },
+                { id: 'blueprint', name: 'Technical Blueprint', desc: '精密蓝图', tag: 'Logic', note: '用工程标注与坐标轴重新定义图标，展现极致的理性美感。' },
+                { id: 'aperture', name: 'Segment Iris', desc: '分瓣光圈', tag: 'Capture', note: '由棱镜叶片组成的机械结构，象征对文字灵感的精确捕捉。' },
+                { id: 'shattered', name: 'Shattered Light', desc: '碎裂光谱', tag: 'Energy', note: '爆发式的几何碎片，展现创作灵感涌现时的动态张力。' },
+                { id: 'bauhaus', name: 'Bauhaus Experiment', desc: '包豪斯构成', tag: 'Art', note: '红黄蓝三原色的重叠实验，回归现代主义设计的几何起点。' },
+                { id: 'chrome', name: 'Chrome Monolith', desc: '液态铬金属', tag: 'Liquid', note: '高反光的液态金属质感，赋予图标物理上的厚重感与高端调性。' },
+                { id: 'etched', name: 'Etched Steel', desc: '精钢蚀刻', tag: 'Industrial', note: '在深色喷砂金属板上蚀刻出极细的品牌轮廓，追求工业级的可靠感。' },
+                { id: 'diffuse', name: 'Cloud Diffusion', desc: '柔光晕影', tag: 'Organic', note: '模糊色彩边界的有机形态，为数字创作环境带来温柔的呼吸感。' }
+            ];
+
+            return (
+                <div className="min-h-screen pb-32">
+                    {/* Header */}
+                    <header className="px-16 pt-24 pb-16">
+                        <div className="flex items-center gap-4 mb-4">
+                            <span className="w-12 h-0.5 bg-white"></span>
+                            <span className="text-xs uppercase tracking-[0.5em] font-light">Prism Icon Exploration</span>
+                        </div>
+                        <h1 className="text-7xl font-bold tracking-tighter mb-6">
+                            LAB <span className="text-zinc-700 font-extralight italic">v2.0</span>
+                        </h1>
+                        <p className="text-zinc-500 text-lg max-w-2xl leading-relaxed font-light">
+                            第二轮设计推演：跳出通用图形，转向更深层的物理叙事、几何构图与艺术风格。
+                        </p>
+                    </header>
+
+                    {/* Grid */}
+                    <div className="icon-grid">
+                        {designs.map(item => (
+                            <div key={item.id} className="icon-card group">
+                                <div className="flex justify-between items-start mb-10">
+                                    <div className="tag">{item.tag}</div>
+                                    <div className="text-[10px] text-zinc-700 font-mono">00{designs.indexOf(item)+1}</div>
+                                </div>
+                                <div className="icon-preview group-hover:scale-110 transition-transform duration-700">
+                                    <IconSVG type={item.id} />
+                                </div>
+                                <h3 className="text-2xl font-bold mb-2 tracking-tight group-hover:text-blue-400 transition-colors">{item.name}</h3>
+                                <p className="text-sm text-zinc-500 mb-8 font-light">{item.desc}</p>
+                                <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/5 text-xs text-zinc-400 leading-relaxed min-h-[80px]">
+                                    {item.note}
+                                </div>
+                                
+                                {/* Shortcut Mock */}
+                                <div className="mt-10 pt-10 border-t border-white/5 flex flex-col items-center opacity-30 group-hover:opacity-100 transition-all duration-500">
+                                    <div className="w-16 h-16 p-3 bg-zinc-900 rounded-[22%] border border-white/10 shadow-inner flex items-center justify-center overflow-hidden">
+                                        <div className="w-full h-full"><IconSVG type={item.id} /></div>
+                                    </div>
+                                    <span className="mt-3 text-[10px] text-zinc-500 font-medium">PRISM</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Final CTA */}
+                    <div className="px-16 mt-20 text-center">
+                        <div className="text-zinc-600 text-sm font-light mb-8">
+                            “ 如果光无法通过，我们就切割黑暗。 ”
+                        </div>
+                        <button className="px-10 py-4 rounded-full border border-white/10 hover:bg-white hover:text-black transition-all text-sm font-bold tracking-widest">
+                            COLLECT SVGS
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prism Product Feature Demo - High Fidelity</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; background: #000; color: #fff; font-family: 'Plus Jakarta Sans', sans-serif; overflow: hidden; }
+        .canvas { width: 1920px; height: 1080px; position: relative; overflow: hidden; background: #050505; }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.02);
+            backdrop-filter: blur(40px) saturate(150%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+            box-shadow: 0 40px 100px rgba(0,0,0,0.5);
+        }
+
+        .code-block {
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 2px;
+            height: 24px;
+            background: #3b82f6;
+            margin-left: 2px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- 动画辅助函数 ---
+        const interpolate = (val, start, end, from, to) => {
+            if (val < start) return from;
+            if (val > end) return to;
+            const p = (val - start) / (end - start);
+            return from + (to - from) * p;
+        };
+
+        const useTime = () => {
+            const [time, setTime] = useState(0);
+            useEffect(() => {
+                let start = performance.now();
+                const frame = (now) => {
+                    setTime((now - start) / 1000);
+                    requestAnimationFrame(frame);
+                };
+                requestAnimationFrame(frame);
+                window.__ready = true;
+            }, []);
+            return time;
+        };
+
+        // --- 1. 开场折射图标 ---
+        const RefractionIntro = ({ t }) => {
+            const opacity = interpolate(t, 2.5, 3.5, 1, 0);
+            const scale = interpolate(t, 0, 2.5, 3, 2.5);
+            if (t > 4) return null;
+
+            return (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity, zIndex: 100 }}>
+                    <div style={{ transform: `scale(${scale})` }}>
+                        <svg width="120" height="120" viewBox="0 0 100 100" fill="none">
+                            <g stroke="white" strokeWidth="1.2" strokeLinecap="round">
+                                {[0, 60, 120, 180, 240, 300].map(deg => (
+                                    <path key={deg} d="M50 50 L50 20 L70 35 Z" transform={`rotate(${deg} 50 50)`} 
+                                          style={{ strokeDasharray: 100, strokeDashoffset: interpolate(t, 0.5, 2, 100, 0) }} />
+                                ))}
+                            </g>
+                        </svg>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- 2. 主界面组件 ---
+        const AppWindow = ({ t }) => {
+            const y = interpolate(t, 3, 4.5, 1200, 100);
+            const opacity = interpolate(t, 3, 4, 0, 1);
+            const sidebarWidth = interpolate(t, 12, 13.5, 0, 320);
+
+            return (
+                <div style={{ position: 'absolute', left: 160, right: 160, top: y, height: 800, opacity }} className="glass-panel overflow-hidden flex">
+                    {/* 侧边栏 */}
+                    <div style={{ width: sidebarWidth, borderRight: '1px solid rgba(255,255,255,0.08)', opacity: interpolate(t, 12, 12.5, 0, 1) }} className="p-8 shrink-0">
+                        <div className="text-zinc-500 text-[10px] font-bold tracking-widest mb-8">DOCUMENT TREE</div>
+                        {[1, 2, 3, 4].map(i => (
+                            <div key={i} className="flex items-center gap-3 mb-6">
+                                <div className="w-1.5 h-1.5 rounded-full bg-zinc-600" />
+                                <div className="h-3 bg-zinc-800 rounded" style={{ width: i === 2 ? 160 : 120 }} />
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* 编辑区 */}
+                    <div className="flex-1 p-16 relative">
+                        {/* 修正后的图标位置：左上角控制区 */}
+                        <div style={{ position: 'absolute', top: 24, left: 24, opacity: 0.4 }}>
+                             <svg width="24" height="24" viewBox="0 0 100 100"><g stroke="white" strokeWidth="4"><path d="M50 50 L50 20 L70 35 Z" transform="rotate(0 50 50)" /><path d="M50 50 L50 20 L70 35 Z" transform="rotate(120 50 50)" /><path d="M50 50 L50 20 L70 35 Z" transform="rotate(240 50 50)" /></g></svg>
+                        </div>
+
+                        {/* 功能演示：打字机效果 */}
+                        <div className="max-w-3xl mx-auto mt-12">
+                            <h2 className="text-4xl font-bold mb-8">
+                                {t > 5 ? "Writing should be transparent." : ""}
+                            </h2>
+                            <div className="text-2xl text-zinc-400 leading-relaxed">
+                                <p className="mb-8">
+                                    {t > 7 ? "With Prism, the boundary between your " : ""}
+                                    {t > 8 ? <span className="text-blue-400 font-bold italic">thought</span> : ""}
+                                    {t > 9 ? " and the screen disappears." : ""}
+                                </p>
+                                
+                                {t > 15 && (
+                                    <div className="code-block" style={{ opacity: interpolate(t, 15, 16, 0, 1), transform: `scale(${interpolate(t, 15, 16, 0.95, 1)})` }}>
+                                        <div className="text-blue-300"># Welcome to the future of Markdown</div>
+                                        <div className="text-zinc-500 mt-2">Prism captures every stroke with precision...</div>
+                                    </div>
+                                )}
+                            </div>
+                            {/* 光标 */}
+                            {t > 4.5 && t < 22 && <div className="cursor animate-pulse" />}
+                        </div>
+
+                        {/* 专注模式覆盖层 */}
+                        <div style={{
+                            position: 'absolute', inset: 0, background: '#000',
+                            opacity: interpolate(t, 18, 20, 0, 0.85),
+                            pointerEvents: 'none'
+                        }} />
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const t = useTime();
+
+            return (
+                <div className="canvas">
+                    {/* 动态背景背景 */}
+                    <div style={{ position: 'absolute', inset: 0, opacity: 0.3 }}>
+                        <div style={{ 
+                            position: 'absolute', top: '50%', left: '50%', 
+                            width: 1200, height: 1200, 
+                            background: 'radial-gradient(circle, #1e3a8a 0%, transparent 70%)',
+                            transform: `translate(-50%, -50%) scale(${interpolate(t, 0, 25, 0.8, 1.2)})`,
+                            filter: 'blur(100px)'
+                        }} />
+                    </div>
+
+                    <RefractionIntro t={t} />
+                    <AppWindow t={t} />
+
+                    {/* 功能标签提示 */}
+                    <div style={{
+                        position: 'absolute', left: '50%', bottom: 100, transform: 'translateX(-50%)',
+                        opacity: interpolate(t, 5, 22, 1, 0)
+                    }}>
+                        <div className="flex gap-12 text-sm font-bold tracking-[0.3em] text-zinc-600">
+                            <span style={{ color: (t > 4 && t < 12) ? '#fff' : '' }}>WRITING</span>
+                            <span style={{ color: (t >= 12 && t < 18) ? '#fff' : '' }}>STRUCTURE</span>
+                            <span style={{ color: (t >= 18) ? '#fff' : '' }}>FOCUS</span>
+                        </div>
+                    </div>
+
+                    {/* 品牌定格 */}
+                    <div style={{
+                        position: 'absolute', inset: 0, background: '#000',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                        opacity: interpolate(t, 23, 24.5, 0, 1),
+                        pointerEvents: 'none', zIndex: 200
+                    }}>
+                        <svg width="80" height="80" viewBox="0 0 100 100" fill="none">
+                            <g stroke="white" strokeWidth="2"><path d="M50 50 L50 20 L70 35 Z" transform="rotate(0 50 50)" /><path d="M50 50 L50 20 L70 35 Z" transform="rotate(120 50 50)" /><path d="M50 50 L50 20 L70 35 Z" transform="rotate(240 50 50)" /></g>
+                        </svg>
+                        <h1 className="mt-8 text-4xl font-bold tracking-[0.5em]">PRISM</h1>
+                        <p className="mt-4 text-zinc-500 font-light italic">Focused Writing Experience.</p>
+                    </div>
+
+                    <div style={{ position: 'absolute', bottom: 48, right: 64, fontSize: 12, color: 'rgba(255,255,255,0.1)', letterSpacing: '0.2em' }}>CREATED BY HUASHU-DESIGN</div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

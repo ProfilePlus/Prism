@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prism 图标设计方案</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 60px 40px;
+            color: #fff;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .header h1 {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            letter-spacing: -0.02em;
+        }
+
+        .header p {
+            font-size: 18px;
+            opacity: 0.9;
+            font-weight: 400;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 32px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            cursor: pointer;
+        }
+
+        .card:hover {
+            transform: translateY(-8px);
+            background: rgba(255, 255, 255, 0.16);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .card.selected {
+            background: rgba(255, 255, 255, 0.22);
+            border-color: rgba(255, 255, 255, 0.4);
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+        }
+
+        .icon-container {
+            width: 160px;
+            height: 160px;
+            margin: 0 auto 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            position: relative;
+        }
+
+        .card-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+
+        .card-desc {
+            font-size: 15px;
+            opacity: 0.85;
+            line-height: 1.6;
+            text-align: center;
+        }
+
+        .checkmark {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            width: 32px;
+            height: 32px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .card.selected .checkmark {
+            opacity: 1;
+            background: #10b981;
+        }
+
+        /* 图标 SVG 样式 */
+        .icon-svg {
+            width: 120px;
+            height: 120px;
+        }
+
+        /* 方案 1: 棱镜光谱 */
+        .prism-spectrum {
+            width: 0;
+            height: 0;
+            border-left: 60px solid transparent;
+            border-right: 60px solid transparent;
+            border-bottom: 100px solid #fff;
+            position: relative;
+            filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.2));
+        }
+
+        .prism-spectrum::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: -40px;
+            width: 80px;
+            height: 4px;
+            background: linear-gradient(90deg,
+                #ef4444 0%,
+                #f59e0b 20%,
+                #eab308 40%,
+                #22c55e 60%,
+                #3b82f6 80%,
+                #8b5cf6 100%
+            );
+            border-radius: 2px;
+        }
+
+        /* 方案 2: 文档折叠 */
+        .doc-fold {
+            width: 90px;
+            height: 110px;
+            background: linear-gradient(135deg, #fff 0%, #e5e7eb 100%);
+            border-radius: 8px;
+            position: relative;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        .doc-fold::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 0;
+            height: 0;
+            border-left: 24px solid transparent;
+            border-top: 24px solid #3b82f6;
+            border-top-right-radius: 8px;
+        }
+
+        .doc-fold::after {
+            content: '';
+            position: absolute;
+            top: 30px;
+            left: 15px;
+            right: 15px;
+            height: 3px;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            border-radius: 2px;
+            box-shadow:
+                0 12px 0 #d1d5db,
+                0 24px 0 #d1d5db,
+                0 36px 0 #d1d5db;
+        }
+
+        /* 方案 3: 几何 M */
+        .geometric-m {
+            font-size: 96px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-family: 'Segoe UI', sans-serif;
+            letter-spacing: -0.05em;
+            filter: drop-shadow(0 4px 12px rgba(59, 130, 246, 0.4));
+        }
+
+        /* 方案 4: 窗口层叠 */
+        .window-stack {
+            position: relative;
+            width: 100px;
+            height: 100px;
+        }
+
+        .window-layer {
+            position: absolute;
+            width: 80px;
+            height: 60px;
+            background: linear-gradient(135deg, #fff 0%, #f3f4f6 100%);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .window-layer:nth-child(1) {
+            top: 0;
+            left: 0;
+            z-index: 3;
+            border-top: 20px solid #3b82f6;
+        }
+
+        .window-layer:nth-child(2) {
+            top: 15px;
+            left: 10px;
+            z-index: 2;
+            opacity: 0.7;
+            border-top: 20px solid #8b5cf6;
+        }
+
+        .window-layer:nth-child(3) {
+            top: 30px;
+            left: 20px;
+            z-index: 1;
+            opacity: 0.4;
+            border-top: 20px solid #ec4899;
+        }
+
+        /* 方案 5: 抽象光束 */
+        .light-beam {
+            position: relative;
+            width: 100px;
+            height: 100px;
+        }
+
+        .beam {
+            position: absolute;
+            width: 4px;
+            height: 80px;
+            background: linear-gradient(180deg, transparent 0%, #fff 50%, transparent 100%);
+            border-radius: 2px;
+            transform-origin: bottom center;
+        }
+
+        .beam:nth-child(1) {
+            left: 20px;
+            bottom: 10px;
+            transform: rotate(-30deg);
+            background: linear-gradient(180deg, transparent 0%, #3b82f6 50%, transparent 100%);
+        }
+
+        .beam:nth-child(2) {
+            left: 48px;
+            bottom: 10px;
+            background: linear-gradient(180deg, transparent 0%, #8b5cf6 50%, transparent 100%);
+        }
+
+        .beam:nth-child(3) {
+            left: 76px;
+            bottom: 10px;
+            transform: rotate(30deg);
+            background: linear-gradient(180deg, transparent 0%, #ec4899 50%, transparent 100%);
+        }
+
+        .beam-base {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 12px;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
+            border-radius: 6px;
+            box-shadow: 0 4px 16px rgba(139, 92, 246, 0.5);
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 40px 20px;
+            }
+
+            .header h1 {
+                font-size: 36px;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Prism 图标设计方案</h1>
+        <p>点击选择你喜欢的方案</p>
+    </div>
+
+    <div class="grid">
+        <!-- 方案 1: 棱镜光谱 -->
+        <div class="card" data-concept="1">
+            <div class="checkmark">✓</div>
+            <div class="icon-container">
+                <div class="prism-spectrum"></div>
+            </div>
+            <div class="card-title">棱镜光谱</div>
+            <div class="card-desc">
+                经典的三角棱镜造型，顶部发散出彩虹光谱。直接呼应 Prism 名称，象征将 Markdown 文本转化为多彩的视觉呈现。
+            </div>
+        </div>
+
+        <!-- 方案 2: 文档折叠 -->
+        <div class="card" data-concept="2">
+            <div class="checkmark">✓</div>
+            <div class="icon-container">
+                <div class="doc-fold"></div>
+            </div>
+            <div class="card-title">文档折叠</div>
+            <div class="card-desc">
+                白色文档页面，右上角蓝色折角，内部渐变线条暗示 Markdown 内容。简洁专业，强调编辑器本质。
+            </div>
+        </div>
+
+        <!-- 方案 3: 几何 M -->
+        <div class="card" data-concept="3">
+            <div class="checkmark">✓</div>
+            <div class="icon-container">
+                <div class="geometric-m">M</div>
+            </div>
+            <div class="card-title">几何 M</div>
+            <div class="card-desc">
+                超粗字重的字母 M（Markdown 首字母），蓝紫渐变填充。现代、大胆、易识别，适合品牌化。
+            </div>
+        </div>
+
+        <!-- 方案 4: 窗口层叠 -->
+        <div class="card" data-concept="4">
+            <div class="checkmark">✓</div>
+            <div class="icon-container">
+                <div class="window-stack">
+                    <div class="window-layer"></div>
+                    <div class="window-layer"></div>
+                    <div class="window-layer"></div>
+                </div>
+            </div>
+            <div class="card-title">窗口层叠</div>
+            <div class="card-desc">
+                三个渐变色窗口层叠，呼应 Windows 11 Fluent Design 和编辑器的多视图模式（编辑/分栏/预览）。
+            </div>
+        </div>
+
+        <!-- 方案 5: 抽象光束 -->
+        <div class="card" data-concept="5">
+            <div class="checkmark">✓</div>
+            <div class="icon-container">
+                <div class="light-beam">
+                    <div class="beam"></div>
+                    <div class="beam"></div>
+                    <div class="beam"></div>
+                    <div class="beam-base"></div>
+                </div>
+            </div>
+            <div class="card-title">抽象光束</div>
+            <div class="card-desc">
+                三束渐变光线从底座发散，抽象表达"棱镜分光"概念。现代、动感、科技感强。
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const cards = document.querySelectorAll('.card');
+        let selectedConcept = null;
+
+        cards.forEach(card => {
+            card.addEventListener('click', () => {
+                // 移除之前的选中状态
+                cards.forEach(c => c.classList.remove('selected'));
+
+                // 添加当前选中状态
+                card.classList.add('selected');
+                selectedConcept = card.dataset.concept;
+
+                console.log('已选择方案:', selectedConcept);
+            });
+        });
+    </script>
+</body>
+</html>

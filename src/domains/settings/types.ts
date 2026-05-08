@@ -1,5 +1,15 @@
+export type AppearanceMode = 'light' | 'dark';
+
+export type ContentTheme = 
+  | 'github' 
+  | 'whitey' 
+  | 'newsprint' 
+  | 'pixyll' 
+  | 'night';
+
 export interface SettingsState {
-  theme: 'light' | 'dark';
+  theme: AppearanceMode;
+  contentTheme: ContentTheme;
   fontSize: number;
   editorFontFamily: string;
   autoSaveInterval: number;
@@ -13,6 +23,7 @@ export interface SettingsState {
 
 export const DEFAULT_SETTINGS: SettingsState = {
   theme: 'light',
+  contentTheme: 'github',
   fontSize: 16,
   editorFontFamily: 'Cascadia Code, Consolas, monospace',
   autoSaveInterval: 2000,

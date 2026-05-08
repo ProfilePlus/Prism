@@ -8,14 +8,18 @@ describe('StatusBar', () => {
       <StatusBar
         viewMode="split"
         wordCount={128}
-        cursor={{ line: 12, column: 8 }}
-        theme="dark"
+        cursor={{ line: 1, column: 1 }}
+        sidebarVisible={true}
+        isSidebarHovered={false}
       />
     );
 
-    expect(screen.getByText('分栏')).toBeInTheDocument();
-    expect(screen.getByText('128 字')).toBeInTheDocument();
-    expect(screen.getByText('Ln 12, Col 8')).toBeInTheDocument();
-    expect(screen.getByText('深色')).toBeInTheDocument();
+    expect(screen.getByTitle('分栏')).toHaveClass('is-active');
+    expect(screen.getByText('128')).toBeInTheDocument();
+    expect(screen.getByText('词')).toBeInTheDocument();
+    expect(screen.getByText('LN')).toBeInTheDocument();
+    expect(screen.getByText('COL')).toBeInTheDocument();
+    expect(screen.getByTitle('新建文件')).toBeInTheDocument();
+    expect(screen.getByTitle('切换到文档列表')).toBeInTheDocument();
   });
 });

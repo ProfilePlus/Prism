@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prism Taskbar Icon Optimization - 5 Proposals</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background: #0f1115; 
+            color: #fff;
+        }
+        .taskbar-mockup {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            height: 48px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            border-top: 1px solid rgba(0,0,0,0.1);
+        }
+        .icon-card {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 24px;
+            transition: all 0.3s ease;
+        }
+        .icon-card:hover {
+            background: rgba(255,255,255,0.06);
+            transform: translateY(-4px);
+        }
+        .proposal-tag {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            letter-spacing: 1px;
+            background: #3b82f6;
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        const IconSVG = ({ type, size = "100%" }) => {
+            const icons = {
+                // 1. 块状对比：将 Segment Iris 实心化，极大增强可读性
+                solid_core: (
+                    <svg viewBox="0 0 100 100" width={size} height={size} fill="none">
+                        <rect x="0" y="0" width="100" height="100" rx="22" fill="#111" />
+                        <path d="M50 20 L75 35 L75 65 L50 80 L25 65 L25 35 Z" fill="#fff" />
+                        <path d="M50 20 L50 80 M75 35 L25 65 M75 65 L25 35" stroke="#111" strokeWidth="3" opacity="0.8" />
+                    </svg>
+                ),
+                // 2. 炫彩背板：利用亮色渐变背板烘托白色符号
+                vibrant_spectrum: (
+                    <svg viewBox="0 0 100 100" width={size} height={size} fill="none">
+                        <defs>
+                            <linearGradient id="g2" x1="0" y1="0" x2="100" y2="100">
+                                <stop offset="0%" stopColor="#4facfe" />
+                                <stop offset="100%" stopColor="#8e2de2" />
+                            </linearGradient>
+                        </defs>
+                        <rect x="0" y="0" width="100" height="100" rx="22" fill="url(#g2)" />
+                        <g stroke="#fff" strokeWidth="6" strokeLinecap="round">
+                            <path d="M50 30 L65 40 L65 60 L50 70 L35 60 L35 40 Z" />
+                            <circle cx="50" cy="50" r="4" fill="#fff" />
+                        </g>
+                    </svg>
+                ),
+                // 3. 霓虹光效：加粗线条并添加外发光，模拟灯管效果
+                neon_heavy: (
+                    <svg viewBox="0 0 100 100" width={size} height={size} fill="none">
+                        <rect x="0" y="0" width="100" height="100" rx="22" fill="#000" />
+                        <circle cx="50" cy="50" r="30" stroke="#00f2fe" strokeWidth="8" opacity="0.2" filter="blur(4px)" />
+                        <g stroke="#00f2fe" strokeWidth="4" strokeLinecap="round">
+                            <path d="M50 25 L75 40 V60 L50 75 L25 60 V40 Z" />
+                            <path d="M50 50 L50 25" strokeWidth="2" opacity="0.6" />
+                        </g>
+                        <circle cx="50" cy="50" r="2" fill="#fff" />
+                    </svg>
+                ),
+                // 4. 三维折射：利用色块深度表现「棱镜」感，高对比度灰阶
+                faceted_gem: (
+                    <svg viewBox="0 0 100 100" width={size} height={size} fill="none">
+                        <rect x="0" y="0" width="100" height="100" rx="22" fill="#1a1a1a" />
+                        <path d="M50 20 L80 35 L50 50 Z" fill="#eee" />
+                        <path d="M50 20 L20 35 L50 50 Z" fill="#ccc" />
+                        <path d="M20 35 L50 50 L50 80 L20 65 Z" fill="#999" />
+                        <path d="M80 35 L50 50 L50 80 L80 65 Z" fill="#666" />
+                    </svg>
+                ),
+                // 5. 极致符号：取消背板限制，使用超粗白色线条及品牌红点
+                pure_symbol: (
+                    <svg viewBox="0 0 100 100" width={size} height={size} fill="none">
+                        <path d="M50 10 L85 75 H15 Z" stroke="#fff" strokeWidth="8" strokeLinejoin="round" />
+                        <path d="M50 45 L65 75 M50 45 L35 75" stroke="#fff" strokeWidth="4" opacity="0.6" />
+                        <circle cx="50" cy="35" r="6" fill="#E60012" />
+                    </svg>
+                )
+            };
+            return icons[type] || icons.solid_core;
+        };
+
+        const App = () => {
+            const proposals = [
+                { id: 'solid_core', name: 'Solid Core', desc: '实心增强', note: '将原有的细线结构实心化。在小尺寸下展现极强的黑白对比，即使模糊处理也能一眼看出六边形轮廓。' },
+                { id: 'vibrant_spectrum', name: 'Vibrant Spectrum', desc: '炫彩底座', note: '采用蓝紫亮色渐变背板。白色符号作为镂空浮现，利用大面积色块吸引视线。' },
+                { id: 'neon_heavy', name: 'Neon Heavy', desc: '霓虹重影', note: '保留原有的科技感，但将线条粗细提升 4 倍，并增加微弱的外发光，模拟 Windows 11 的发光材质。' },
+                { id: 'faceted_gem', name: 'Faceted Gem', desc: '折射切面', note: '利用四个深浅不同的灰阶色块模拟三棱镜的物理体积。通过明度差异建立边缘，无需线条即可识别图形。' },
+                { id: 'pure_symbol', name: 'Bold Minimalist', desc: '极限极简', note: '抛弃复杂的折射逻辑，回归大线重笔触的几何符号。醒目的红点作为品牌视觉锚点。' }
+            ];
+
+            return (
+                <div className="min-h-screen pb-20">
+                    <header className="p-10 text-center bg-zinc-900 border-b border-white/5 mb-10">
+                        <h1 className="text-3xl font-extrabold tracking-tighter mb-2 italic">PRISM <span className="text-blue-500">TASKBAR OPTIMIZATION</span></h1>
+                        <p className="text-zinc-500 text-sm max-w-2xl mx-auto">
+                            针对 Windows 任务栏（32px）显示环境专项优化的 5 组方案。重点解决了原方案线条过细、对比度不足的问题。
+                        </p>
+                    </header>
+
+                    <div className="px-10 space-y-12">
+                        {proposals.map((p, idx) => (
+                            <div key={p.id} className="icon-card p-8 flex flex-col md:flex-row gap-10 items-center">
+                                {/* 设计细节展示 */}
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <span className="proposal-tag">PROPOSAL 0{idx+1}</span>
+                                        <h3 className="text-xl font-bold text-white">{p.name}</h3>
+                                    </div>
+                                    <p className="text-zinc-400 text-sm leading-relaxed mb-6">"{p.note}"</p>
+                                    <div className="bg-black/20 rounded-xl p-4 font-mono text-[11px] text-zinc-500">
+                                        Optimization: {p.desc}
+                                    </div>
+                                </div>
+
+                                {/* 预览对比 */}
+                                <div className="flex flex-col items-center gap-6 bg-black/40 p-10 rounded-3xl border border-white/5">
+                                    <div className="text-[10px] text-zinc-500 uppercase tracking-widest mb-2">High-Res Detail</div>
+                                    <div className="w-24 h-24">
+                                        <IconSVG type={p.id} />
+                                    </div>
+                                    
+                                    <div className="w-full mt-4">
+                                        <div className="text-[10px] text-zinc-500 uppercase tracking-widest mb-4 text-center">Taskbar Mockup (100%)</div>
+                                        <div className="taskbar-mockup rounded-lg overflow-hidden shadow-2xl">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-6 h-6 opacity-30"><svg viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="#000"/></svg></div>
+                                                <div className="w-8 h-8 flex items-center justify-center p-1 bg-black/5 rounded hover:bg-black/10 transition-colors">
+                                                    <IconSVG type={p.id} size="100%" />
+                                                </div>
+                                                <div className="w-6 h-6 opacity-30"><svg viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="#000"/></svg></div>
+                                                <div className="w-1 h-4 bg-black/10 mx-2"></div>
+                                                <div className="w-6 h-6 opacity-20"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="#000"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <footer className="mt-20 p-10 text-center border-t border-white/5 text-xs text-zinc-600 font-mono italic">
+                        Generated by Huashu-Design · Logic over Aesthetics
+                    </footer>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

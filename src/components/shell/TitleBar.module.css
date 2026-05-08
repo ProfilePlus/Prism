@@ -1,9 +1,10 @@
 .titlebar {
-  height: 32px;
+  height: 36px; /* 从 32px 调高，增加透气感 */
   display: flex;
   align-items: center;
-  padding-left: 14px;
+  padding-left: 16px;
   font-size: 12px;
+  font-weight: 500;
   color: var(--text-secondary);
   user-select: none;
   border-bottom: 1px solid var(--stroke-surface);
@@ -11,13 +12,10 @@
   app-region: drag;
 }
 
-body.dark .titlebar {
-  border-bottom-color: var(--stroke-surface);
-}
-
 .title {
   flex: 1;
   pointer-events: none;
+  letter-spacing: 0.2px;
 }
 
 .controls {
@@ -29,30 +27,35 @@ body.dark .titlebar {
 
 .btn {
   width: 46px;
-  height: 32px;
+  height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: none;
   background: transparent;
-  color: var(--text-primary);
+  color: var(--text-secondary); /* 默认为次要文本颜色，不那么刺眼 */
   cursor: pointer;
   font-size: 10px;
   font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets', sans-serif;
-  transition: background 0.08s ease;
+  transition: all var(--duration-fast) var(--ease-out);
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
 
 .btn:hover {
-  background: var(--accent-tint);
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
-body.dark .btn:hover {
-  background: var(--accent-tint);
+.btn:active {
+  background: var(--bg-active);
 }
 
 .btn.close:hover {
   background: #C42B1C;
   color: #fff;
+}
+
+.btn.close:active {
+  background: #A42417; /* 点击时稍微加深红色 */
 }

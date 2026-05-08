@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prism Icon Lottery — Postmodern Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brand-blue: #0067C0;
+            --brand-blue-hover: #0078D4;
+            --slate: #334155;
+            --teal: #0d9488;
+            --warm: #b45309;
+            --neutral-50: #fafafa;
+            --neutral-100: #f1f5f9;
+            --neutral-900: #0f172a;
+            --ease: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background:
+                radial-gradient(circle at 20% 30%, rgba(0, 103, 192, 0.08), transparent 40%),
+                radial-gradient(circle at 80% 70%, rgba(13, 148, 136, 0.06), transparent 40%),
+                var(--neutral-100);
+            min-height: 100vh;
+            padding: 48px 24px 140px;
+            color: var(--neutral-900);
+        }
+
+        .header {
+            max-width: 1200px;
+            margin: 0 auto 56px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: clamp(40px, 5vw, 64px);
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, var(--brand-blue) 0%, var(--teal) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            font-size: 18px;
+            color: #64748b;
+            margin-bottom: 24px;
+        }
+
+        .lottery-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 32px;
+            background: var(--brand-blue);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.25s var(--ease);
+            box-shadow:
+                0 4px 16px rgba(0, 103, 192, 0.25),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .lottery-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.5s;
+        }
+
+        .lottery-btn:hover::before {
+            left: 100%;
+        }
+
+        .lottery-btn:hover {
+            background: var(--brand-blue-hover);
+            transform: translateY(-2px);
+            box-shadow:
+                0 8px 24px rgba(0, 103, 192, 0.35),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        .lottery-btn:active {
+            transform: translateY(0);
+        }
+
+        .lottery-btn.running {
+            background: var(--slate);
+            pointer-events: none;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .card {
+            aspect-ratio: 1;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s var(--ease);
+            overflow: hidden;
+            box-shadow:
+                0 2px 8px rgba(0, 0, 0, 0.04),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.8), transparent 60%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow:
+                0 16px 48px rgba(0, 103, 192, 0.12),
+                0 0 0 1px rgba(0, 103, 192, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 1);
+        }
+
+        .card.highlight {
+            border-color: var(--brand-blue);
+            box-shadow:
+                0 0 0 3px rgba(0, 103, 192, 0.2),
+                0 16px 48px rgba(0, 103, 192, 0.25);
+            animation: pulse 0.6s var(--ease-bounce);
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+
+        .card.locked {
+            border-color: var(--brand-blue);
+            background: rgba(0, 103, 192, 0.06);
+            backdrop-filter: blur(20px);
+        }
+
+        .card .num {
+            position: absolute;
+            top: 14px;
+            left: 14px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #cbd5e1;
+            z-index: 2;
+        }
+
+        .card .tag {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            font-size: 9px;
+            font-weight: 700;
+            color: #94a3b8;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            z-index: 2;
+        }
+
+        .lock-badge {
+            position: absolute;
+            bottom: 14px;
+            right: 14px;
+            width: 36px;
+            height: 36px;
+            background: var(--brand-blue);
+            border-radius: 50%;
+            color: #fff;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transform: scale(0) rotate(-180deg);
+            transition: all 0.4s var(--ease-bounce);
+            box-shadow: 0 4px 12px rgba(0, 103, 192, 0.4);
+            z-index: 2;
+        }
+
+        .card.locked .lock-badge {
+            opacity: 1;
+            transform: scale(1) rotate(0deg);
+        }
+
+        /* Icon container with 3D perspective */
+        .icon-wrap {
+            position: relative;
+            transition: transform 0.4s var(--ease);
+            transform-style: preserve-3d;
+        }
+
+        .card:hover .icon-wrap {
+            transform: perspective(600px) rotateY(5deg) rotateX(-5deg);
+        }
+
+        /* ═══════════════════════════════════════
+           20 POSTMODERN ICON DESIGNS
+           ═══════════════════════════════════════ */
+
+        /* 1. Glassmorphic Triangle */
+        .icon-1 {
+            width: 0;
+            height: 0;
+            border-left: 48px solid transparent;
+            border-right: 48px solid transparent;
+            border-bottom: 84px solid var(--brand-blue);
+            filter: drop-shadow(0 8px 24px rgba(0, 103, 192, 0.3));
+            position: relative;
+        }
+        .icon-1::after {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: -24px;
+            width: 48px;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+            transform: rotate(-60deg);
+        }
+
+        /* 2. Neon Outline */
+        .icon-2 {
+            width: 76px;
+            height: 68px;
+            border: 3px solid var(--brand-blue);
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+            box-shadow:
+                0 0 20px rgba(0, 103, 192, 0.4),
+                inset 0 0 20px rgba(0, 103, 192, 0.2);
+            background: rgba(0, 103, 192, 0.05);
+        }
+
+        /* 3. Gradient Split */
+        .icon-3 {
+            width: 76px;
+            height: 76px;
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+        .icon-3::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 50%;
+            height: 100%;
+            background: linear-gradient(135deg, var(--brand-blue), var(--teal));
+            clip-path: polygon(100% 0%, 0% 50%, 100% 100%);
+        }
+        .icon-3::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 50%;
+            height: 100%;
+            background: var(--neutral-900);
+            clip-path: polygon(0% 0%, 100% 50%, 0% 100%);
+        }
+
+        /* 4. Layered Bars with Glow */
+        .icon-4 {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .icon-4 span {
+            height: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            position: relative;
+            overflow: hidden;
+        }
+        .icon-4 span::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 50%;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.4), transparent);
+        }
+        .icon-4 span:nth-child(1) {
+            width: 64px;
+            background: linear-gradient(90deg, var(--brand-blue), var(--teal));
+        }
+        .icon-4 span:nth-child(2) {
+            width: 52px;
+            background: var(--slate);
+        }
+        .icon-4 span:nth-child(3) {
+            width: 40px;
+            background: var(--teal);
+        }
+
+        /* 5. Frosted Glass Triangle */
+        .icon-5 {
+            width: 76px;
+            height: 76px;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 14px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow:
+                0 8px 32px rgba(0, 0, 0, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+        .icon-5::after {
+            content: '';
+            width: 0;
+            height: 0;
+            border-left: 30px solid transparent;
+            border-right: 30px solid transparent;
+            border-bottom: 52px solid #fff;
+            filter: drop-shadow(0 4px 12px rgba(255, 255, 255, 0.3));
+        }
+
+        /* 6. 3D Letter P */
+        .icon-6 {
+            font-size: 92px;
+            font-weight: 800;
+            color: var(--neutral-900);
+            line-height: 1;
+            text-shadow:
+                2px 2px 0 rgba(0, 103, 192, 0.3),
+                4px 4px 0 rgba(0, 103, 192, 0.2),
+                6px 6px 0 rgba(0, 103, 192, 0.1);
+        }
+
+        /* 7. Gradient Letter M */
+        .icon-7 {
+            font-size: 92px;
+            font-weight: 800;
+            line-height: 1;
+            background: linear-gradient(135deg, var(--brand-blue) 0%, var(--teal) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter: drop-shadow(0 4px 12px rgba(0, 103, 192, 0.3));
+        }
+
+        /* 8. Outlined P */
+        .icon-8 {
+            font-size: 76px;
+            font-weight: 800;
+            color: transparent;
+            line-height: 1;
+            -webkit-text-stroke: 3px var(--slate);
+            text-stroke: 3px var(--slate);
+        }
+
+        /* 9. Glowing P */
+        .icon-9 {
+            width: 76px;
+            height: 76px;
+            background: linear-gradient(135deg, var(--brand-blue), var(--teal));
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 60px;
+            font-weight: 800;
+            color: #fff;
+            line-height: 1;
+            box-shadow:
+                0 8px 32px rgba(0, 103, 192, 0.4),
+                inset 0 2px 0 rgba(255, 255, 255, 0.3);
+        }
+
+        /* 10. Paper Fold with Shadow */
+        .icon-10 {
+            width: 60px;
+            height: 76px;
+            background: linear-gradient(135deg, #fff 0%, #f8fafc 100%);
+            border: 2px solid var(--neutral-900);
+            border-radius: 10px;
+            position: relative;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        }
+        .icon-10::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 0;
+            height: 0;
+            border-left: 18px solid transparent;
+            border-top: 18px solid var(--brand-blue);
+            filter: drop-shadow(0 2px 4px rgba(0, 103, 192, 0.3));
+        }
+        .icon-10::after {
+            content: '';
+            position: absolute;
+            top: 26px;
+            left: 14px;
+            right: 14px;
+            height: 4px;
+            background: linear-gradient(90deg, var(--brand-blue), var(--teal));
+            border-radius: 2px;
+            box-shadow: 0 10px 0 #e2e8f0, 0 20px 0 #e2e8f0;
+        }
+
+        /* 11. Neon Hash */
+        .icon-11 {
+            font-size: 76px;
+            font-weight: 800;
+            color: var(--teal);
+            line-height: 1;
+            text-shadow:
+                0 0 20px rgba(13, 148, 136, 0.6),
+                0 0 40px rgba(13, 148, 136, 0.3);
+        }
+
+        /* 12. Code Brackets */
+        .icon-12 {
+            font-size: 60px;
+            font-weight: 300;
+            color: var(--neutral-900);
+            line-height: 1;
+        }
+        .icon-12 b {
+            color: var(--brand-blue);
+            font-weight: 800;
+            text-shadow: 0 2px 8px rgba(0, 103, 192, 0.3);
+        }
+
+        /* 13. Glowing Asterisk */
+        .icon-13 {
+            font-size: 92px;
+            font-weight: 300;
+            color: var(--warm);
+            line-height: 1;
+            text-shadow:
+                0 0 30px rgba(180, 83, 9, 0.5),
+                0 4px 12px rgba(180, 83, 9, 0.3);
+        }
+
+        /* 14. Layered Circle */
+        .icon-14 {
+            width: 76px;
+            height: 76px;
+            border-radius: 50%;
+            background: var(--brand-blue);
+            position: relative;
+            overflow: hidden;
+            box-shadow:
+                0 8px 32px rgba(0, 103, 192, 0.3),
+                inset 0 2px 0 rgba(255, 255, 255, 0.3);
+        }
+        .icon-14::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 50%;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), transparent);
+        }
+        .icon-14::after {
+            content: '';
+            position: absolute;
+            top: 26px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 26px solid transparent;
+            border-right: 26px solid transparent;
+            border-bottom: 44px solid rgba(255, 255, 255, 0.9);
+        }
+
+        /* 15. Concentric Glow */
+        .icon-15 {
+            width: 76px;
+            height: 76px;
+            border: 4px solid var(--brand-blue);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow:
+                0 0 20px rgba(0, 103, 192, 0.3),
+                inset 0 0 20px rgba(0, 103, 192, 0.1);
+        }
+        .icon-15::before {
+            content: '';
+            width: 48px;
+            height: 48px;
+            border: 4px solid var(--slate);
+            border-radius: 50%;
+            box-shadow: inset 0 0 10px rgba(51, 65, 85, 0.2);
+        }
+
+        /* 16. Diagonal Gradient */
+        .icon-16 {
+            width: 76px;
+            height: 76px;
+            border-radius: 14px;
+            background: var(--neutral-900);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        }
+        .icon-16::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, transparent 40%, rgba(255, 255, 255, 0.1) 50%, transparent 60%);
+        }
+        .icon-16::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, var(--brand-blue), var(--teal));
+            clip-path: polygon(100% 0%, 0% 100%, 100% 100%);
+        }
+
+        /* 17. Floating Squares */
+        .icon-17 {
+            position: relative;
+            width: 76px;
+            height: 76px;
+        }
+        .icon-17 span {
+            position: absolute;
+            width: 52px;
+            height: 52px;
+            border-radius: 10px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        }
+        .icon-17 span:nth-child(1) {
+            background: linear-gradient(135deg, var(--brand-blue), var(--teal));
+            top: 0;
+            left: 0;
+            z-index: 2;
+        }
+        .icon-17 span:nth-child(2) {
+            background: var(--teal);
+            opacity: 0.7;
+            bottom: 0;
+            right: 0;
+            z-index: 1;
+        }
+
+        /* 18. Frosted Window */
+        .icon-18 {
+            width: 68px;
+            height: 52px;
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(15, 23, 42, 0.2);
+            border-radius: 10px;
+            position: relative;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+        .icon-18::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 14px;
+            background: linear-gradient(135deg, var(--brand-blue), var(--teal));
+            border-radius: 8px 8px 0 0;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        }
+
+        /* 19. Gradient Pen */
+        .icon-19 {
+            width: 20px;
+            height: 76px;
+            background: linear-gradient(180deg, var(--neutral-900), var(--slate));
+            border-radius: 5px 5px 0 0;
+            position: relative;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        .icon-19::after {
+            content: '';
+            position: absolute;
+            bottom: -16px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 20px solid var(--brand-blue);
+            filter: drop-shadow(0 4px 8px rgba(0, 103, 192, 0.4));
+        }
+
+        /* 20. Pixel Grid Glow */
+        .icon-20 {
+            display: grid;
+            grid-template-columns: repeat(5, 10px);
+            gap: 6px;
+        }
+        .icon-20 b {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #e2e8f0;
+            transition: all 0.3s;
+        }
+        .icon-20 b.on {
+            background: var(--brand-blue);
+            box-shadow: 0 0 10px rgba(0, 103, 192, 0.6);
+        }
+
+        /* Controls */
+        .controls {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            display: flex;
+            gap: 12px;
+            z-index: 100;
+        }
+
+        .ctrl-btn {
+            width: 52px;
+            height: 52px;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            font-size: 22px;
+            cursor: pointer;
+            transition: all 0.3s var(--ease);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        .ctrl-btn:hover {
+            transform: scale(1.1) translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        .ctrl-btn:active {
+            transform: scale(0.95);
+        }
+
+        .tweaks-panel {
+            position: fixed;
+            bottom: 96px;
+            right: 32px;
+            width: 260px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 20px;
+            padding: 24px;
+            display: none;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+        }
+
+        .tweaks-panel.show {
+            display: block;
+            animation: slideUp 0.3s var(--ease);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .tweaks-panel h3 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        .tw-row {
+            margin-bottom: 16px;
+        }
+
+        .tw-row label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #64748b;
+            margin-bottom: 8px;
+        }
+
+        .tw-row input[type=range] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #e2e8f0;
+            outline: none;
+            appearance: none;
+        }
+
+        .tw-row input[type=range]::-webkit-slider-thumb {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--brand-blue);
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 103, 192, 0.3);
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+                gap: 20px;
+            }
+
+            .lottery-btn {
+                padding: 14px 28px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Prism Icon Lottery</h1>
+    <p>后现代版 · 20 个方案</p>
+    <button class="lottery-btn" id="lotteryBtn">
+        <span>🎲</span>
+        <span id="btnText">开始抽奖</span>
+    </button>
+</div>
+
+<div class="grid" id="grid">
+    <!-- Icons will be generated by JavaScript -->
+</div>
+
+<div class="controls">
+    <button class="ctrl-btn" id="resetBtn" title="重置">↻</button>
+    <button class="ctrl-btn" id="tweaksBtn" title="调整">⚙</button>
+</div>
+
+<div class="tweaks-panel" id="tweaksPanel">
+    <h3>Tweaks</h3>
+    <div class="tw-row">
+        <label>Icon Scale</label>
+        <input type="range" id="scaleSlider" min="70" max="130" value="100">
+    </div>
+    <div class="tw-row">
+        <label>Animation Speed</label>
+        <input type="range" id="speedSlider" min="50" max="200" value="100">
+    </div>
+    <div class="tw-row">
+        <label>Blur Intensity</label>
+        <input type="range" id="blurSlider" min="0" max="40" value="20">
+    </div>
+</div>
+
+<script>
+    const iconTemplates = [
+        { tag: '棱镜', html: '<div class="icon-1"></div>' },
+        { tag: '霓虹', html: '<div class="icon-2"></div>' },
+        { tag: '渐变', html: '<div class="icon-3"></div>' },
+        { tag: '光泽', html: '<div class="icon-4"><span></span><span></span><span></span></div>' },
+        { tag: '毛玻璃', html: '<div class="icon-5"></div>' },
+        { tag: '3D', html: '<div class="icon-6">P</div>' },
+        { tag: '渐变', html: '<div class="icon-7">M</div>' },
+        { tag: '描边', html: '<div class="icon-8">P</div>' },
+        { tag: '发光', html: '<div class="icon-9">P</div>' },
+        { tag: '折纸', html: '<div class="icon-10"></div>' },
+        { tag: '霓虹', html: '<div class="icon-11">#</div>' },
+        { tag: '代码', html: '<div class="icon-12">&lt;<b>/</b>&gt;</div>' },
+        { tag: '光晕', html: '<div class="icon-13">*</div>' },
+        { tag: '层叠', html: '<div class="icon-14"></div>' },
+        { tag: '同心', html: '<div class="icon-15"></div>' },
+        { tag: '对角', html: '<div class="icon-16"></div>' },
+        { tag: '浮动', html: '<div class="icon-17"><span></span><span></span></div>' },
+        { tag: '窗口', html: '<div class="icon-18"></div>' },
+        { tag: '笔尖', html: '<div class="icon-19"></div>' },
+        { tag: '像素', html: '<div class="icon-20"><b class="on"></b><b class="on"></b><b class="on"></b><b></b><b></b><b class="on"></b><b></b><b></b><b class="on"></b><b></b><b class="on"></b><b class="on"></b><b class="on"></b><b></b><b></b><b class="on"></b><b></b><b></b><b></b><b></b><b class="on"></b><b></b><b></b><b></b><b></b></div>' }
+    ];
+
+    const grid = document.getElementById('grid');
+    const lotteryBtn = document.getElementById('lotteryBtn');
+    const btnText = document.getElementById('btnText');
+    const resetBtn = document.getElementById('resetBtn');
+    const tweaksBtn = document.getElementById('tweaksBtn');
+    const tweaksPanel = document.getElementById('tweaksPanel');
+    const scaleSlider = document.getElementById('scaleSlider');
+    const speedSlider = document.getElementById('speedSlider');
+    const blurSlider = document.getElementById('blurSlider');
+
+    let isRunning = false;
+    let animSpeed = 100;
+
+    // Generate cards
+    iconTemplates.forEach((icon, i) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.dataset.id = i + 1;
+        card.innerHTML = `
+            <span class="num">${String(i + 1).padStart(2, '0')}</span>
+            <span class="tag">${icon.tag}</span>
+            <div class="lock-badge">🔒</div>
+            <div class="icon-wrap">${icon.html}</div>
+        `;
+        grid.appendChild(card);
+    });
+
+    const cards = document.querySelectorAll('.card');
+
+    // Manual selection
+    cards.forEach(card => {
+        card.addEventListener('click', () => {
+            if (!isRunning) {
+                card.classList.toggle('locked');
+            }
+        });
+    });
+
+    // Lottery animation
+    lotteryBtn.addEventListener('click', async () => {
+        if (isRunning) return;
+
+        isRunning = true;
+        lotteryBtn.classList.add('running');
+        btnText.textContent = '抽奖中...';
+
+        cards.forEach(c => c.classList.remove('highlight'));
+
+        const rounds = 20;
+        const baseDelay = animSpeed;
+
+        for (let i = 0; i < rounds; i++) {
+            const randomCard = cards[Math.floor(Math.random() * cards.length)];
+            cards.forEach(c => c.classList.remove('highlight'));
+            randomCard.classList.add('highlight');
+            await new Promise(resolve => setTimeout(resolve, baseDelay + i * 10));
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 300));
+        const winner = cards[Math.floor(Math.random() * cards.length)];
+        cards.forEach(c => c.classList.remove('highlight'));
+        winner.classList.add('highlight', 'locked');
+
+        isRunning = false;
+        lotteryBtn.classList.remove('running');
+        btnText.textContent = '再次抽奖';
+    });
+
+    // Reset
+    resetBtn.addEventListener('click', () => {
+        cards.forEach(c => {
+            c.classList.remove('locked', 'highlight');
+        });
+        btnText.textContent = '开始抽奖';
+    });
+
+    // Tweaks
+    tweaksBtn.addEventListener('click', () => {
+        tweaksPanel.classList.toggle('show');
+    });
+
+    scaleSlider.addEventListener('input', (e) => {
+        const scale = e.target.value / 100;
+        document.querySelectorAll('.icon-wrap').forEach(wrap => {
+            wrap.style.transform = `scale(${scale})`;
+        });
+    });
+
+    speedSlider.addEventListener('input', (e) => {
+        animSpeed = parseInt(e.target.value);
+    });
+
+    blurSlider.addEventListener('input', (e) => {
+        const blur = e.target.value;
+        cards.forEach(card => {
+            card.style.backdropFilter = `blur(${blur}px)`;
+        });
+    });
+</script>
+
+</body>
+</html>

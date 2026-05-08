@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prism Icon Concepts — 20 Variants</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --blue: #0067C0;
+            --blue-light: #0078D4;
+            --purple: #6d28d9;
+            --teal: #0d9488;
+            --slate: #334155;
+            --warm: #b45309;
+            --rose: #be123c;
+            --neutral-50: #fafafa;
+            --neutral-100: #f1f5f9;
+            --neutral-200: #e2e8f0;
+            --neutral-800: #1e293b;
+            --neutral-900: #0f172a;
+            --ease: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: var(--neutral-100);
+            min-height: 100vh;
+            padding: 60px 32px 120px;
+            color: var(--neutral-900);
+        }
+
+        .header {
+            max-width: 600px;
+            margin: 0 auto 64px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: clamp(36px, 5vw, 56px);
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            margin-bottom: 12px;
+            color: var(--neutral-900);
+        }
+
+        .header p {
+            font-size: 18px;
+            color: #64748b;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .cell {
+            aspect-ratio: 1;
+            background: #fff;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            border: 2px solid transparent;
+            transition: all 0.25s var(--ease);
+            overflow: hidden;
+        }
+
+        .cell:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 16px 48px rgba(0,0,0,0.1);
+        }
+
+        .cell.picked {
+            border-color: var(--blue);
+            box-shadow: 0 0 0 4px rgba(0,103,192,0.12);
+        }
+
+        .cell .tag {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #94a3b8;
+            letter-spacing: 0.04em;
+        }
+
+        .cell .num {
+            position: absolute;
+            bottom: 10px;
+            right: 12px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #cbd5e1;
+        }
+
+        .pick-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 28px;
+            height: 28px;
+            background: var(--blue);
+            border-radius: 50%;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transform: scale(0);
+            transition: all 0.3s var(--ease);
+        }
+
+        .cell.picked .pick-badge {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* ═══════════════════════════════════════
+           20 ICON DESIGNS — each unique
+           ═══════════════════════════════════════ */
+
+        /* 1. Solid Triangle — 纯色三角，无渐变 */
+        .i1 {
+            width: 0; height: 0;
+            border-left: 48px solid transparent;
+            border-right: 48px solid transparent;
+            border-bottom: 84px solid var(--blue);
+        }
+
+        /* 2. Outlined Triangle — 线框棱镜 */
+        .i2 {
+            width: 80px; height: 70px;
+            border: 3px solid var(--neutral-800);
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+            position: relative;
+        }
+        .i2::after {
+            content: '';
+            position: absolute;
+            inset: 4px;
+            border: 3px solid var(--neutral-800);
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+        }
+
+        /* 3. Split Prism — 左蓝右白 */
+        .i3 {
+            width: 80px; height: 80px;
+            position: relative;
+        }
+        .i3-left, .i3-right {
+            position: absolute;
+            top: 0;
+            width: 50%;
+            height: 100%;
+        }
+        .i3-left {
+            left: 0;
+            background: var(--blue);
+            clip-path: polygon(100% 0%, 0% 50%, 100% 100%);
+        }
+        .i3-right {
+            right: 0;
+            background: var(--neutral-800);
+            clip-path: polygon(0% 0%, 100% 50%, 0% 100%);
+        }
+
+        /* 4. Stacked Bars — 三条色带 */
+        .i4 {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: center;
+        }
+        .i4 span {
+            height: 8px;
+            border-radius: 4px;
+        }
+        .i4 span:nth-child(1) { width: 64px; background: var(--blue); }
+        .i4 span:nth-child(2) { width: 48px; background: var(--slate); }
+        .i4 span:nth-child(3) { width: 32px; background: var(--teal); }
+
+        /* 5. Dot Grid — 点阵 P */
+        .i5 {
+            display: grid;
+            grid-template-columns: repeat(5, 10px);
+            gap: 6px;
+        }
+        .i5 b {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: var(--neutral-200);
+        }
+        .i5 b.on { background: var(--blue); }
+
+        /* 6. Monogram P — 粗体 P */
+        .i6 {
+            font-size: 96px;
+            font-weight: 800;
+            color: var(--neutral-900);
+            line-height: 1;
+            letter-spacing: -0.06em;
+        }
+
+        /* 7. Slash Mark — 斜杠 Markdown */
+        .i7 {
+            font-size: 72px;
+            font-weight: 800;
+            color: var(--blue);
+            line-height: 1;
+            transform: skewX(-12deg);
+        }
+
+        /* 8. Window Minimal — 极简窗口 */
+        .i8 {
+            width: 72px;
+            height: 56px;
+            border: 3px solid var(--neutral-800);
+            border-radius: 8px;
+            position: relative;
+        }
+        .i8::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 14px;
+            background: var(--blue);
+            border-radius: 5px 5px 0 0;
+        }
+        .i8::after {
+            content: '';
+            position: absolute;
+            top: 22px; left: 10px;
+            width: 32px; height: 3px;
+            background: var(--neutral-800);
+            box-shadow: 0 8px 0 var(--neutral-200), 0 16px 0 var(--neutral-200);
+        }
+
+        /* 9. Hash Symbol — # 号 */
+        .i9 {
+            font-size: 80px;
+            font-weight: 800;
+            color: var(--teal);
+            line-height: 1;
+        }
+
+        /* 10. Circle Cut — 圆形切割 */
+        .i10 {
+            width: 80px; height: 80px;
+            border-radius: 50%;
+            background: var(--blue);
+            position: relative;
+            overflow: hidden;
+        }
+        .i10::after {
+            content: '';
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            width: 60%;
+            height: 60%;
+            background: #fff;
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+        }
+
+        /* 11. Brackets — 尖括号 */
+        .i11 {
+            font-size: 64px;
+            font-weight: 300;
+            color: var(--neutral-800);
+            line-height: 1;
+            letter-spacing: -0.1em;
+        }
+        .i11 b {
+            color: var(--blue);
+            font-weight: 800;
+        }
+
+        /* 12. Layered Squares — 层叠方块 */
+        .i12 {
+            position: relative;
+            width: 80px; height: 80px;
+        }
+        .i12 span {
+            position: absolute;
+            border-radius: 8px;
+        }
+        .i12 span:nth-child(1) {
+            width: 52px; height: 52px;
+            background: var(--blue);
+            top: 0; left: 0;
+        }
+        .i12 span:nth-child(2) {
+            width: 52px; height: 52px;
+            background: var(--teal);
+            opacity: 0.7;
+            bottom: 0; right: 0;
+        }
+
+        /* 13. Pen Nib — 笔尖 */
+        .i13 {
+            width: 20px; height: 80px;
+            background: var(--neutral-800);
+            border-radius: 4px 4px 0 0;
+            position: relative;
+        }
+        .i13::after {
+            content: '';
+            position: absolute;
+            bottom: -16px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0; height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 20px solid var(--blue);
+        }
+
+        /* 14. Concentric Rings — 同心环 */
+        .i14 {
+            width: 80px; height: 80px;
+            border: 4px solid var(--blue);
+            border-radius: 50%;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .i14::before {
+            content: '';
+            width: 48px; height: 48px;
+            border: 4px solid var(--slate);
+            border-radius: 50%;
+        }
+        .i14::after {
+            content: '';
+            position: absolute;
+            width: 16px; height: 16px;
+            background: var(--teal);
+            border-radius: 50%;
+        }
+
+        /* 15. Diagonal Split — 对角分割 */
+        .i15 {
+            width: 80px; height: 80px;
+            border-radius: 12px;
+            background: var(--neutral-900);
+            position: relative;
+            overflow: hidden;
+        }
+        .i15::after {
+            content: '';
+            position: absolute;
+            top: 0; right: 0;
+            width: 100%; height: 100%;
+            background: var(--blue);
+            clip-path: polygon(100% 0%, 0% 100%, 100% 100%);
+        }
+
+        /* 16. Asterisk — 星号 */
+        .i16 {
+            font-size: 96px;
+            font-weight: 300;
+            color: var(--warm);
+            line-height: 1;
+        }
+
+        /* 17. Stacked Pages — 堆叠纸张 */
+        .i17 {
+            position: relative;
+            width: 64px; height: 80px;
+        }
+        .i17 span {
+            position: absolute;
+            width: 56px; height: 72px;
+            background: #fff;
+            border: 2px solid var(--neutral-200);
+            border-radius: 6px;
+        }
+        .i17 span:nth-child(1) { top: 0; left: 0; z-index: 3; border-color: var(--blue); }
+        .i17 span:nth-child(2) { top: 4px; left: 4px; z-index: 2; }
+        .i17 span:nth-child(3) { top: 8px; left: 8px; z-index: 1; }
+
+        /* 18. Arrow Up — 向上箭头 */
+        .i18 {
+            width: 0; height: 0;
+            border-left: 40px solid transparent;
+            border-right: 40px solid transparent;
+            border-bottom: 48px solid var(--blue);
+            position: relative;
+        }
+        .i18::after {
+            content: '';
+            position: absolute;
+            top: 48px;
+            left: -12px;
+            width: 24px; height: 40px;
+            background: var(--blue);
+        }
+
+        /* 19. Eye — 视觉之眼 */
+        .i19 {
+            width: 88px; height: 48px;
+            background: var(--neutral-900);
+            border-radius: 50%;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .i19::before {
+            content: '';
+            width: 28px; height: 28px;
+            background: var(--blue);
+            border-radius: 50%;
+        }
+        .i19::after {
+            content: '';
+            position: absolute;
+            width: 12px; height: 12px;
+            background: #fff;
+            border-radius: 50%;
+        }
+
+        /* 20. Negative P — 负空间 P */
+        .i20 {
+            width: 80px; height: 80px;
+            background: var(--neutral-900);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 64px;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        /* Tweaks */
+        .tweaks-btn {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 48px; height: 48px;
+            background: var(--neutral-900);
+            border: none;
+            border-radius: 50%;
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+            transition: all 0.2s var(--ease);
+            z-index: 100;
+        }
+        .tweaks-btn:hover { transform: scale(1.1); }
+        .tweaks-btn:active { transform: scale(0.95); }
+
+        .tweaks-panel {
+            position: fixed;
+            bottom: 84px;
+            right: 24px;
+            width: 260px;
+            background: #fff;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+            border: 1px solid var(--neutral-200);
+            z-index: 100;
+            display: none;
+        }
+        .tweaks-panel.show { display: block; }
+
+        .tweaks-panel h3 {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .tw-row {
+            margin-bottom: 14px;
+        }
+        .tw-row label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #64748b;
+            margin-bottom: 6px;
+        }
+        .tw-row input[type=range] {
+            width: 100%;
+            accent-color: var(--blue);
+        }
+        .tw-row select {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid var(--neutral-200);
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: inherit;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Prism Icons</h1>
+    <p>20 个方案，点击选择</p>
+</div>
+
+<div class="grid" id="grid">
+
+    <div class="cell" data-id="1">
+        <span class="tag">棱镜</span>
+        <div class="pick-badge">✓</div>
+        <div class="i1"></div>
+        <span class="num">01</span>
+    </div>
+
+    <div class="cell" data-id="2">
+        <span class="tag">线框</span>
+        <div class="pick-badge">✓</div>
+        <div style="width:80px;height:70px;position:relative;">
+            <div style="width:100%;height:100%;border:3px solid var(--neutral-800);clip-path:polygon(50% 0%,0% 100%,100% 100%);"></div>
+        </div>
+        <span class="num">02</span>
+    </div>
+
+    <div class="cell" data-id="3">
+        <span class="tag">分割</span>
+        <div class="pick-badge">✓</div>
+        <div class="i3">
+            <div class="i3-left"></div>
+            <div class="i3-right"></div>
+        </div>
+        <span class="num">03</span>
+    </div>
+
+    <div class="cell" data-id="4">
+        <span class="tag">色带</span>
+        <div class="pick-badge">✓</div>
+        <div class="i4">
+            <span></span><span></span><span></span>
+        </div>
+        <span class="num">04</span>
+    </div>
+
+    <div class="cell" data-id="5">
+        <span class="tag">点阵</span>
+        <div class="pick-badge">✓</div>
+        <div class="i5">
+            <b class="on"></b><b class="on"></b><b class="on"></b><b></b><b></b>
+            <b class="on"></b><b></b><b></b><b class="on"></b><b></b>
+            <b class="on"></b><b class="on"></b><b class="on"></b><b></b><b></b>
+            <b class="on"></b><b></b><b></b><b></b><b></b>
+            <b class="on"></b><b></b><b></b><b></b><b></b>
+        </div>
+        <span class="num">05</span>
+    </div>
+
+    <div class="cell" data-id="6">
+        <span class="tag">字母</span>
+        <div class="pick-badge">✓</div>
+        <div class="i6">P</div>
+        <span class="num">06</span>
+    </div>
+
+    <div class="cell" data-id="7">
+        <span class="tag">斜杠</span>
+        <div class="pick-badge">✓</div>
+        <div class="i7">#</div>
+        <span class="num">07</span>
+    </div>
+
+    <div class="cell" data-id="8">
+        <span class="tag">窗口</span>
+        <div class="pick-badge">✓</div>
+        <div class="i8"></div>
+        <span class="num">08</span>
+    </div>
+
+    <div class="cell" data-id="9">
+        <span class="tag">符号</span>
+        <div class="pick-badge">✓</div>
+        <div class="i9">#</div>
+        <span class="num">09</span>
+    </div>
+
+    <div class="cell" data-id="10">
+        <span class="tag">切割</span>
+        <div class="pick-badge">✓</div>
+        <div class="i10"></div>
+        <span class="num">10</span>
+    </div>
+
+    <div class="cell" data-id="11">
+        <span class="tag">括号</span>
+        <div class="pick-badge">✓</div>
+        <div class="i11">&lt;<b>/</b>&gt;</div>
+        <span class="num">11</span>
+    </div>
+
+    <div class="cell" data-id="12">
+        <span class="tag">层叠</span>
+        <div class="pick-badge">✓</div>
+        <div class="i12">
+            <span></span><span></span>
+        </div>
+        <span class="num">12</span>
+    </div>
+
+    <div class="cell" data-id="13">
+        <span class="tag">笔尖</span>
+        <div class="pick-badge">✓</div>
+        <div class="i13"></div>
+        <span class="num">13</span>
+    </div>
+
+    <div class="cell" data-id="14">
+        <span class="tag">同心</span>
+        <div class="pick-badge">✓</div>
+        <div class="i14"></div>
+        <span class="num">14</span>
+    </div>
+
+    <div class="cell" data-id="15">
+        <span class="tag">对角</span>
+        <div class="pick-badge">✓</div>
+        <div class="i15"></div>
+        <span class="num">15</span>
+    </div>
+
+    <div class="cell" data-id="16">
+        <span class="tag">星号</span>
+        <div class="pick-badge">✓</div>
+        <div class="i16">*</div>
+        <span class="num">16</span>
+    </div>
+
+    <div class="cell" data-id="17">
+        <span class="tag">纸张</span>
+        <div class="pick-badge">✓</div>
+        <div class="i17">
+            <span></span><span></span><span></span>
+        </div>
+        <span class="num">17</span>
+    </div>
+
+    <div class="cell" data-id="18">
+        <span class="tag">箭头</span>
+        <div class="pick-badge">✓</div>
+        <div class="i18"></div>
+        <span class="num">18</span>
+    </div>
+
+    <div class="cell" data-id="19">
+        <span class="tag">视觉</span>
+        <div class="pick-badge">✓</div>
+        <div class="i19"></div>
+        <span class="num">19</span>
+    </div>
+
+    <div class="cell" data-id="20">
+        <span class="tag">负空间</span>
+        <div class="pick-badge">✓</div>
+        <div class="i20">P</div>
+        <span class="num">20</span>
+    </div>
+
+</div>
+
+<button class="tweaks-btn" id="twBtn">⚙</button>
+<div class="tweaks-panel" id="twPanel">
+    <h3>Tweaks</h3>
+    <div class="tw-row">
+        <label>Icon Scale</label>
+        <input type="range" id="twScale" min="60" max="140" value="100">
+    </div>
+    <div class="tw-row">
+        <label>Background</label>
+        <select id="twBg">
+            <option value="#fff">White</option>
+            <option value="#f1f5f9" selected>Light Gray</option>
+            <option value="#0f172a">Dark</option>
+            <option value="#fef3c7">Warm</option>
+        </select>
+    </div>
+    <div class="tw-row">
+        <label>Border Radius</label>
+        <input type="range" id="twRadius" min="0" max="32" value="16">
+    </div>
+</div>
+
+<script>
+    // Selection
+    const cells = document.querySelectorAll('.cell');
+    cells.forEach(c => {
+        c.addEventListener('click', () => {
+            c.classList.toggle('picked');
+        });
+    });
+
+    // Tweaks
+    const twBtn = document.getElementById('twBtn');
+    const twPanel = document.getElementById('twPanel');
+    twBtn.addEventListener('click', () => twPanel.classList.toggle('show'));
+
+    document.getElementById('twScale').addEventListener('input', e => {
+        const s = e.target.value / 100;
+        cells.forEach(c => {
+            const icon = c.children[2];
+            if (icon) icon.style.transform = `scale(${s})`;
+        });
+    });
+
+    document.getElementById('twBg').addEventListener('change', e => {
+        const v = e.target.value;
+        cells.forEach(c => c.style.background = v);
+        if (v === '#0f172a') {
+            cells.forEach(c => c.style.borderColor = 'rgba(255,255,255,0.1)');
+        } else {
+            cells.forEach(c => c.style.borderColor = '');
+        }
+    });
+
+    document.getElementById('twRadius').addEventListener('input', e => {
+        cells.forEach(c => c.style.borderRadius = e.target.value + 'px');
+    });
+</script>
+</body>
+</html>

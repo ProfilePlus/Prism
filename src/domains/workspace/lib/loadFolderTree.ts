@@ -9,49 +9,21 @@ const IGNORE_DIRS = new Set([
   'target',
   '.next',
   '.cache',
+  '__pycache__',
+  'venv',
+  '.venv',
 ]);
+
+const MAX_DEPTH = 8;
 
 function shouldIncludeFile(name: string): boolean {
   return /\.(md|markdown|txt)$/i.test(name);
 }
 
 function joinPath(dir: string, name: string): string {
+  const normalizedDir = dir.replace(/[\\/]$/, '');
   const sep = dir.includes('\\') ? '\\' : '/';
-  return `${dir}${sep}${name}`;
-}
-
-async function collectFiles(
-  dirPath: string,
-  out: { path: string; name: string }[],
-  depth = 0,
-  maxDepth = 6,
-): Promise<void> {
-  if (depth >= maxDepth) return;
-
-  console.log(`[loadFolderTree] Reading dir at depth ${depth}:`, dirPath);
-
-  let entries;
-  try {
-    entries = await readDir(dirPath);
-  } catch (err) {
-    console.error(`[loadFolderTree] Failed to read dir ${dirPath}:`, err);
-    return;
-  }
-
-  console.log(`[loadFolderTree] Found ${entries.length} entries in:`, dirPath);
-
-  for (const entry of entries) {
-    if (entry.name.startsWith('.')) continue;
-
-    const fullPath = joinPath(dirPath, entry.name);
-
-    if (entry.isDirectory) {
-      if (IGNORE_DIRS.has(entry.name)) continue;
-      await collectFiles(fullPath, out, depth + 1, maxDepth);
-    } else if (shouldIncludeFile(entry.name)) {
-      out.push({ path: fullPath, name: entry.name });
-    }
-  }
+  return `${normalizedDir}${sep}${name}`;
 }
 
 function stripFrontmatter(content: string): string {
@@ -65,33 +37,94 @@ function stripFrontmatter(content: string): string {
 }
 
 function extractPreview(content: string): string {
-  const stripped = stripFrontmatter(content);
-  const compact = stripped
-    .replace(/^#+\s+.*$/gm, '')
-    .replace(/```[\s\S]*?```/g, '')
-    .replace(/[*_>`#-]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return compact.slice(0, 120);
+  if (!content) return '';
+
+  let text = stripFrontmatter(content);
+  text = text.replace(/^\|.*\|$/gm, '');
+  text = text.replace(/^[\s]*\|[-| :]*\|[\s]*$/gm, '');
+  text = text.replace(/```[\s\S]*?```/g, '');
+  text = text.replace(/\$\$[\s\S]*?\$\$/g, '');
+  text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+  text = text.replace(/!\[[^\]]*\]\([^)]+\)/g, '');
+  text = text.replace(/^#+\s+(.*)$/gm, '$1');
+  text = text.replace(/^[\s]*[-*+]\s+/gm, '');
+  text = text.replace(/^[\s]*\d+\.\s+/gm, '');
+  text = text.replace(/^>+\s*/gm, '');
+  text = text.replace(/`([^`]+)`/g, '$1');
+  text = text.replace(/\$([^$]+)\$/g, '$1');
+  text = text.replace(/[*_~]{1,3}/g, '');
+  text = text.replace(/<[^>]*>/g, '');
+
+  const lines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  return lines.join(' ').slice(0, 100);
+}
+
+async function buildFileNode(path: string, name: string): Promise<FileNode> {
+  let preview = '';
+  try {
+    const content = await readTextFile(path);
+    preview = extractPreview(content);
+  } catch {
+    preview = '';
+  }
+
+  return {
+    path,
+    name,
+    kind: 'file',
+    preview,
+  };
+}
+
+async function readFolderChildren(folderPath: string, depth: number): Promise<FileNode[]> {
+  if (depth >= MAX_DEPTH) return [];
+
+  let entries;
+  try {
+    entries = await readDir(folderPath);
+  } catch (err) {
+    console.error(`[loadFolderTree] Failed to read dir ${folderPath}:`, err);
+    return [];
+  }
+
+  const visibleEntries = entries
+    .filter((entry) => !entry.name.startsWith('.'))
+    .filter((entry) => {
+      if (!entry.isDirectory) return entry.isFile && shouldIncludeFile(entry.name);
+      return !IGNORE_DIRS.has(entry.name);
+    })
+    .sort((a, b) => {
+      if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+
+  const nodes = await Promise.all(
+    visibleEntries.map(async (entry): Promise<FileNode> => {
+      const fullPath = joinPath(folderPath, entry.name);
+
+      if (entry.isDirectory) {
+        return {
+          path: fullPath,
+          name: entry.name,
+          kind: 'directory',
+          children: await readFolderChildren(fullPath, depth + 1),
+        };
+      }
+
+      return buildFileNode(fullPath, entry.name);
+    }),
+  );
+
+  return nodes;
 }
 
 export async function loadFolderTree(folderPath: string): Promise<FileNode[]> {
-  const collected: { path: string; name: string }[] = [];
-  await collectFiles(folderPath, collected);
-
-  collected.sort((a, b) => a.name.localeCompare(b.name));
-
-  const nodes: FileNode[] = [];
-  for (const file of collected) {
-    let preview = '';
-    try {
-      const content = await readTextFile(file.path);
-      preview = extractPreview(content);
-    } catch (err) {
-      console.warn(`[loadFolderTree] Failed to read preview for ${file.path}:`, err);
-    }
-    nodes.push({ path: file.path, name: file.name, preview });
-  }
-
+  console.log('[loadFolderTree] Starting for:', folderPath);
+  const nodes = await readFolderChildren(folderPath, 0);
+  console.log(`[loadFolderTree] Loaded ${nodes.length} root nodes`);
   return nodes;
 }

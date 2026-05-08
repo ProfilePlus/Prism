@@ -1,22 +1,32 @@
 import { create } from 'zustand';
-import { WorkspaceState, FileNode, SidebarTab } from './types';
+import { WorkspaceState, FileNode, SidebarTab, FileTreeMode } from './types';
 
 interface WorkspaceStore extends WorkspaceState {
   setRootPath: (path: string) => void;
   setFileTree: (tree: FileNode[]) => void;
+  setFileTreeMode: (mode: FileTreeMode) => void;
   toggleSidebar: () => void;
   setSidebarVisible: (visible: boolean) => void;
+  toggleStatusBar: () => void;
+  toggleTypewriterMode: () => void;
   setSidebarTab: (tab: SidebarTab) => void;
   toggleFocusMode: () => void;
+  setFullscreen: (v: boolean) => void;
+  setAlwaysOnTop: (v: boolean) => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
   mode: 'single',
   rootPath: null,
   fileTree: [],
+  fileTreeMode: 'tree',
   sidebarVisible: true,
   sidebarTab: 'files',
   focusMode: false,
+  statusBarVisible: true,
+  typewriterMode: false,
+  isFullscreen: false,
+  isAlwaysOnTop: false,
 
   setRootPath: (path) => {
     set({ rootPath: path, mode: 'folder' });
@@ -24,6 +34,10 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
 
   setFileTree: (tree) => {
     set({ fileTree: tree });
+  },
+
+  setFileTreeMode: (fileTreeMode) => {
+    set({ fileTreeMode });
   },
 
   toggleSidebar: () => {
@@ -34,6 +48,17 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
     set({ sidebarVisible: visible });
   },
 
+  toggleStatusBar: () => {
+    set((state) => ({ statusBarVisible: !state.statusBarVisible }));
+  },
+
+  toggleTypewriterMode: () => {
+    set((state) => ({ typewriterMode: !state.typewriterMode }));
+  },
+
+  setFullscreen: (isFullscreen: boolean) => set({ isFullscreen }),
+  setAlwaysOnTop: (isAlwaysOnTop: boolean) => set({ isAlwaysOnTop }),
+
   setSidebarTab: (tab) => {
     set({ sidebarTab: tab, sidebarVisible: true });
   },
@@ -42,6 +67,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
     set((state) => ({
       focusMode: !state.focusMode,
       sidebarVisible: state.focusMode ? true : false,
+      statusBarVisible: state.focusMode ? true : false,
     }));
   },
 }));

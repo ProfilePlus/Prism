@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prism Icon Lottery — 20 Concepts</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brand-blue: #0067C0;
+            --brand-blue-hover: #0078D4;
+            --slate: #334155;
+            --teal: #0d9488;
+            --warm: #b45309;
+            --neutral-50: #fafafa;
+            --neutral-100: #f1f5f9;
+            --neutral-900: #0f172a;
+            --ease: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--neutral-100);
+            min-height: 100vh;
+            padding: 48px 24px 140px;
+            color: var(--neutral-900);
+        }
+
+        .header {
+            max-width: 1200px;
+            margin: 0 auto 56px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: clamp(40px, 5vw, 64px);
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            margin-bottom: 16px;
+        }
+
+        .header p {
+            font-size: 18px;
+            color: #64748b;
+            margin-bottom: 24px;
+        }
+
+        .lottery-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 32px;
+            background: var(--brand-blue);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.25s var(--ease);
+            box-shadow: 0 4px 16px rgba(0, 103, 192, 0.25);
+        }
+
+        .lottery-btn:hover {
+            background: var(--brand-blue-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 103, 192, 0.35);
+        }
+
+        .lottery-btn:active {
+            transform: translateY(0);
+        }
+
+        .lottery-btn.running {
+            background: var(--slate);
+            pointer-events: none;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .card {
+            aspect-ratio: 1;
+            background: #fff;
+            border: 2px solid transparent;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.25s var(--ease);
+            overflow: hidden;
+        }
+
+        .card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+        }
+
+        .card.highlight {
+            border-color: var(--brand-blue);
+            box-shadow: 0 0 0 4px rgba(0, 103, 192, 0.12);
+            animation: pulse 0.6s var(--ease);
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .card.locked {
+            border-color: var(--brand-blue);
+            background: rgba(0, 103, 192, 0.04);
+        }
+
+        .card .num {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #cbd5e1;
+        }
+
+        .card .tag {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            font-size: 10px;
+            font-weight: 700;
+            color: #94a3b8;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .lock-badge {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            width: 32px;
+            height: 32px;
+            background: var(--brand-blue);
+            border-radius: 50%;
+            color: #fff;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transform: scale(0);
+            transition: all 0.3s var(--ease);
+        }
+
+        .card.locked .lock-badge {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* ═══════════════════════════════════════
+           20 ICON DESIGNS
+           ═══════════════════════════════════════ */
+
+        /* 1. Solid Triangle */
+        .icon-1 {
+            width: 0;
+            height: 0;
+            border-left: 44px solid transparent;
+            border-right: 44px solid transparent;
+            border-bottom: 76px solid var(--brand-blue);
+        }
+
+        /* 2. Outlined Prism */
+        .icon-2 {
+            width: 72px;
+            height: 64px;
+            border: 3px solid var(--neutral-900);
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+        }
+
+        /* 3. Split Prism */
+        .icon-3 {
+            width: 72px;
+            height: 72px;
+            position: relative;
+        }
+        .icon-3::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 50%;
+            height: 100%;
+            background: var(--brand-blue);
+            clip-path: polygon(100% 0%, 0% 50%, 100% 100%);
+        }
+        .icon-3::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 50%;
+            height: 100%;
+            background: var(--neutral-900);
+            clip-path: polygon(0% 0%, 100% 50%, 0% 100%);
+        }
+
+        /* 4. Three Bars */
+        .icon-4 {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .icon-4 span {
+            height: 8px;
+            border-radius: 4px;
+        }
+        .icon-4 span:nth-child(1) { width: 60px; background: var(--brand-blue); }
+        .icon-4 span:nth-child(2) { width: 48px; background: var(--slate); }
+        .icon-4 span:nth-child(3) { width: 36px; background: var(--teal); }
+
+        /* 5. Inverted Triangle */
+        .icon-5 {
+            width: 72px;
+            height: 72px;
+            background: var(--neutral-900);
+            border-radius: 12px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .icon-5::after {
+            content: '';
+            width: 0;
+            height: 0;
+            border-left: 28px solid transparent;
+            border-right: 28px solid transparent;
+            border-bottom: 48px solid #fff;
+        }
+
+        /* 6. Letter P Bold */
+        .icon-6 {
+            font-size: 88px;
+            font-weight: 800;
+            color: var(--neutral-900);
+            line-height: 1;
+        }
+
+        /* 7. Letter M */
+        .icon-7 {
+            font-size: 88px;
+            font-weight: 800;
+            color: var(--brand-blue);
+            line-height: 1;
+        }
+
+        /* 8. Monospace P */
+        .icon-8 {
+            font-size: 72px;
+            font-weight: 400;
+            color: var(--slate);
+            line-height: 1;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* 9. Negative P */
+        .icon-9 {
+            width: 72px;
+            height: 72px;
+            background: var(--brand-blue);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 56px;
+            font-weight: 800;
+            color: #fff;
+            line-height: 1;
+        }
+
+        /* 10. Document Fold */
+        .icon-10 {
+            width: 56px;
+            height: 72px;
+            background: #fff;
+            border: 2px solid var(--neutral-900);
+            border-radius: 8px;
+            position: relative;
+        }
+        .icon-10::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 0;
+            height: 0;
+            border-left: 16px solid transparent;
+            border-top: 16px solid var(--brand-blue);
+        }
+        .icon-10::after {
+            content: '';
+            position: absolute;
+            top: 24px;
+            left: 12px;
+            right: 12px;
+            height: 3px;
+            background: var(--brand-blue);
+            box-shadow: 0 8px 0 #e2e8f0, 0 16px 0 #e2e8f0;
+        }
+
+        /* 11. Hash Symbol */
+        .icon-11 {
+            font-size: 72px;
+            font-weight: 800;
+            color: var(--teal);
+            line-height: 1;
+        }
+
+        /* 12. Brackets */
+        .icon-12 {
+            font-size: 56px;
+            font-weight: 300;
+            color: var(--neutral-900);
+            line-height: 1;
+        }
+        .icon-12 b {
+            color: var(--brand-blue);
+            font-weight: 800;
+        }
+
+        /* 13. Asterisk */
+        .icon-13 {
+            font-size: 88px;
+            font-weight: 300;
+            color: var(--warm);
+            line-height: 1;
+        }
+
+        /* 14. Circle Cut */
+        .icon-14 {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: var(--brand-blue);
+            position: relative;
+            overflow: hidden;
+        }
+        .icon-14::after {
+            content: '';
+            position: absolute;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 24px solid transparent;
+            border-right: 24px solid transparent;
+            border-bottom: 40px solid #fff;
+        }
+
+        /* 15. Concentric Rings */
+        .icon-15 {
+            width: 72px;
+            height: 72px;
+            border: 4px solid var(--brand-blue);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .icon-15::before {
+            content: '';
+            width: 44px;
+            height: 44px;
+            border: 4px solid var(--slate);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 16. Diagonal Split */
+        .icon-16 {
+            width: 72px;
+            height: 72px;
+            border-radius: 12px;
+            background: var(--neutral-900);
+            position: relative;
+            overflow: hidden;
+        }
+        .icon-16::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--brand-blue);
+            clip-path: polygon(100% 0%, 0% 100%, 100% 100%);
+        }
+
+        /* 17. Layered Squares */
+        .icon-17 {
+            position: relative;
+            width: 72px;
+            height: 72px;
+        }
+        .icon-17 span {
+            position: absolute;
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+        }
+        .icon-17 span:nth-child(1) {
+            background: var(--brand-blue);
+            top: 0;
+            left: 0;
+        }
+        .icon-17 span:nth-child(2) {
+            background: var(--teal);
+            opacity: 0.7;
+            bottom: 0;
+            right: 0;
+        }
+
+        /* 18. Window Minimal */
+        .icon-18 {
+            width: 64px;
+            height: 48px;
+            border: 3px solid var(--neutral-900);
+            border-radius: 8px;
+            position: relative;
+        }
+        .icon-18::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 12px;
+            background: var(--brand-blue);
+            border-radius: 5px 5px 0 0;
+        }
+
+        /* 19. Pen Nib */
+        .icon-19 {
+            width: 18px;
+            height: 72px;
+            background: var(--neutral-900);
+            border-radius: 4px 4px 0 0;
+            position: relative;
+        }
+        .icon-19::after {
+            content: '';
+            position: absolute;
+            bottom: -14px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 9px solid transparent;
+            border-right: 9px solid transparent;
+            border-top: 18px solid var(--brand-blue);
+        }
+
+        /* 20. Dot Grid P */
+        .icon-20 {
+            display: grid;
+            grid-template-columns: repeat(5, 9px);
+            gap: 5px;
+        }
+        .icon-20 b {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: #e2e8f0;
+        }
+        .icon-20 b.on {
+            background: var(--brand-blue);
+        }
+
+        /* Controls */
+        .controls {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            display: flex;
+            gap: 12px;
+            z-index: 100;
+        }
+
+        .ctrl-btn {
+            width: 48px;
+            height: 48px;
+            background: #fff;
+            border: 2px solid var(--neutral-900);
+            border-radius: 50%;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.2s var(--ease);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ctrl-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+        }
+
+        .ctrl-btn:active {
+            transform: scale(0.95);
+        }
+
+        .tweaks-panel {
+            position: fixed;
+            bottom: 92px;
+            right: 32px;
+            width: 240px;
+            background: #fff;
+            border: 2px solid var(--neutral-900);
+            border-radius: 16px;
+            padding: 20px;
+            display: none;
+            z-index: 100;
+        }
+
+        .tweaks-panel.show {
+            display: block;
+        }
+
+        .tweaks-panel h3 {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .tw-row {
+            margin-bottom: 12px;
+        }
+
+        .tw-row label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #64748b;
+            margin-bottom: 6px;
+        }
+
+        .tw-row input[type=range] {
+            width: 100%;
+            accent-color: var(--brand-blue);
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+                gap: 16px;
+            }
+
+            .lottery-btn {
+                padding: 12px 24px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Prism Icon Lottery</h1>
+    <p>20 个方案，点击抽奖或手动选择</p>
+    <button class="lottery-btn" id="lotteryBtn">
+        <span>🎲</span>
+        <span id="btnText">开始抽奖</span>
+    </button>
+</div>
+
+<div class="grid" id="grid">
+    <div class="card" data-id="1">
+        <span class="num">01</span>
+        <span class="tag">棱镜</span>
+        <div class="lock-badge">🔒</div>
+        <div class="icon-1"></div>
+    </div>
+
+    <div class="card" data-id="2">
+        <span class="num">02</span>
+        <span class="tag">线框</span>
+        <div class="lock-badge">🔒</div>
+        <div class="icon-2"></div>
+    </div>
+
+    <div class="card" data-id="3">
+        <span class="num">03</span>
+        <span class="tag">分割</span>
+        <div class="lock-badge">🔒</div>
+        <div class="icon-3"></div>
+    </div>
+
+    <div class="card" data-id="4">
+        <span class="num">04</span>
+        <span class="tag">色带</span>
+        <div class="lock-badge">🔒</div>
+        <div class="icon-4"><span></span><span></span><span></span></div>
+    </div>
+
+    <div class="card" data-id="5">
+        <span class="num">05</span>
+        <span class="tag">负空间</span>
+        <div class="lock-badge">🔒</div>
+        <div class="icon-5"></div>
+    </div>
+
+    <div class="card" data-id="6">
+        <span class="num">06</span>
+        <span class="tag">字母</span>
+        <div class="lock-badge">🔒</div>
+        <div class="icon-6">P</div>
+    </div>
+
+    <div class="card" data-id="7">
+        <span class="num">07</span>
+        <span class="tag">字母</span>
+        <div class="lock-badge">🔒</div>
+        <div class="icon-7">M</div>
+    </div>
+
+    <div class="card" data-id="8">
+        <span class="num">08</span>
+        <span class="tag">等宽</span>
+        <div class="lock-badge">🔒</div>
+        <div class="icon-8">P</div>
+    </div>
+
+    <div class="card" data-id="9">
+        <span class="num">09</span>
+        <span class="tag">反转</span>
+        <div class="lock-badge">🔒</div>
+        <div class="icon-9">P</div>
+    </div>
+
+    <div class="card" data-id="10">
+        <span class="num">10</span>
+        <span class="tag">文档</span>
+        <div class="lock-badge">🔒</div>
+        <div class="icon-10"></div>
+    </div>
+
+    <div class="card" data-id="11">
+        <span class="num">11</span>
+        <span class="tag">符号</span>
+        <div class="lock-badge">🔒</div>
+        <div class="icon-11">#</div>
+    </div>
+
+    <div class="card" data-id="12">
+        <span class="num">12</span>
+        <span class="tag">括号</span>
+        <div class="lock-badge">🔒</div>
+        <div class="icon-12">&lt;<b>/</b>&gt;</div>
+    </div>
+
+    <div class="card" data-id="13">
+        <span class="num">13</span>
+        <span class="tag">星号</span>
+        <div class="lock-badge">🔒</div>
+        <div class="icon-13">*</div>
+    </div>
+
+    <div class="card" data-id="14">
+        <span class="num">14</span>
+        <span class="tag">切割</span>
+        <div class="lock-badge">🔒</div>
+        <div class="icon-14"></div>
+    </div>
+
+    <div class="card" data-id="15">
+        <span class="num">15</span>
+        <span class="tag">同心</span>
+        <div class="lock-badge">🔒</div>
+        <div class="icon-15"></div>
+    </div>
+
+    <div class="card" data-id="16">
+        <span class="num">16</span>
+        <span class="tag">对角</span>
+        <div class="lock-badge">🔒</div>
+        <div class="icon-16"></div>
+    </div>
+
+    <div class="card" data-id="17">
+        <span class="num">17</span>
+        <span class="tag">层叠</span>
+        <div class="lock-badge">🔒</div>
+        <div class="icon-17"><span></span><span></span></div>
+    </div>
+
+    <div class="card" data-id="18">
+        <span class="num">18</span>
+        <span class="tag">窗口</span>
+        <div class="lock-badge">🔒</div>
+        <div class="icon-18"></div>
+    </div>
+
+    <div class="card" data-id="19">
+        <span class="num">19</span>
+        <span class="tag">笔尖</span>
+        <div class="lock-badge">🔒</div>
+        <div class="icon-19"></div>
+    </div>
+
+    <div class="card" data-id="20">
+        <span class="num">20</span>
+        <span class="tag">点阵</span>
+        <div class="lock-badge">🔒</div>
+        <div class="icon-20">
+            <b class="on"></b><b class="on"></b><b class="on"></b><b></b><b></b>
+            <b class="on"></b><b></b><b></b><b class="on"></b><b></b>
+            <b class="on"></b><b class="on"></b><b class="on"></b><b></b><b></b>
+            <b class="on"></b><b></b><b></b><b></b><b></b>
+            <b class="on"></b><b></b><b></b><b></b><b></b>
+        </div>
+    </div>
+</div>
+
+<div class="controls">
+    <button class="ctrl-btn" id="resetBtn" title="重置">↻</button>
+    <button class="ctrl-btn" id="tweaksBtn" title="调整">⚙</button>
+</div>
+
+<div class="tweaks-panel" id="tweaksPanel">
+    <h3>Tweaks</h3>
+    <div class="tw-row">
+        <label>Icon Scale</label>
+        <input type="range" id="scaleSlider" min="70" max="130" value="100">
+    </div>
+    <div class="tw-row">
+        <label>Animation Speed</label>
+        <input type="range" id="speedSlider" min="50" max="200" value="100">
+    </div>
+</div>
+
+<script>
+    const cards = document.querySelectorAll('.card');
+    const lotteryBtn = document.getElementById('lotteryBtn');
+    const btnText = document.getElementById('btnText');
+    const resetBtn = document.getElementById('resetBtn');
+    const tweaksBtn = document.getElementById('tweaksBtn');
+    const tweaksPanel = document.getElementById('tweaksPanel');
+    const scaleSlider = document.getElementById('scaleSlider');
+    const speedSlider = document.getElementById('speedSlider');
+
+    let isRunning = false;
+    let animSpeed = 100;
+
+    // Manual selection
+    cards.forEach(card => {
+        card.addEventListener('click', () => {
+            if (!isRunning) {
+                card.classList.toggle('locked');
+            }
+        });
+    });
+
+    // Lottery animation
+    lotteryBtn.addEventListener('click', async () => {
+        if (isRunning) return;
+
+        isRunning = true;
+        lotteryBtn.classList.add('running');
+        btnText.textContent = '抽奖中...';
+
+        // Clear previous highlights
+        cards.forEach(c => c.classList.remove('highlight'));
+
+        // Random highlight animation
+        const rounds = 20;
+        const baseDelay = animSpeed;
+
+        for (let i = 0; i < rounds; i++) {
+            const randomCard = cards[Math.floor(Math.random() * cards.length)];
+            cards.forEach(c => c.classList.remove('highlight'));
+            randomCard.classList.add('highlight');
+            await new Promise(resolve => setTimeout(resolve, baseDelay + i * 10));
+        }
+
+        // Final selection
+        await new Promise(resolve => setTimeout(resolve, 300));
+        const winner = cards[Math.floor(Math.random() * cards.length)];
+        cards.forEach(c => c.classList.remove('highlight'));
+        winner.classList.add('highlight', 'locked');
+
+        isRunning = false;
+        lotteryBtn.classList.remove('running');
+        btnText.textContent = '再次抽奖';
+    });
+
+    // Reset
+    resetBtn.addEventListener('click', () => {
+        cards.forEach(c => {
+            c.classList.remove('locked', 'highlight');
+        });
+        btnText.textContent = '开始抽奖';
+    });
+
+    // Tweaks
+    tweaksBtn.addEventListener('click', () => {
+        tweaksPanel.classList.toggle('show');
+    });
+
+    scaleSlider.addEventListener('input', (e) => {
+        const scale = e.target.value / 100;
+        cards.forEach(card => {
+            const icon = card.querySelector('[class^="icon-"]');
+            if (icon) icon.style.transform = `scale(${scale})`;
+        });
+    });
+
+    speedSlider.addEventListener('input', (e) => {
+        animSpeed = parseInt(e.target.value);
+    });
+</script>
+
+</body>
+</html>

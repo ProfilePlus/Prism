@@ -3,6 +3,8 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { loadFolderTree } from '../domains/workspace/lib/loadFolderTree';
+import { openUrl } from '@tauri-apps/plugin-opener';
+import { openPrismWindow } from './openWindow';
 
 export async function executeMenuAction(
   action: string,
@@ -39,17 +41,16 @@ export async function executeMenuAction(
       case 'showFiles':
         return handleShowSidebarTab('files', context);
       case 'showSearch':
-        return handleShowSidebarTab('search', context);
+        window.dispatchEvent(new CustomEvent('prism-search', { detail: { action: 'open' } }));
+        return;
       case 'focusMode':
         return handleFocusMode(context);
       case 'alwaysOnTop':
-        return await handleAlwaysOnTop();
+        return await handleAlwaysOnTop(context);
       case 'typewriterMode':
-        window.dispatchEvent(new CustomEvent('prism-editor-command', { detail: { command: 'typewriterMode' } }));
-        return;
+        return context.workspaceStore.toggleTypewriterMode();
       case 'statusBar':
-        context.showToast?.('状态栏切换功能即将推出');
-        return;
+        return context.workspaceStore.toggleStatusBar();
       case 'devTools':
         return await handleDevTools();
 
@@ -104,22 +105,25 @@ export async function executeMenuAction(
 
       // ═══ 窗口控制 ═══
       case 'fullscreen':
-        return await handleFullscreen();
+        return await handleFullscreen(context);
       case 'actualSize':
         return handleZoom('reset');
       case 'zoomIn':
         return handleZoom('in');
       case 'zoomOut':
         return handleZoom('out');
-
-      // ═══ 主题 ═══
+      case 'alwaysOnTop':
+        return await handleAlwaysOnTop(context);
       case 'themeGithub':
+        return context.settingsStore.setContentTheme('github');
       case 'themeWhitey':
+        return context.settingsStore.setContentTheme('whitey');
       case 'themeNewsprint':
+        return context.settingsStore.setContentTheme('newsprint');
       case 'themePixyll':
-        return handleTheme('light', context);
+        return context.settingsStore.setContentTheme('pixyll');
       case 'themeNight':
-        return handleTheme('dark', context);
+        return context.settingsStore.setContentTheme('night');
 
       // ═══ 帮助菜单 ═══
       case 'whatsNew':
@@ -147,11 +151,8 @@ export async function executeMenuAction(
         return;
 
       // ═══ 剩余文件菜单 ═══
-      case 'newWindow': {
-        const m = await import('@tauri-apps/api/webviewWindow');
-        new m.WebviewWindow(`prism-${Date.now()}`, { url: '/', title: 'Prism' });
-        return;
-      }
+      case 'newWindow':
+        return await openPrismWindow({});
       case 'quickOpen':
         return await handleOpen(context);
       case 'saveAll':
@@ -200,7 +201,17 @@ export async function executeMenuAction(
 // ══════════════════════════════════════════════════════════
 
 async function handleNew(context: MenuActionContext): Promise<void> {
-  context.documentStore.createNewDocument();
+  if (!context.documentStore.currentDocument) {
+    context.documentStore.createNewDocument();
+  } else {
+    await openPrismWindow({});
+  }
+}
+
+function dirname(path: string): string {
+  const parts = path.split(/[\\/]/);
+  parts.pop();
+  return parts.join(path.includes('\\') ? '\\' : '/');
 }
 
 async function handleOpen(context: MenuActionContext): Promise<void> {
@@ -211,9 +222,23 @@ async function handleOpen(context: MenuActionContext): Promise<void> {
 
   if (!selected || Array.isArray(selected)) return;
 
-  const content = await readTextFile(selected);
-  const name = selected.split(/[\\/]/).pop() ?? 'Untitled.md';
-  context.documentStore.openDocument(selected, name, content);
+  if (!context.documentStore.currentDocument) {
+    const content = await readTextFile(selected);
+    const name = selected.split(/[\\/]/).pop() ?? 'Untitled.md';
+    context.documentStore.openDocument(selected, name, content);
+
+    // 加载父目录的文件树
+    try {
+      const parentDir = dirname(selected);
+      context.workspaceStore.setRootPath(parentDir);
+      const tree = await loadFolderTree(parentDir);
+      context.workspaceStore.setFileTree(tree);
+    } catch (err) {
+      console.error('[Menu] Failed to load parent folder tree:', err);
+    }
+  } else {
+    await openPrismWindow({ filePath: selected });
+  }
 }
 
 async function handleOpenFolder(context: MenuActionContext): Promise<void> {
@@ -221,13 +246,16 @@ async function handleOpenFolder(context: MenuActionContext): Promise<void> {
 
   if (!selected || Array.isArray(selected)) return;
 
-  context.workspaceStore.setRootPath(selected);
-
-  try {
-    const tree = await loadFolderTree(selected);
-    context.workspaceStore.setFileTree(tree);
-  } catch (err) {
-    console.error('[Menu] Failed to load folder tree:', err);
+  if (!context.documentStore.currentDocument) {
+    context.workspaceStore.setRootPath(selected);
+    try {
+      const tree = await loadFolderTree(selected);
+      context.workspaceStore.setFileTree(tree);
+    } catch (err) {
+      console.error('[Menu] Failed to load folder tree:', err);
+    }
+  } else {
+    await openPrismWindow({ folderPath: selected });
   }
 }
 
@@ -303,7 +331,9 @@ function handleFocusMode(context: MenuActionContext): void {
 }
 
 async function handleDevTools(): Promise<void> {
-  console.log('[Menu] DevTools: Use Shift+F12 or right-click > Inspect');
+  // 在 Tauri v2 中，可以使用 getCurrentWindow().close() 等，但调试窗口通常是核心功能
+  // 暂时通过 console 信息提示
+  console.log('[DevTools] Press Shift+F12 or Ctrl+Shift+I (if enabled in tauri.conf.json) to open Inspector');
 }
 
 // ══════════════════════════════════════════════════════════
@@ -362,17 +392,19 @@ function handleBlockFormat(
 // 窗口控制
 // ══════════════════════════════════════════════════════════
 
-async function handleFullscreen(): Promise<void> {
+async function handleFullscreen(context: MenuActionContext): Promise<void> {
   const win = getCurrentWindow();
   const isFull = await win.isFullscreen();
   await win.setFullscreen(!isFull);
+  context.workspaceStore.setFullscreen(!isFull);
 }
 
-async function handleAlwaysOnTop(): Promise<void> {
+async function handleAlwaysOnTop(context: MenuActionContext): Promise<void> {
   const win = getCurrentWindow();
   const isOnTop = await win.isAlwaysOnTop?.();
   if (isOnTop !== undefined) {
     await win.setAlwaysOnTop(!isOnTop);
+    context.workspaceStore.setAlwaysOnTop(!isOnTop);
   }
 }
 
@@ -383,35 +415,24 @@ const ZOOM_MAX = 3.0;
 function handleZoom(direction: 'in' | 'out' | 'reset'): void {
   const el = document.documentElement;
   if (direction === 'reset') {
-    el.style.zoom = '1';
+    el.style.setProperty('--app-zoom', '1');
     return;
   }
 
-  const current = parseFloat(el.style.zoom || '1');
+  const current = parseFloat(getComputedStyle(el).getPropertyValue('--app-zoom') || '1');
   const next =
     direction === 'in'
       ? Math.min(current + ZOOM_STEP, ZOOM_MAX)
       : Math.max(current - ZOOM_STEP, ZOOM_MIN);
 
-  el.style.zoom = String(Math.round(next * 100) / 100);
-}
-
-// ══════════════════════════════════════════════════════════
-// 主题
-// ══════════════════════════════════════════════════════════
-
-function handleTheme(
-  theme: 'light' | 'dark',
-  context: MenuActionContext
-): void {
-  context.settingsStore.setTheme(theme);
+  el.style.setProperty('--app-zoom', String(Math.round(next * 100) / 100));
 }
 
 // ══════════════════════════════════════════════════════════
 // 帮助链接
 // ══════════════════════════════════════════════════════════
 
-function handleHelpLink(action: string): void {
+async function handleHelpLink(action: string): Promise<void> {
   const urls: Record<string, string> = {
     whatsNew: 'https://github.com/prism-editor/prism/releases',
     quickStart: 'https://github.com/prism-editor/prism/wiki/quick-start',
@@ -428,5 +449,11 @@ function handleHelpLink(action: string): void {
     feedback: 'https://github.com/prism-editor/prism/issues',
   };
   const url = urls[action];
-  if (url) window.open(url, '_blank');
+  if (url) {
+    try {
+      await openUrl(url);
+    } catch (err) {
+      console.error('[handleHelpLink] Failed to open URL:', err);
+    }
+  }
 }

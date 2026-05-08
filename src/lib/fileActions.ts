@@ -1,0 +1,453 @@
+import {
+  exists,
+  mkdir,
+  readTextFile,
+  remove,
+  rename,
+  stat,
+  writeTextFile,
+} from '@tauri-apps/plugin-fs';
+import { confirm, message } from '@tauri-apps/plugin-dialog';
+import { openPath, revealItemInDir } from '@tauri-apps/plugin-opener';
+import { useDocumentStore } from '../domains/document/store';
+import { useWorkspaceStore } from '../domains/workspace/store';
+import { loadFolderTree } from '../domains/workspace/lib/loadFolderTree';
+import { openPrismWindow } from './openWindow';
+
+export type FileActionInput =
+  | string
+  | {
+      action: string;
+      path?: string;
+      name?: string;
+    };
+
+interface FileActionContext {
+  documentStore: ReturnType<typeof useDocumentStore.getState>;
+  workspaceStore: ReturnType<typeof useWorkspaceStore.getState>;
+  showToast?: (message: string) => void;
+}
+
+interface ParsedFileAction {
+  command: string;
+  path?: string;
+  name?: string;
+}
+
+function parseAction(input: FileActionInput): ParsedFileAction {
+  if (typeof input !== 'string') {
+    const separatorIndex = input.action.indexOf(':');
+    if (separatorIndex === -1) {
+      return {
+        command: input.action,
+        path: input.path,
+        name: input.name,
+      };
+    }
+
+    return {
+      command: input.action.slice(0, separatorIndex),
+      path: input.path ?? input.action.slice(separatorIndex + 1),
+      name: input.name,
+    };
+  }
+
+  const separatorIndex = input.indexOf(':');
+  if (separatorIndex === -1) {
+    return { command: input };
+  }
+
+  return {
+    command: input.slice(0, separatorIndex),
+    path: input.slice(separatorIndex + 1),
+  };
+}
+
+function basename(path: string): string {
+  const parts = path.split(/[\\/]/);
+  return parts[parts.length - 1] || path;
+}
+
+function dirname(path: string): string {
+  const parts = path.split(/[\\/]/);
+  parts.pop();
+  return parts.join(path.includes('\\') ? '\\' : '/');
+}
+
+function joinPath(dir: string, name: string): string {
+  const normalizedDir = dir.replace(/[\\/]$/, '');
+  const sep = dir.includes('\\') ? '\\' : '/';
+  return `${normalizedDir}${sep}${name}`;
+}
+
+function splitName(name: string): { stem: string; ext: string } {
+  const index = name.lastIndexOf('.');
+  if (index <= 0) return { stem: name, ext: '' };
+  return { stem: name.slice(0, index), ext: name.slice(index) };
+}
+
+function normalizeForCompare(path: string): string {
+  return path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+}
+
+function isSamePath(a: string, b: string): boolean {
+  return normalizeForCompare(a) === normalizeForCompare(b);
+}
+
+function isPathInside(path: string, possibleParent: string): boolean {
+  const normalizedPath = normalizeForCompare(path);
+  const normalizedParent = normalizeForCompare(possibleParent);
+  return normalizedPath === normalizedParent || normalizedPath.startsWith(`${normalizedParent}/`);
+}
+
+function replacePathPrefix(path: string, oldPrefix: string, newPrefix: string): string {
+  if (!isPathInside(path, oldPrefix)) return path;
+  const trimmedOldPrefix = oldPrefix.replace(/[\\/]+$/, '');
+  const suffix = path.slice(trimmedOldPrefix.length);
+  return `${newPrefix}${suffix}`;
+}
+
+function formatError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes)) return '未知';
+  if (bytes < 1024) return `${bytes} B`;
+
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let value = bytes / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${value.toFixed(value >= 10 ? 1 : 2)} ${units[unitIndex]}`;
+}
+
+function formatDate(date: Date | null): string {
+  return date ? date.toLocaleString() : '不可用';
+}
+
+function requestInlineRename(path: string): void {
+  window.dispatchEvent(new CustomEvent('prism-file-rename-request', { detail: { path } }));
+}
+
+async function copyText(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.left = '-9999px';
+  textarea.style.top = '0';
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  const copied = document.execCommand('copy');
+  document.body.removeChild(textarea);
+
+  if (!copied) {
+    throw new Error('无法写入系统剪贴板');
+  }
+}
+
+async function refreshWorkspace(context: FileActionContext, rootPath = context.workspaceStore.rootPath): Promise<void> {
+  if (!rootPath) return;
+  const tree = await loadFolderTree(rootPath);
+  context.workspaceStore.setFileTree(tree);
+}
+
+async function getUniquePath(parentDir: string, stem: string, ext = ''): Promise<string> {
+  for (let index = 0; index < 1000; index += 1) {
+    const suffix = index === 0 ? '' : ` (${index})`;
+    const candidate = joinPath(parentDir, `${stem}${suffix}${ext}`);
+    if (!(await exists(candidate))) return candidate;
+  }
+
+  throw new Error(`无法生成不重名的路径: ${stem}${ext}`);
+}
+
+async function getUniqueCopyPath(originalPath: string): Promise<string> {
+  const parentDir = dirname(originalPath);
+  const { stem, ext } = splitName(basename(originalPath));
+
+  for (let index = 0; index < 1000; index += 1) {
+    const suffix = index === 0 ? ' (副本)' : ` (副本 ${index})`;
+    const candidate = joinPath(parentDir, `${stem}${suffix}${ext}`);
+    if (!(await exists(candidate))) return candidate;
+  }
+
+  throw new Error(`无法生成副本路径: ${basename(originalPath)}`);
+}
+
+function getWorkspaceTargetDir(context: FileActionContext, requestedPath?: string): string | null {
+  if (requestedPath) return requestedPath;
+  if (context.workspaceStore.rootPath) return context.workspaceStore.rootPath;
+
+  context.showToast?.('请先打开一个工作区文件夹');
+  return null;
+}
+
+async function handleOpenFile(path: string, context: FileActionContext): Promise<void> {
+  const content = await readTextFile(path);
+  context.documentStore.openDocument(path, basename(path), content);
+}
+
+async function handleOpenNewWindow(path: string | undefined, context: FileActionContext): Promise<void> {
+  if (path) {
+    const info = await stat(path);
+    await openPrismWindow(info.isDirectory ? { folderPath: path } : { filePath: path });
+    return;
+  }
+
+  if (!context.workspaceStore.rootPath) {
+    throw new Error('当前没有打开的工作区');
+  }
+
+  await openPrismWindow({ folderPath: context.workspaceStore.rootPath });
+}
+
+async function handleNewFile(parentPath: string | undefined, context: FileActionContext): Promise<void> {
+  const targetDir = getWorkspaceTargetDir(context, parentPath);
+  if (!targetDir) return;
+
+  const filePath = await getUniquePath(targetDir, '未命名', '.md');
+  await writeTextFile(filePath, '', { createNew: true });
+  const content = await readTextFile(filePath);
+  context.documentStore.openDocument(filePath, basename(filePath), content);
+  await refreshWorkspace(context);
+  requestInlineRename(filePath);
+  context.showToast?.('已创建新文件');
+}
+
+async function handleNewFolder(parentPath: string | undefined, context: FileActionContext): Promise<void> {
+  const targetDir = getWorkspaceTargetDir(context, parentPath);
+  if (!targetDir) return;
+
+  const folderPath = await getUniquePath(targetDir, '新建文件夹');
+  await mkdir(folderPath);
+  context.workspaceStore.setFileTreeMode('tree');
+  await refreshWorkspace(context);
+  requestInlineRename(folderPath);
+  context.showToast?.('已创建新文件夹');
+}
+
+async function handleCommitRename(path: string, newName: string, context: FileActionContext): Promise<void> {
+  const safeName = newName.trim();
+  if (!safeName) {
+    context.showToast?.('名称不能为空');
+    return;
+  }
+  if (/[\\/]/.test(safeName)) {
+    context.showToast?.('名称不能包含路径分隔符');
+    return;
+  }
+
+  const oldInfo = await stat(path);
+  const targetPath = joinPath(dirname(path), safeName);
+  if (isSamePath(path, targetPath)) return;
+
+  if ((await exists(targetPath)) && !isSamePath(path, targetPath)) {
+    context.showToast?.(`“${safeName}” 已存在`);
+    return;
+  }
+
+  await rename(path, targetPath);
+
+  const doc = context.documentStore.currentDocument;
+  if (doc?.path) {
+    if (isSamePath(doc.path, path)) {
+      context.documentStore.updateDocumentPath(doc.path, targetPath, basename(targetPath));
+    } else if (oldInfo.isDirectory && isPathInside(doc.path, path)) {
+      const nextDocumentPath = replacePathPrefix(doc.path, path, targetPath);
+      context.documentStore.updateDocumentPath(doc.path, nextDocumentPath, basename(nextDocumentPath));
+    }
+  }
+
+  await refreshWorkspace(context);
+  context.showToast?.('重命名完成');
+}
+
+async function handleDuplicate(path: string, context: FileActionContext): Promise<void> {
+  const info = await stat(path);
+  if (!info.isFile) {
+    context.showToast?.('只能为文件创建副本');
+    return;
+  }
+
+  const content = await readTextFile(path);
+  const targetPath = await getUniqueCopyPath(path);
+  await writeTextFile(targetPath, content, { createNew: true });
+  await refreshWorkspace(context);
+  context.showToast?.(`已创建副本: ${basename(targetPath)}`);
+}
+
+async function handleDelete(path: string, context: FileActionContext): Promise<void> {
+  const info = await stat(path);
+  const confirmed = await confirm(
+    `确定要删除“${basename(path)}”吗？此操作不可撤销。`,
+    {
+      title: '删除确认',
+      kind: 'warning',
+      okLabel: '删除',
+      cancelLabel: '取消',
+    },
+  );
+
+  if (!confirmed) return;
+
+  await remove(path, { recursive: info.isDirectory });
+
+  const doc = context.documentStore.currentDocument;
+  if (doc?.path && (isSamePath(doc.path, path) || (info.isDirectory && isPathInside(doc.path, path)))) {
+    context.documentStore.closeDocument();
+  }
+
+  await refreshWorkspace(context);
+  context.showToast?.('已删除');
+}
+
+async function handleOpenLocation(path: string): Promise<void> {
+  const info = await stat(path);
+  if (info.isDirectory) {
+    await openPath(path);
+    return;
+  }
+
+  await revealItemInDir(path);
+}
+
+async function handleCopyPath(path: string, context: FileActionContext): Promise<void> {
+  await copyText(path);
+  context.showToast?.('路径已复制到剪贴板');
+}
+
+async function handleProperties(path: string): Promise<void> {
+  const info = await stat(path);
+  const details = [
+    `名称: ${basename(path)}`,
+    `路径: ${path}`,
+    `类型: ${info.isDirectory ? '文件夹' : info.isFile ? '文件' : '符号链接'}`,
+    `大小: ${formatBytes(info.size)}`,
+    `创建时间: ${formatDate(info.birthtime)}`,
+    `修改时间: ${formatDate(info.mtime)}`,
+    `访问时间: ${formatDate(info.atime)}`,
+    `只读: ${info.readonly ? '是' : '否'}`,
+  ].join('\n');
+
+  await message(details, { title: '属性', kind: 'info' });
+}
+
+async function handleRefresh(context: FileActionContext): Promise<void> {
+  if (!context.workspaceStore.rootPath) {
+    context.showToast?.('当前没有打开的工作区');
+    return;
+  }
+
+  await refreshWorkspace(context);
+  context.showToast?.('文件树已刷新');
+}
+
+export async function executeFileAction(
+  input: FileActionInput,
+  context: FileActionContext,
+): Promise<void> {
+  const { command, path, name } = parseAction(input);
+
+  try {
+    switch (command) {
+      case 'openFile':
+        if (!path) throw new Error('缺少文件路径');
+        await handleOpenFile(path, context);
+        return;
+
+      case 'openNewWindow':
+        await handleOpenNewWindow(path, context);
+        return;
+
+      case 'newFile':
+        await handleNewFile(path, context);
+        return;
+
+      case 'newFolder':
+        await handleNewFolder(path, context);
+        return;
+
+      case 'rename':
+        if (!path) throw new Error('缺少重命名路径');
+        requestInlineRename(path);
+        return;
+
+      case 'commitRename':
+        if (!path || name === undefined) throw new Error('缺少重命名参数');
+        await handleCommitRename(path, name, context);
+        return;
+
+      case 'duplicate':
+        if (!path) throw new Error('缺少副本路径');
+        await handleDuplicate(path, context);
+        return;
+
+      case 'delete':
+        if (!path) throw new Error('缺少删除路径');
+        await handleDelete(path, context);
+        return;
+
+      case 'openRootLocation':
+        if (!context.workspaceStore.rootPath) throw new Error('当前没有打开的工作区');
+        await openPath(context.workspaceStore.rootPath);
+        return;
+
+      case 'openLocation':
+        if (!path) throw new Error('缺少打开位置路径');
+        await handleOpenLocation(path);
+        return;
+
+      case 'copyRootPath':
+        if (!context.workspaceStore.rootPath) throw new Error('当前没有打开的工作区');
+        await handleCopyPath(context.workspaceStore.rootPath, context);
+        return;
+
+      case 'copyPath':
+        if (!path) throw new Error('缺少复制路径');
+        await handleCopyPath(path, context);
+        return;
+
+      case 'properties':
+        if (!path) throw new Error('缺少属性路径');
+        await handleProperties(path);
+        return;
+
+      case 'refreshFolder':
+        await handleRefresh(context);
+        return;
+
+      case 'viewList':
+        context.workspaceStore.setFileTreeMode('list');
+        return;
+
+      case 'viewTree':
+        context.workspaceStore.setFileTreeMode('tree');
+        return;
+
+      case 'searchInFolder':
+        if (!context.workspaceStore.rootPath) throw new Error('当前没有打开的工作区');
+        window.dispatchEvent(new CustomEvent('prism-search', {
+          detail: { action: 'open', rootPath: context.workspaceStore.rootPath },
+        }));
+        return;
+
+      default:
+        context.showToast?.(`功能“${command}”尚未实现`);
+    }
+  } catch (err) {
+    console.error(`[FileAction] ${command} failed:`, err);
+    context.showToast?.(`操作失败: ${formatError(err)}`);
+  }
+}

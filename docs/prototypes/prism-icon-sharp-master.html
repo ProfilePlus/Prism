@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prism - The Sharp Dev Master</title>
+    <style>
+        :root {
+            --bg: #050506;
+            --text: #ffffff;
+            --p-color: #ffffff;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: "SF Mono", "Consolas", monospace;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 120px 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 100px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: #555;
+        }
+
+        /* --- THE SHARP DEV MASTER ICON --- */
+        .monolith {
+            width: 120px; 
+            height: 160px; 
+            background: rgba(255,255,255,0.08); 
+            backdrop-filter: blur(25px); 
+            -webkit-backdrop-filter: blur(25px);
+            border-radius: 4px; /* Sharper radius for technical look */
+            transform: rotateY(-20deg) rotateX(10deg); 
+            box-shadow: 
+                30px 40px 80px rgba(0,0,0,0.8),
+                inset 0 0 0 1px rgba(255,255,255,0.1); 
+            border: 1px solid rgba(255,255,255,0.2); 
+            overflow: hidden; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            position: relative;
+        }
+
+        .refraction {
+            position: absolute; 
+            width: 180%; 
+            height: 180%; 
+            background: 
+                radial-gradient(circle at 20% 20%, #ec4899 0%, transparent 50%), 
+                radial-gradient(circle at 80% 80%, #3b82f6 0%, transparent 50%); 
+            opacity: 0.7; 
+            filter: blur(20px); /* Reduced blur for sharper light boundaries */
+            z-index: 0;
+        }
+
+        .symbol-p {
+            z-index: 1; 
+            color: #fff; 
+            font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+            font-weight: 700; 
+            font-size: 82px; 
+            opacity: 1; /* Pure white, no transparency loss */
+            filter: none; /* ABSOLUTELY NO GLOW - SHARP ONLY */
+            line-height: 1;
+            user-select: none;
+            text-rendering: optimizeLegibility;
+        }
+
+        /* Technical Grid Overlay (Subtle hint of logic) */
+        .grid-hint {
+            position: absolute;
+            inset: 0;
+            background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 10px 10px;
+            z-index: 0;
+        }
+
+        .label {
+            margin-top: 40px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.2em;
+            color: #3b82f6;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Prism Master [Revision: Sharp]</h1>
+</div>
+
+<div class="monolith">
+    <div class="refraction"></div>
+    <div class="grid-hint"></div>
+    <div class="symbol-p">P</div>
+</div>
+
+<div class="label">Logical &middot; Code-Centric &middot; Sharp</div>
+
+</body>
+</html>

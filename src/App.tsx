@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { useDocumentStore } from './domains/document/store';
 import { useSettingsStore } from './domains/settings/store';
 import { useWorkspaceStore } from './domains/workspace/store';
@@ -7,7 +7,7 @@ import { DocumentView } from './domains/document/components/DocumentView';
 import { StatusBar } from './domains/workspace/components/StatusBar';
 import { Sidebar } from './domains/workspace/components/Sidebar';
 import { useBootstrap } from './hooks/useBootstrap';
-import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
+import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { save } from '@tauri-apps/plugin-dialog';
 import { EditorPaneHandle } from './domains/editor/components/EditorPane';
 import { exportToHtml } from './lib/exportToHtml';
@@ -15,6 +15,8 @@ import { WindowShell } from './components/shell/WindowShell';
 import { TitleBar } from './components/shell/TitleBar';
 import { MenuBar } from './components/shell/MenuBar';
 import { executeMenuAction } from './lib/menuActions';
+import { executeFileAction, FileActionInput } from './lib/fileActions';
+import { ContextMenu } from './components/shell/ContextMenu';
 
 function basename(path: string): string {
   const parts = path.split(/[\\/]/);
@@ -26,85 +28,175 @@ function App() {
   const openDocument = useDocumentStore((s) => s.openDocument);
   const setViewMode = useDocumentStore((s) => s.setViewMode);
   const markSaved = useDocumentStore((s) => s.markSaved);
-  const { theme } = useSettingsStore();
-  const { fileTree, sidebarVisible, focusMode } = useWorkspaceStore();
+  
+  const { loadSettings } = useSettingsStore();
+  const workspace = useWorkspaceStore();
 
   const editorRef = useRef<EditorPaneHandle>(null);
+  const toastTimerRef = useRef<number | null>(null);
   const [cursor, setCursor] = useState({ line: 1, column: 1 });
+  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
+  const [globalContextMenu, setGlobalContextMenu] = useState<{ x: number, y: number, items: any[] } | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useBootstrap();
   useAutoSave(2000);
 
   useEffect(() => {
-    useSettingsStore.getState().loadSettings();
-  }, []);
+    const params = new URLSearchParams(window.location.search);
+    let changed = false;
+    if (currentDocument?.path) {
+      if (params.get('file') !== currentDocument.path) {
+        params.set('file', currentDocument.path);
+        changed = true;
+      }
+    }
+    if (workspace.rootPath) {
+      if (params.get('folder') !== workspace.rootPath) {
+        params.set('folder', workspace.rootPath);
+        changed = true;
+      }
+    }
+    if (changed) {
+      const newUrl = `${window.location.pathname}?${params.toString()}`;
+      window.history.replaceState({ path: newUrl }, '', newUrl);
+    }
+  }, [currentDocument?.path, workspace.rootPath]);
 
   useEffect(() => {
-    const handleKeyDown = async (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        if (!currentDocument || !currentDocument.isDirty) return;
+    loadSettings();
+  }, [loadSettings]);
 
-        try {
-          let targetPath = currentDocument.path;
-
-          if (!targetPath) {
-            const chosen = await save({
-              filters: [{ name: 'Markdown', extensions: ['md'] }],
-              defaultPath: currentDocument.name,
-            });
-            if (!chosen) return;
-            targetPath = chosen;
-          }
-
-          await writeTextFile(targetPath, currentDocument.content);
-
-          if (!currentDocument.path) {
-            const name = targetPath.split(/[\\/]/).pop() || 'Untitled.md';
-            openDocument(targetPath, name, currentDocument.content);
-          }
-
-          markSaved();
-          console.log('[App] Manual save success:', targetPath);
-        } catch (err) {
-          console.error('[App] Manual save failed:', err);
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentDocument, markSaved, openDocument]);
-
-  const wordCount = currentDocument
-    ? currentDocument.content.split(/\s+/).filter(Boolean).length
-    : 0;
-
-  const handleViewModeChange = (mode: 'edit' | 'split' | 'preview') => {
-    setViewMode(mode);
-  };
-
-  const handleOutlineClick = (line: number) => {
-    editorRef.current?.jumpToLine(line);
-  };
-
-  const handleExportHtml = async () => {
-    if (!currentDocument) return;
-    try {
-      await exportToHtml(currentDocument.content, currentDocument.name);
-      console.log('[App] HTML export success');
-    } catch (err) {
-      console.error('[App] HTML export failed:', err);
+  const showToast = useCallback((message: string) => {
+    setToastMessage(message);
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
     }
-  };
+    toastTimerRef.current = window.setTimeout(() => setToastMessage(null), 2800);
+  }, []);
 
-  const handleMenuAction = async (action: string) => {
+  useEffect(() => () => {
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+  }, []);
+
+  const handleFileAction = useCallback(async (input: FileActionInput) => {
+    await executeFileAction(input, {
+      documentStore: useDocumentStore.getState(),
+      workspaceStore: useWorkspaceStore.getState(),
+      showToast,
+    });
+  }, [showToast]);
+
+  const handleFileClick = useCallback(async (path: string) => {
+    await handleFileAction({ action: 'openFile', path });
+  }, [handleFileAction]);
+
+  const handleMenuAction = useCallback(async (action: string) => {
     await executeMenuAction(action, {
       documentStore: useDocumentStore.getState(),
       settingsStore: useSettingsStore.getState(),
       workspaceStore: useWorkspaceStore.getState(),
-      showToast: (msg) => console.log('[Toast]', msg),
+      showToast,
     });
+  }, [showToast]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<FileActionInput>).detail;
+      handleFileAction(detail);
+    };
+    window.addEventListener('prism-file-action' as any, handler);
+    return () => window.removeEventListener('prism-file-action' as any, handler);
+  }, [handleFileAction]);
+
+  const handleKeyDown = useCallback(async (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && workspace.focusMode) {
+      workspace.toggleFocusMode();
+      return;
+    }
+    const ctrl = e.ctrlKey || e.metaKey;
+    const shift = e.shiftKey;
+    const alt = e.altKey;
+    const code = e.code;
+
+    if (ctrl && !shift && !alt && code === 'KeyS') {
+      e.preventDefault();
+      if (!currentDocument || !currentDocument.isDirty) return;
+      try {
+        let targetPath = currentDocument.path;
+        if (!targetPath) {
+          const chosen = await save({
+            filters: [{ name: 'Markdown', extensions: ['md'] }],
+            defaultPath: currentDocument.name,
+          });
+          if (!chosen) return;
+          targetPath = chosen;
+        }
+        await writeTextFile(targetPath, currentDocument.content);
+        if (!currentDocument.path) {
+          openDocument(targetPath, basename(targetPath), currentDocument.content);
+        }
+        markSaved();
+      } catch (err) {
+        console.error('[App] Manual save failed:', err);
+        showToast(`保存失败: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      return;
+    }
+
+    let action: string | null = null;
+    if (ctrl && !shift && !alt) {
+      action = ({
+        KeyN: 'new', KeyO: 'open', KeyP: 'quickOpen', Comma: 'preferences',
+        Digit1: 'h1', Digit2: 'h2', Digit3: 'h3', Digit4: 'h4', Digit5: 'h5', Digit6: 'h6', Digit0: 'paragraph',
+        Equal: 'increaseHeading', Minus: 'decreaseHeading', Slash: 'sourceMode',
+        KeyB: 'bold', KeyI: 'italic', KeyU: 'underline', KeyK: 'link', Backslash: 'clearFormat',
+      } as Record<string, string>)[code] ?? null;
+    } else if (ctrl && shift && !alt) {
+      action = ({
+        KeyN: 'newWindow', KeyS: 'saveAs', KeyC: 'copyMd', KeyV: 'pastePlain', KeyL: 'toggleSidebar',
+        Digit1: 'showOutline', Digit2: 'showDocs', Digit3: 'showFiles', Digit9: 'actualSize',
+        KeyF: 'showSearch', KeyM: 'mathBlock', KeyK: 'codeBlock', KeyQ: 'quote',
+        BracketLeft: 'orderedList', BracketRight: 'unorderedList', KeyX: 'taskList', Backquote: 'inlineCode',
+        Equal: 'zoomIn', Minus: 'zoomOut',
+      } as Record<string, string>)[code] ?? null;
+    } else if (!ctrl && !shift && !alt) {
+      action = ({ F8: 'focusMode', F9: 'typewriterMode', F11: 'fullscreen' } as Record<string, string>)[code] ?? null;
+    } else if (!ctrl && shift && !alt && code === 'F12') {
+      action = 'devTools';
+    }
+    if (action) {
+      e.preventDefault();
+      handleMenuAction(action);
+    }
+  }, [currentDocument, markSaved, openDocument, workspace, handleMenuAction, showToast]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
+  const handleFolderContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const items = [
+      { label: '在新窗口中打开', action: 'openNewWindow' },
+      { type: 'separator' },
+      { label: '新建文件', action: 'newFile' },
+      { label: '新建文件夹', action: 'newFolder' },
+      { type: 'separator' },
+      { label: '搜索', action: 'searchInFolder' },
+      { type: 'separator' },
+      { label: '文档列表', action: 'viewList', checked: workspace.fileTreeMode === 'list' },
+      { label: '文档树', action: 'viewTree', checked: workspace.fileTreeMode === 'tree' },
+      { type: 'separator' },
+      { label: '刷新', action: 'refreshFolder' },
+      { type: 'separator' },
+      { label: '复制文件路径', action: 'copyRootPath' },
+      { label: '打开文件位置', action: 'openRootLocation' },
+    ];
+    setGlobalContextMenu({ x: e.clientX, y: e.clientY, items });
   };
 
   const titleText = currentDocument
@@ -113,42 +205,86 @@ function App() {
 
   return (
     <WindowShell>
-      {!focusMode && <TitleBar title={titleText} />}
-      {!focusMode && <MenuBar onAction={handleMenuAction} />}
-      <div style={{ flex: 1, display: 'flex', minHeight: 0, minWidth: 0 }}>
-        {sidebarVisible && !focusMode && (
-          <Sidebar
-            fileTree={fileTree}
-            documentContent={currentDocument?.content ?? ''}
-            activePath={currentDocument?.path}
-            onFileClick={async (path) => {
-              try {
-                const content = await readTextFile(path);
-                openDocument(path, basename(path), content);
-              } catch (err) {
-                console.error('[App] Failed to switch file:', err);
-              }
-            }}
-            onOutlineClick={handleOutlineClick}
-          />
+      {!workspace.focusMode && <TitleBar title={titleText} />}
+      {!workspace.focusMode && <MenuBar onAction={handleMenuAction} />}
+      <div className="app-main" style={{ flex: 1, display: 'flex', minHeight: 0, minWidth: 0 }}>
+        {workspace.sidebarVisible && !workspace.focusMode && (
+          <div 
+            onMouseEnter={() => setIsSidebarHovered(true)}
+            onMouseLeave={() => setIsSidebarHovered(false)}
+            style={{ display: 'flex', flexDirection: 'column' }}
+          >
+            <Sidebar
+              fileTree={workspace.fileTree}
+              sidebarTab={workspace.sidebarTab}
+              setSidebarTab={workspace.setSidebarTab}
+              documentContent={currentDocument?.content ?? ''}
+              activePath={currentDocument?.path}
+              onFileClick={handleFileClick}
+              onOutlineClick={(line) => editorRef.current?.jumpToLine(line)}
+            />
+          </div>
         )}
-        <DocumentView ref={editorRef} onCursorChange={setCursor} />
+        <DocumentView 
+          key={currentDocument?.path || 'new-doc'} 
+          ref={editorRef} 
+          onCursorChange={setCursor} 
+        />
       </div>
 
-      {currentDocument && !focusMode && (
+      {currentDocument && !workspace.focusMode && workspace.statusBarVisible && (
         <StatusBar
           viewMode={currentDocument.viewMode}
-          wordCount={wordCount}
+          wordCount={currentDocument.content.split(/\s+/).filter(Boolean).length}
           cursor={cursor}
-          theme={theme}
-          onViewModeChange={handleViewModeChange}
-          onExportHtml={handleExportHtml}
-          onToggleFocusMode={() => useWorkspaceStore.getState().toggleFocusMode()}
-          onToggleTheme={() => {
-            const s = useSettingsStore.getState();
-            s.setTheme(s.theme === 'light' ? 'dark' : 'light');
-          }}
+          sidebarVisible={workspace.sidebarVisible}
+          isSidebarHovered={isSidebarHovered}
+          onMouseEnter={() => setIsSidebarHovered(true)}
+          onMouseLeave={() => setIsSidebarHovered(false)}
+          onViewModeChange={setViewMode}
+          onExportHtml={() => currentDocument && exportToHtml(currentDocument.content, currentDocument.name)}
+          onToggleFocusMode={() => workspace.toggleFocusMode()}
+          onToggleSidebar={() => workspace.toggleSidebar()}
+          onFolderContextMenu={handleFolderContextMenu}
+          onNewFile={() => handleFileAction('newFile')}
+          onToggleFileTreeMode={() => handleFileAction(workspace.fileTreeMode === 'tree' ? 'viewList' : 'viewTree')}
         />
+      )}
+
+      {globalContextMenu && (
+        <ContextMenu
+          x={globalContextMenu.x}
+          y={globalContextMenu.y}
+          items={globalContextMenu.items}
+          onAction={handleFileAction}
+          onClose={() => setGlobalContextMenu(null)}
+        />
+      )}
+
+      {toastMessage && (
+        <div
+          role="status"
+          className="prism-toast"
+          style={{
+            position: 'fixed',
+            left: '50%',
+            bottom: workspace.statusBarVisible && !workspace.focusMode ? '44px' : '18px',
+            transform: 'translateX(-50%)',
+            zIndex: 20000,
+            maxWidth: 'min(520px, calc(100vw - 40px))',
+            padding: '9px 14px',
+            borderRadius: '8px',
+            border: '1px solid var(--stroke-surface)',
+            background: 'var(--bg-surface-solid)',
+            color: 'var(--text-primary)',
+            boxShadow: 'var(--elevation-flyout)',
+            fontSize: '12px',
+            lineHeight: 1.5,
+            pointerEvents: 'none',
+          }}
+        >
+          {toastMessage}
+        </div>
       )}
     </WindowShell>
   );

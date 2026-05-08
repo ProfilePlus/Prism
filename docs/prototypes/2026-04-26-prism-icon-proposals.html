@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prism Desktop Icon Lab - 10 Design Proposals</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #050505; color: #fff; overflow-x: hidden; }
+        .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 32px; padding: 48px; }
+        .icon-card { 
+            background: rgba(255,255,255,0.03); 
+            border: 1px solid rgba(255,255,255,0.06); 
+            border-radius: 24px; 
+            padding: 32px; 
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .icon-card:hover { 
+            background: rgba(255,255,255,0.08); 
+            border-color: rgba(255,255,255,0.2); 
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+        .icon-preview {
+            width: 120px;
+            height: 120px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        /* 图标通用阴影 */
+        .icon-drop-shadow { filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3)); }
+
+        /* 特殊滤镜 */
+        .blur-back { backdrop-filter: blur(8px); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        const IconSVG = ({ type }) => {
+            const icons = {
+                refraction: (
+                    <svg viewBox="0 0 100 100" className="w-full h-full icon-drop-shadow">
+                        <defs>
+                            <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stopColor="#4facfe" />
+                                <stop offset="100%" stopColor="#00f2fe" />
+                            </linearGradient>
+                        </defs>
+                        <path d="M50 15 L85 75 L15 75 Z" fill="rgba(255,255,255,0.1)" stroke="url(#g1)" strokeWidth="2" />
+                        <path d="M50 15 L85 75 L50 75 Z" fill="rgba(79, 172, 254, 0.2)" />
+                        <circle cx="50" cy="55" r="15" fill="white" opacity="0.1" filter="blur(4px)" />
+                    </svg>
+                ),
+                isometric: (
+                    <svg viewBox="0 0 100 100" className="w-full h-full icon-drop-shadow">
+                        <path d="M50 20 L80 35 L80 65 L50 80 L20 65 L20 35 Z" fill="#1e1e1e" stroke="#fff" strokeWidth="2"/>
+                        <path d="M50 20 V80 M50 20 L80 35 M50 20 L20 35" stroke="#fff" strokeWidth="1" opacity="0.5"/>
+                        <path d="M20 35 L50 50 L80 35" fill="none" stroke="#fff" strokeWidth="1"/>
+                    </svg>
+                ),
+                spectrum: (
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                        <rect x="10" y="10" width="80" height="80" rx="20" fill="#000" />
+                        <path d="M30 30 Q50 10 70 30 T70 70 Q50 90 30 70 T30 30" fill="none" strokeWidth="6" stroke="url(#rainbow)" />
+                        <defs>
+                            <linearGradient id="rainbow" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stopColor="#ff0000" />
+                                <stop offset="20%" stopColor="#ffff00" />
+                                <stop offset="40%" stopColor="#00ff00" />
+                                <stop offset="60%" stopColor="#00ffff" />
+                                <stop offset="80%" stopColor="#0000ff" />
+                                <stop offset="100%" stopColor="#ff00ff" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                ),
+                minimalist: (
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                        <path d="M50 25 L75 70 H25 Z" fill="none" stroke="#fff" strokeWidth="1" />
+                        <path d="M50 25 V70" stroke="#fff" strokeWidth="0.5" strokeDasharray="2 2" />
+                        <circle cx="50" cy="25" r="1.5" fill="#E60012" />
+                    </svg>
+                ),
+                fluent: (
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                        <rect x="10" y="10" width="80" height="80" rx="22" fill="#2b2b2b" />
+                        <path d="M30 35 L70 35 L50 75 Z" fill="#0078d4" />
+                        <path d="M30 35 L50 75 L40 75 Z" fill="#2899f5" />
+                        <rect x="10" y="10" width="80" height="80" rx="22" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                    </svg>
+                ),
+                lens: (
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                        <circle cx="50" cy="50" r="40" fill="none" stroke="#fff" strokeWidth="2" />
+                        <circle cx="50" cy="50" r="32" fill="none" stroke="#fff" strokeWidth="0.5" opacity="0.3" />
+                        <path d="M40 50 L50 40 L60 50 L50 60 Z" fill="#fff" />
+                    </svg>
+                ),
+                brutalist: (
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                        <rect x="15" y="15" width="70" height="70" fill="#00ff00" />
+                        <rect x="25" y="25" width="50" height="50" fill="#000" />
+                        <path d="M35 35 L65 35 L50 65 Z" fill="#00ff00" />
+                    </svg>
+                ),
+                stacked: (
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                        <rect x="20" y="20" width="50" height="60" rx="4" fill="rgba(255,255,255,0.1)" stroke="#fff" strokeWidth="1.5" />
+                        <rect x="30" y="15" width="50" height="60" rx="4" fill="rgba(255,255,255,0.05)" stroke="#fff" strokeWidth="1.5" />
+                        <path d="M45 35 H65 M45 45 H60 M45 55 H65" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                ),
+                pure: (
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                        <path d="M50 10 L90 80 L10 80 Z" fill="url(#p1)" />
+                        <defs>
+                            <linearGradient id="p1" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stopColor="#ff416c" />
+                                <stop offset="100%" stopColor="#ff4b2b" />
+                            </linearGradient>
+                        </defs>
+                        <path d="M50 10 L50 80 L10 80 Z" fill="rgba(0,0,0,0.2)" />
+                    </svg>
+                ),
+                void: (
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                        <circle cx="50" cy="50" r="45" fill="#fff" />
+                        <path d="M45 40 L55 50 L45 60" fill="none" stroke="#000" strokeWidth="4" />
+                        <circle cx="65" cy="50" r="3" fill="#E60012" />
+                    </svg>
+                )
+            };
+            return icons[type] || icons.refraction;
+        };
+
+        const App = () => {
+            const designs = [
+                { id: 'refraction', name: 'Refraction Glass', desc: '毛玻璃折射', tag: 'Aesthetic', note: '利用光线穿过玻璃块产生的色散效果，展现 Markdown 编辑器的透亮感。' },
+                { id: 'isometric', name: 'Isometric Crystal', desc: '等轴晶体', tag: 'Solid', note: '精密的三维几何体，象征工具的逻辑性与稳定性。' },
+                { id: 'spectrum', name: 'Spectrum Flow', desc: '光谱流体', tag: 'Creative', note: '液态光谱流转，适合侧重创意表达的写作者。' },
+                { id: 'minimalist', name: 'Zen Minimalist', desc: '禅意极简', tag: 'Pure', note: '单笔细线与呼吸红点，呼应 Prism 的东方极简界面基因。' },
+                { id: 'fluent', name: 'Fluent Acrylic', desc: '微软亚克力', tag: 'System', note: '高度对齐 Windows 11 设计规范，与操作系统完美融合。' },
+                { id: 'lens', name: 'Focus Lens', desc: '聚焦透镜', tag: 'Focus', note: '强调「专注」的核心体验，中心菱形点明品牌。' },
+                { id: 'brutalist', name: 'Cyber Brutalist', desc: '硬核布鲁托', tag: 'Dev', note: '荧光绿与黑色色块，为程序员与极客打造的生产力符号。' },
+                { id: 'stacked', name: 'Layered Paper', desc: '重叠纸张', tag: 'Doc', note: '将文档的层级与棱镜的折射面合二为一，强调文字创作。' },
+                { id: 'pure', name: 'Pure Prism', desc: '纯粹光谱', tag: 'Modern', note: '去掉一切装饰，仅用色块的折射关系定义品牌。' },
+                { id: 'void', name: 'Zen Void', desc: '无相之圆', tag: 'Clean', note: '大面积留白中的精巧动作，极致的极简主义宣言。' }
+            ];
+
+            return (
+                <div className="min-h-screen pb-24">
+                    {/* Header */}
+                    <header className="p-12 text-center border-b border-white/5 bg-zinc-950/50 backdrop-blur-xl sticky top-0 z-50">
+                        <h1 className="text-4xl font-extrabold tracking-tighter mb-2">PRISM <span className="text-zinc-500 font-light">ICON LAB</span></h1>
+                        <p className="text-zinc-500 text-sm max-w-xl mx-auto leading-relaxed">
+                            基于 Prism 编辑器品牌 DNA 推演的 10 款桌面图标设计方案。涵盖了从 Windows 11 原生感到极致极简主义的视觉探索。
+                        </p>
+                    </header>
+
+                    {/* Gallery */}
+                    <div className="icon-grid">
+                        {designs.map(item => (
+                            <div key={item.id} className="icon-card group">
+                                <div className="absolute top-4 right-4 px-2 py-1 rounded-full bg-white/5 text-[10px] font-bold text-zinc-500 uppercase tracking-widest border border-white/5">
+                                    {item.tag}
+                                </div>
+                                <div className="icon-preview group-hover:scale-110 transition-transform duration-500">
+                                    <IconSVG type={item.id} />
+                                </div>
+                                <h3 className="text-lg font-bold mb-1 text-white group-hover:text-blue-400 transition-colors">{item.name}</h3>
+                                <p className="text-xs text-zinc-500 mb-6 font-mono">{item.desc}</p>
+                                <div className="mt-auto p-4 rounded-xl bg-black/40 border border-white/5 text-[11px] text-zinc-400 leading-relaxed italic">
+                                    "{item.note}"
+                                </div>
+                                
+                                {/* 桌面快捷方式模拟 */}
+                                <div className="mt-8 flex flex-col items-center opacity-40 group-hover:opacity-100 transition-opacity">
+                                    <div className="w-12 h-12 mb-2 p-2 bg-zinc-900 rounded-xl border border-white/10 flex items-center justify-center">
+                                        <div className="w-full h-full"><IconSVG type={item.id} /></div>
+                                    </div>
+                                    <span className="text-[10px] text-zinc-500 font-mono">Prism.exe</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Footer */}
+                    <footer className="px-12 py-12 flex justify-between items-center border-t border-white/5">
+                        <div className="text-xs text-zinc-600 font-mono italic">
+                            Generated by Huashu-Design · 2026 Icon Explorations
+                        </div>
+                        <div className="flex gap-4">
+                            <button className="px-6 py-2 rounded-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all">导出所选 SVG</button>
+                        </div>
+                    </footer>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

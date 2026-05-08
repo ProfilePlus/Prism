@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prism 图标设计提案 - 纯净原生版</title>
+    <style>
+        /* 基础变量 */
+        :root {
+            --bg-window: #ffffff;
+            --bg-sidebar: #fcfcfc;
+            --sidebar-w: 72px;
+            --status-h: 32px;
+            --accent: #E60012;
+            --text-main: #333;
+            --border-color: rgba(0,0,0,0.08);
+            --icon-stroke: 1.2px;
+            --panel-bg: #1a1a1a;
+            --panel-text: #eee;
+        }
+
+        /* 主布局 */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #000;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            color: var(--text-main);
+        }
+
+        /* 左侧控制面板 */
+        .controls {
+            width: 320px;
+            background: var(--panel-bg);
+            color: var(--panel-text);
+            padding: 32px;
+            border-right: 1px solid #333;
+            z-index: 10;
+            overflow-y: auto;
+        }
+        .controls h1 { font-size: 20px; margin-bottom: 8px; color: #fff; }
+        .controls p { font-size: 13px; color: #888; margin-bottom: 32px; line-height: 1.5; }
+
+        .theme-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.05);
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .theme-card:hover { background: rgba(255,255,255,0.08); }
+        .theme-card.active {
+            background: rgba(255,255,255,0.1);
+            border-color: rgba(255,255,255,0.2);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        .theme-card h3 { font-size: 14px; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+        .theme-card.active h3::after {
+            content: ''; width: 8px; height: 8px; background: #3b82f6; border-radius: 50%;
+            box-shadow: 0 0 10px #3b82f6;
+        }
+        .theme-card p { font-size: 11px; color: #666; margin: 0; }
+
+        .expert-note {
+            margin-top: 40px;
+            padding: 16px;
+            background: rgba(59,130,246,0.1);
+            border: 1px solid rgba(59,130,246,0.2);
+            border-radius: 8px;
+        }
+        .expert-note h4 { font-size: 11px; text-transform: uppercase; color: #60a5fa; margin-bottom: 8px; letter-spacing: 1px; }
+        .expert-note p { font-size: 12px; color: #ccc; margin: 0; font-style: italic; }
+
+        /* 右侧预览区 */
+        .preview-area {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #0a0a0a;
+            padding: 40px;
+        }
+
+        .prism-window {
+            width: 100%;
+            max-width: 900px;
+            height: 600px;
+            background: var(--bg-window);
+            border-radius: 12px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        /* 侧边栏样式 */
+        .sidebar {
+            width: var(--sidebar-w);
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 0;
+            gap: 20px;
+            transition: all 0.3s;
+        }
+        .icon-btn {
+            width: 44px;
+            height: 44px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .icon-btn:hover { background: rgba(0,0,0,0.03); }
+        .icon-btn.active { color: var(--accent); }
+
+        .main-content {
+            flex: 1;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .skeleton { background: currentColor; opacity: 0.05; border-radius: 4px; }
+
+        /* 状态栏样式 */
+        .status-bar {
+            height: var(--status-h);
+            background: var(--bg-sidebar);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            font-size: 11px;
+            justify-content: space-between;
+            color: rgba(0,0,0,0.5);
+        }
+
+        /* --- 风格变体 --- */
+        
+        /* 1. 东方极简 */
+        .theme-minimal {
+            --bg-window: #fff; --bg-sidebar: #fff; --accent: #E60012; --icon-stroke: 0.9px;
+        }
+        .theme-minimal .icon-btn.active::after {
+            content: ''; width: 3px; height: 3px; background: var(--accent); border-radius: 50%; margin-top: 4px;
+            animation: pulse-dot 2s infinite;
+        }
+        @keyframes pulse-dot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.3); } }
+
+        /* 2. 信息建筑 */
+        .theme-pentagram {
+            --bg-window: #f0f0f0; --bg-sidebar: #f0f0f0; --accent: #000; --icon-stroke: 2px;
+        }
+        .theme-pentagram .icon-btn.active { 
+            background: #fff; border: 1px solid #000; border-radius: 0; transform: translate(-2px, -2px);
+            box-shadow: 2px 2px 0 #000;
+        }
+
+        /* 3. 动力诗学 */
+        .theme-poetics {
+            --bg-window: #111; --bg-sidebar: #0a0a0a; --accent: #4facfe; --icon-stroke: 1.5px;
+            --text-main: #eee; --border-color: rgba(255,255,255,0.1);
+        }
+        .theme-poetics .icon-btn svg { filter: drop-shadow(2px 0 0 rgba(255,0,0,0.3)) drop-shadow(-1px 0 0 rgba(0,255,255,0.3)); }
+
+        /* 4. 柔性材质 */
+        .theme-fluent {
+            --bg-window: #f3f3f3; --bg-sidebar: rgba(255,255,255,0.6); --accent: #0078d4; --icon-stroke: 1.2px;
+        }
+        .theme-fluent .sidebar { backdrop-filter: blur(20px); }
+        .theme-fluent .icon-btn { border-radius: 12px; }
+        .theme-fluent .icon-btn.active { background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transform: scale(1.1); }
+
+        /* 5. 极客布鲁托 */
+        .theme-brutalist {
+            --bg-window: #000; --bg-sidebar: #000; --accent: #00ff00; --icon-stroke: 1.5px;
+            --text-main: #00ff00; --border-color: #00ff00;
+        }
+        .theme-brutalist .icon-btn.active { background: #00ff00; color: #000; box-shadow: 4px 4px 0 #fff; }
+        .theme-brutalist .skeleton { border: 1px solid #00ff00; opacity: 0.2; }
+
+        svg { fill: none; stroke: currentColor; stroke-width: var(--icon-stroke); stroke-linecap: round; stroke-linejoin: round; transition: stroke-width 0.3s; }
+        .theme-pentagram svg { stroke-linecap: square; stroke-linejoin: miter; }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <h1>Prism 设计提案</h1>
+        <p>纯净原生版：无 React、无外部依赖。直接双击运行，无安全告警。</p>
+        
+        <div id="theme-list">
+            <!-- 由 JS 填充 -->
+        </div>
+
+        <div class="expert-note">
+            <h4>专家评价 (Expert Review)</h4>
+            <p id="expert-text">该方案通过极细的笔触创造了极大的「负空间」，非常适合长文写作场景，减少视觉干扰。</p>
+        </div>
+    </div>
+
+    <div class="preview-area">
+        <div id="prism-window" class="prism-window theme-minimal">
+            <div style="display: flex; flex: 1; overflow: hidden;">
+                <!-- 侧边栏 -->
+                <div class="sidebar">
+                    <div class="icon-btn active" onclick="setActive(this)">
+                        <svg width="20" height="20" viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                    </div>
+                    <div class="icon-btn" onclick="setActive(this)">
+                        <svg width="20" height="20" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    </div>
+                    <div class="icon-btn" onclick="setActive(this)">
+                        <svg width="20" height="20" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                    </div>
+                    <div style="margin-top: auto; opacity: 0.3;" class="icon-btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    </div>
+                </div>
+
+                <!-- 主内容 -->
+                <div class="main-content">
+                    <div class="skeleton" style="height: 24px; width: 40%; margin-bottom: 30px;"></div>
+                    <div class="skeleton" style="height: 12px; width: 90%;"></div>
+                    <div class="skeleton" style="height: 12px; width: 85%;"></div>
+                    <div class="skeleton" style="height: 12px; width: 70%; margin-bottom: 40px;"></div>
+                    <div style="display: flex; gap: 20px;">
+                        <div class="skeleton" style="height: 120px; flex: 1;"></div>
+                        <div class="skeleton" style="height: 120px; flex: 1;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 状态栏 -->
+            <div class="status-bar">
+                <div style="display: flex; gap: 15px;">
+                    <span>UTF-8</span>
+                    <span>Markdown</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="opacity: 0.8;">PRISM ALPHA</span>
+                    <div style="width: 1px; height: 12px; background: currentColor; opacity: 0.2;"></div>
+                    <svg width="14" height="14" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const themes = [
+            { id: 'minimal', name: '东方极简', desc: 'Kenya Hara / 0.9pt 线条 / 朱砂红点', note: '该方案通过极细的笔触创造了极大的「负空间」，非常适合长文写作场景，减少视觉干扰。' },
+            { id: 'pentagram', name: '信息建筑', desc: 'Pentagram / 2pt 粗线 / 绝对几何', note: '功能主义的巅峰。图标与文本字重完美统一，呈现出一种工业时代的精密美感。' },
+            { id: 'poetics', name: '动力诗学', desc: 'Field.io / 错位双线 / 棱镜色散', note: '通过多维线条模拟光影，完美契合「Prism」的产品命名语义。' },
+            { id: 'fluent', name: '柔性材质', desc: 'Fluent 2.0 / 亚克力模糊 / 连续曲率', note: '最符合现代操作系统的审美趋势，通过微阴影和模糊感建立层级。' },
+            { id: 'brutalist', name: '极客布鲁托', desc: 'Modern Brutalism / 像素对齐 / 反色高亮', note: '一种反设计的宣言。对程序员和高级用户极具吸引力。' }
+        ];
+
+        const themeList = document.getElementById('theme-list');
+        const prismWindow = document.getElementById('prism-window');
+        const expertText = document.getElementById('expert-text');
+
+        themes.forEach((t, index) => {
+            const card = document.createElement('div');
+            card.className = `theme-card ${index === 0 ? 'active' : ''}`;
+            card.innerHTML = `<h3>${t.name}</h3><p>${t.desc}</p>`;
+            card.onclick = () => {
+                // 切换激活状态
+                document.querySelectorAll('.theme-card').forEach(c => c.classList.remove('active'));
+                card.classList.add('active');
+                
+                // 切换预览窗口类
+                prismWindow.className = `prism-window theme-${t.id}`;
+                
+                // 切换评价
+                expertText.innerText = t.note;
+            };
+            themeList.appendChild(card);
+        });
+
+        function setActive(el) {
+            const parent = el.parentElement;
+            parent.querySelectorAll('.icon-btn').forEach(btn => btn.classList.remove('active'));
+            el.classList.add('active');
+        }
+    </script>
+</body>
+</html>

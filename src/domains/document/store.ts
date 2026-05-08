@@ -6,6 +6,7 @@ interface DocumentStore extends DocumentState {
   closeDocument: () => void;
   createNewDocument: () => void;
   updateContent: (content: string) => void;
+  updateDocumentPath: (oldPath: string, newPath: string, name: string) => void;
   setViewMode: (viewMode: 'edit' | 'split' | 'preview') => void;
   markSaved: () => void;
 }
@@ -51,6 +52,19 @@ export const useDocumentStore = create<DocumentStore>((set) => ({
           ...state.currentDocument,
           content,
           isDirty: true,
+        },
+      };
+    });
+  },
+
+  updateDocumentPath: (oldPath, newPath, name) => {
+    set((state) => {
+      if (!state.currentDocument || state.currentDocument.path !== oldPath) return state;
+      return {
+        currentDocument: {
+          ...state.currentDocument,
+          path: newPath,
+          name,
         },
       };
     });

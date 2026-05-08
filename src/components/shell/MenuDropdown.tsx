@@ -55,6 +55,9 @@ export function MenuDropdown({ items, onAction, onClose }: MenuDropdownProps) {
             aria-haspopup={item.submenu ? true : undefined}
             onClick={() => handleItemClick(item)}
           >
+            <div className={styles.check}>
+              {item.checked ? <span className={styles.checkIcon}></span> : null}
+            </div>
             <span className={styles.label}>{item.label}</span>
             <span className={styles.meta}>
               {item.shortcut ? (

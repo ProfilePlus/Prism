@@ -8,6 +8,7 @@ export interface MenuItemBase {
 
 export interface MenuItemNormal extends MenuItemBase {
   label: string;
+  checked?: boolean;
   type?: never;
 }
 

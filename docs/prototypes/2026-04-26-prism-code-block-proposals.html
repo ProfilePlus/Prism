@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prism 代码块样式选型方案 - 5 组提案</title>
+    <style>
+        :root {
+            --bg: #f5f5f5;
+            --card-bg: #ffffff;
+            --text-p: #1a1a1a;
+            --text-s: #666666;
+            --border: #e5e5e5;
+            --radius: 12px;
+            --accent: #0067c0;
+        }
+
+        body {
+            font-family: 'Segoe UI', "Microsoft YaHei", sans-serif;
+            background: var(--bg);
+            color: var(--text-p);
+            margin: 0;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header { text-align: center; margin-bottom: 40px; }
+        .header h1 { font-weight: 300; margin: 0; color: var(--text-p); }
+        .header p { color: var(--text-s); margin-top: 10px; }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 40px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .proposal-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 32px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .proposal-card:hover { 
+            transform: translateY(-2px); 
+            border-color: var(--accent); 
+        }
+
+        .proposal-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .proposal-title span { color: var(--accent); font-size: 14px; font-weight: bold; background: rgba(0, 103, 192, 0.1); padding: 4px 10px; border-radius: 20px; }
+        
+        .proposal-desc {
+            font-size: 13px;
+            color: var(--text-s);
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+
+        /* 基础代码块样式复位 */
+        pre {
+            margin: 0;
+            text-align: left;
+            white-space: pre;
+            word-spacing: normal;
+            word-break: normal;
+            word-wrap: normal;
+            line-height: 1.5;
+            tab-size: 4;
+            hyphens: none;
+            font-family: 'JetBrains Mono', Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+        }
+
+        code { font-family: inherit; }
+
+        /* =========================================
+           方案 1: GitHub Classic (专业纯净)
+           ========================================= */
+        .style-github {
+            background-color: #f6f8fa;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            padding: 16px;
+            color: #24292f;
+        }
+        .style-github .keyword { color: #cf222e; }
+        .style-github .function { color: #8250df; }
+        .style-github .string { color: #0a3069; }
+        .style-github .comment { color: #6e7781; }
+
+        /* =========================================
+           方案 2: Mac Terminal / One Dark (沉浸暗黑)
+           ========================================= */
+        .style-mac {
+            background-color: #282c34;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+        .style-mac-header {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            background: #21252b;
+            gap: 6px;
+        }
+        .mac-dot { width: 10px; height: 10px; border-radius: 50%; }
+        .mac-dot.close { background: #ff5f56; }
+        .mac-dot.min { background: #ffbd2e; }
+        .mac-dot.max { background: #27c93f; }
+        .style-mac pre {
+            padding: 16px;
+            color: #abb2bf;
+        }
+        .style-mac .keyword { color: #c678dd; }
+        .style-mac .function { color: #61afef; }
+        .style-mac .string { color: #98c379; }
+        .style-mac .comment { color: #5c6370; font-style: italic; }
+
+        /* =========================================
+           方案 3: Notion Minimal (极致留白)
+           ========================================= */
+        .style-notion {
+            background-color: #f7f7f5;
+            border-radius: 4px;
+            padding: 24px 20px;
+            color: #37352f;
+        }
+        .style-notion .keyword { color: #e03e3e; }
+        .style-notion .function { color: #0f7b6c; }
+        .style-notion .string { color: #dfab01; }
+        .style-notion .comment { color: #9b9a97; }
+
+        /* =========================================
+           方案 4: Nord Slate (北欧冷淡风)
+           ========================================= */
+        .style-nord {
+            background-color: #2e3440;
+            border: 1px solid #3b4252;
+            border-radius: 8px;
+            padding: 16px 20px;
+            color: #d8dee9;
+            position: relative;
+        }
+        .style-nord::before {
+            content: 'typescript';
+            position: absolute;
+            top: 0;
+            right: 16px;
+            background: #4c566a;
+            color: #eceff4;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-bottom-left-radius: 4px;
+            border-bottom-right-radius: 4px;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+        .style-nord .keyword { color: #81a1c1; }
+        .style-nord .function { color: #88c0d0; }
+        .style-nord .string { color: #a3be8c; }
+        .style-nord .comment { color: #4c566a; }
+
+        /* =========================================
+           方案 5: Cyberpunk / Fluent Neon (霓虹赛博)
+           ========================================= */
+        .style-cyber {
+            background: rgba(10, 10, 15, 0.95);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-left: 3px solid #00f2ff; /* 霓虹左边框 */
+            border-radius: 6px;
+            padding: 16px;
+            color: #e2e8f0;
+            box-shadow: 0 4px 20px rgba(0, 242, 255, 0.05);
+            position: relative;
+        }
+        .style-cyber::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(135deg, rgba(0,242,255,0.03) 0%, transparent 100%);
+            pointer-events: none;
+        }
+        .style-cyber .keyword { color: #ff007a; text-shadow: 0 0 8px rgba(255,0,122,0.4); }
+        .style-cyber .function { color: #00f2ff; }
+        .style-cyber .string { color: #39ff14; }
+        .style-cyber .comment { color: #64748b; }
+
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Prism 代码块样式选型</h1>
+        <p>为您精选的 5 种代码块排版风格，适用于 Markdown 预览区。</p>
+    </div>
+
+    <div class="grid">
+        
+        <!-- 方案 1 -->
+        <div class="proposal-card">
+            <div class="proposal-title">
+                GitHub Classic (专业纯净) <span>#01</span>
+            </div>
+            <div class="proposal-desc">
+                最经典、最具代码直觉的排版。浅灰背景配合极细的描边，不过分抢眼，非常适合作为默认的亮色主题代码块。
+            </div>
+            <pre class="style-github"><code><span class="keyword">function</span> <span class="function">calculatePhysics</span>(mass: <span class="keyword">number</span>) {
+    <span class="comment">// Standard gravity constant</span>
+    <span class="keyword">const</span> GRAVITY = <span class="string">9.81</span>;
+    <span class="keyword">return</span> mass * GRAVITY;
+}</code></pre>
+        </div>
+
+        <!-- 方案 2 -->
+        <div class="proposal-card">
+            <div class="proposal-title">
+                Mac Terminal (沉浸深色) <span>#02</span>
+            </div>
+            <div class="proposal-desc">
+                带有 macOS 标志性窗口红黄绿三圆点的深色主题（类似 One Dark）。非常适合强调代码内容的层级，在浅色长文中形成极强的视觉对比和沉浸感。
+            </div>
+            <div class="style-mac">
+                <div class="style-mac-header">
+                    <div class="mac-dot close"></div>
+                    <div class="mac-dot min"></div>
+                    <div class="mac-dot max"></div>
+                </div>
+                <pre><code><span class="keyword">function</span> <span class="function">calculatePhysics</span>(mass: <span class="keyword">number</span>) {
+    <span class="comment">// Standard gravity constant</span>
+    <span class="keyword">const</span> GRAVITY = <span class="string">9.81</span>;
+    <span class="keyword">return</span> mass * GRAVITY;
+}</code></pre>
+            </div>
+        </div>
+
+        <!-- 方案 3 -->
+        <div class="proposal-card">
+            <div class="proposal-title">
+                Notion Minimal (极致留白) <span>#03</span>
+            </div>
+            <div class="proposal-desc">
+                无边框、更紧凑的圆角、更大的内部留白（Padding）。它不像是代码编辑器，更像是文档中的一个高亮引用区，适合非重度开发者的文字工作者。
+            </div>
+            <pre class="style-notion"><code><span class="keyword">function</span> <span class="function">calculatePhysics</span>(mass: <span class="keyword">number</span>) {
+    <span class="comment">// Standard gravity constant</span>
+    <span class="keyword">const</span> GRAVITY = <span class="string">9.81</span>;
+    <span class="keyword">return</span> mass * GRAVITY;
+}</code></pre>
+        </div>
+
+        <!-- 方案 4 -->
+        <div class="proposal-card">
+            <div class="proposal-title">
+                Nord Slate (北欧冷淡风) <span>#04</span>
+            </div>
+            <div class="proposal-desc">
+                低对比度的灰蓝色调，右上角附带悬浮的**语言标签 (Language Badge)**。这是现代技术博客（如 Vercel, Tailwind）最喜欢的排版方式，极具工程美感。
+            </div>
+            <pre class="style-nord"><code><span class="keyword">function</span> <span class="function">calculatePhysics</span>(mass: <span class="keyword">number</span>) {
+    <span class="comment">// Standard gravity constant</span>
+    <span class="keyword">const</span> GRAVITY = <span class="string">9.81</span>;
+    <span class="keyword">return</span> mass * GRAVITY;
+}</code></pre>
+        </div>
+
+        <!-- 方案 5 -->
+        <div class="proposal-card">
+            <div class="proposal-title">
+                Fluent Neon (霓虹赛博) <span>#05</span>
+            </div>
+            <div class="proposal-desc">
+                专为 Night 主题设计的暗黑风。纯黑背景，带有一抹极具科技感的**霓虹青色左侧高亮边框**，关键字带有轻微的光晕特效（Glow）。
+            </div>
+            <pre class="style-cyber"><code><span class="keyword">function</span> <span class="function">calculatePhysics</span>(mass: <span class="keyword">number</span>) {
+    <span class="comment">// Standard gravity constant</span>
+    <span class="keyword">const</span> GRAVITY = <span class="string">9.81</span>;
+    <span class="keyword">return</span> mass * GRAVITY;
+}</code></pre>
+        </div>
+
+    </div>
+</body>
+</html>

@@ -2,7 +2,7 @@
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  min-width: 300px;
+  min-width: 260px; /* 从 300px 减小，使菜单不显得臃肿 */
   padding: 4px;
   border-radius: var(--radius-lg);
   background: var(--layer-2);
@@ -11,19 +11,13 @@
   backdrop-filter: blur(40px) saturate(180%);
   -webkit-backdrop-filter: blur(40px) saturate(180%);
   z-index: 1000;
-  animation: flyoutIn 0.18s cubic-bezier(0.17, 0.67, 0.3, 0.99);
-}
-
-body.dark .dropdown {
-  background: var(--layer-2);
-  border-color: var(--stroke-control);
-  box-shadow: var(--elevation-flyout);
+  animation: flyoutIn var(--duration-normal) var(--ease-out);
 }
 
 @keyframes flyoutIn {
   from {
     opacity: 0;
-    transform: translateY(-4px) scale(0.98);
+    transform: translateY(-6px) scale(0.98);
   }
   to {
     opacity: 1;
@@ -37,32 +31,46 @@ body.dark .dropdown {
   justify-content: space-between;
   padding: 8px 12px;
   font-size: 13px;
+  font-weight: 400;
   border-radius: var(--radius-sm);
   cursor: pointer;
   gap: 24px;
   color: var(--text-primary);
-  transition: background 0.12s ease;
+  transition: all var(--duration-fast) var(--ease-out);
 }
 
 .item:hover {
-  background: var(--accent-tint);
+  background: var(--bg-hover); /* 替换为标准底色，不使用主题蓝 */
 }
 
-body.dark .item:hover {
-  background: var(--accent-tint);
+.item:active {
+  transform: scale(0.98);
+  background: var(--bg-active);
+}
+
+.check {
+  width: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: -4px;
+}
+
+.checkIcon {
+  font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets';
+  font-size: 10px;
+  color: var(--accent);
 }
 
 .item.disabled {
-  opacity: 0.4;
+  opacity: 0.5;
   cursor: not-allowed;
+  color: var(--text-secondary);
 }
 
 .item.disabled:hover {
   background: transparent;
-}
-
-.item.submenu {
-  /* submenu items have same styling as regular items */
+  transform: none;
 }
 
 .label {
@@ -77,14 +85,16 @@ body.dark .item:hover {
 }
 
 .shortcut {
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  font-weight: 500;
+  letter-spacing: 0.2px;
 }
 
 .arrow {
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
   font-size: 10px;
   margin-left: 8px;
 }
@@ -93,8 +103,4 @@ body.dark .item:hover {
   height: 1px;
   background: var(--stroke-divider);
   margin: 4px 8px;
-}
-
-body.dark .separator {
-  background: var(--stroke-divider);
 }

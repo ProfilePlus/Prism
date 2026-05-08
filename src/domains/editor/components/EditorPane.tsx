@@ -6,17 +6,53 @@ import {
   useRef,
   useState,
 } from 'react';
-import { basicSetup } from 'codemirror';
-import { EditorView, ViewUpdate } from '@codemirror/view';
-import { EditorState } from '@codemirror/state';
+import { EditorView, ViewUpdate, keymap, lineNumbers, highlightActiveLineGutter, highlightSpecialChars, drawSelection, dropCursor, rectangularSelection, crosshairCursor, highlightActiveLine, Decoration, DecorationSet } from '@codemirror/view';
+import { EditorState, Prec, StateEffect, StateField } from '@codemirror/state';
+
+// 定义闪烁效果的 Effect
+const addLineFlash = StateEffect.define<number>();
+const removeLineFlash = StateEffect.define<number>();
+
+// 管理闪烁装饰的 Field
+const lineFlashField = StateField.define<DecorationSet>({
+  create() {
+    return Decoration.none;
+  },
+  update(flashes, tr) {
+    flashes = flashes.map(tr.changes);
+    for (const e of tr.effects) {
+      if (e.is(addLineFlash)) {
+        const deco = Decoration.line({
+          attributes: { class: 'cm-line-flash' }
+        });
+        flashes = flashes.update({
+          add: [deco.range(tr.state.doc.lineAt(e.value).from)]
+        });
+      } else if (e.is(removeLineFlash)) {
+        return Decoration.none;
+      }
+    }
+    return flashes;
+  },
+  provide: f => EditorView.decorations.from(f)
+});
+
 import { markdown } from '@codemirror/lang-markdown';
 import { oneDark } from '@codemirror/theme-one-dark';
+import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands';
+import { syntaxHighlighting, defaultHighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap } from '@codemirror/language';
+import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
+import { highlightSelectionMatches } from '@codemirror/search';
+import { SearchQuery, setSearchQuery, findNext, findPrevious, replaceNext, replaceAll, selectMatches } from '@codemirror/search';
 import { useSettingsStore } from '../../settings/store';
+import { useWorkspaceStore } from '../../workspace/store';
 import { FloatingToolbar } from './FloatingToolbar';
+import { SearchParams } from './SearchPanel';
 
 export interface EditorPaneHandle {
   jumpToLine: (line: number) => void;
   setScrollRatio: (ratio: number) => void;
+  execSearch?: (action: 'next' | 'prev' | 'all' | 'replace' | 'replaceAll', params: SearchParams) => void;
 }
 
 interface EditorPaneProps {
@@ -46,6 +82,11 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     const onCursorChangeRef = useRef(onCursorChange);
     const onScrollRatioChangeRef = useRef(onScrollRatioChange);
     const theme = useSettingsStore((s) => s.theme);
+    const typewriterMode = useWorkspaceStore((s) => s.typewriterMode);
+    
+    // 关键标记：用于拦截因同步内容触发的 onChange
+    const isUpdatingFromPropsRef = useRef(false);
+
     const [toolbarState, setToolbarState] = useState({
       visible: false,
       x: 0,
@@ -64,6 +105,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       onScrollRatioChangeRef.current = onScrollRatioChange;
     }, [onScrollRatioChange]);
 
+    const isProgrammaticScrollRef = useRef(false);
+
     useImperativeHandle(ref, () => ({
       jumpToLine: (lineNumber: number) => {
         const view = viewRef.current;
@@ -74,8 +117,20 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
 
         view.dispatch({
           selection: { anchor: line.from },
-          effects: EditorView.scrollIntoView(line.from, { y: 'center' }),
+          effects: [
+            EditorView.scrollIntoView(line.from, { y: 'center' }),
+            addLineFlash.of(line.from)
+          ],
         });
+
+        // 2秒后清除闪烁样式
+        setTimeout(() => {
+          if (viewRef.current) {
+            viewRef.current.dispatch({
+              effects: removeLineFlash.of(line.from)
+            });
+          }
+        }, 2000);
 
         view.focus();
       },
@@ -84,8 +139,35 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         if (!view) return;
         const scroller = view.scrollDOM;
         const maxScroll = scroller.scrollHeight - scroller.clientHeight;
-        scroller.scrollTop = Math.max(0, ratio) * maxScroll;
+        const targetScroll = Math.max(0, ratio) * maxScroll;
+        if (Math.abs(scroller.scrollTop - targetScroll) > 1) {
+          isProgrammaticScrollRef.current = true;
+          scroller.scrollTop = targetScroll;
+        }
       },
+      execSearch: (action, params) => {
+        const view = viewRef.current;
+        if (!view) return;
+
+        view.dispatch({
+          effects: setSearchQuery.of(new SearchQuery({
+            search: params.query,
+            caseSensitive: params.matchCase,
+            regexp: params.regexp,
+            wholeWord: params.wholeWord,
+            replace: params.replaceWith
+          }))
+        });
+
+        switch (action) {
+          case 'next': findNext(view); break;
+          case 'prev': findPrevious(view); break;
+          case 'all': selectMatches(view); break;
+          case 'replace': replaceNext(view); break;
+          case 'replaceAll': replaceAll(view); break;
+        }
+        view.focus();
+      }
     }));
 
     const handleFormat = useCallback(
@@ -97,7 +179,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           | 'link'
           | 'quote'
           | 'underline'
-          | 'strikethrough',
+          | 'strikethrough'
+          | 'highlight',
       ) => {
         const view = viewRef.current;
         if (!view) return;
@@ -128,6 +211,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           wrappedText = `<u>${selectedText}</u>`;
         } else if (format === 'strikethrough') {
           wrappedText = `~~${selectedText}~~`;
+        } else if (format === 'highlight') {
+          wrappedText = `<mark>${selectedText}</mark>`;
         }
 
         view.dispatch({
@@ -174,7 +259,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         const line = view.state.doc.lineAt(cursor);
         const lineText = view.state.doc.sliceString(line.from, line.to);
 
-        // 特殊处理：段落（清除 heading 前缀）
         if (fmt === 'paragraph') {
           const stripped = lineText.replace(/^#{1,6}\s*/, '');
           view.dispatch({ changes: { from: line.from, to: line.to, insert: stripped } });
@@ -182,7 +266,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           return;
         }
 
-        // 特殊处理：增加 heading 级别
         if (fmt === 'increaseHeading') {
           const match = lineText.match(/^(#{1,6})\s/);
           if (match && match[1].length < 6) {
@@ -194,7 +277,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           return;
         }
 
-        // 特殊处理：减少 heading 级别
         if (fmt === 'decreaseHeading') {
           const match = lineText.match(/^(#{1,6})\s/);
           if (match && match[1].length > 1) {
@@ -206,7 +288,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           return;
         }
 
-        // 特殊处理：在上方/下方插入空行
         if (fmt === 'insertAbove') {
           view.dispatch({ changes: { from: line.from, insert: '\n' } });
           view.dispatch({ selection: { anchor: line.from } });
@@ -233,11 +314,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           linkReference: '[text][ref]\n\n[ref]: url',
           footnote: '[^1]\n\n[^1]: ',
           comment: '<!-- ',
-          paragraph: '',
-          increaseHeading: '#',
-          decreaseHeading: '',
-          insertAbove: '\n',
-          insertBelow: '\n',
         };
 
         const suffixMap: Record<string, string> = {
@@ -260,10 +336,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         }
         view.focus();
       };
-
-      window.addEventListener('prism-format', onFormat);
-      window.addEventListener('prism-heading', onHeading);
-      window.addEventListener('prism-block-format', onBlock);
 
       const onEditorCommand = (e: Event) => {
         const view = viewRef.current;
@@ -318,7 +390,11 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         }
       };
 
+      window.addEventListener('prism-format', onFormat);
+      window.addEventListener('prism-heading', onHeading);
+      window.addEventListener('prism-block-format', onBlock);
       window.addEventListener('prism-editor-command', onEditorCommand);
+
       return () => {
         window.removeEventListener('prism-format', onFormat);
         window.removeEventListener('prism-heading', onHeading);
@@ -327,68 +403,108 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       };
     }, [handleFormat]);
 
+    // 处理来自 Props 的内容同步（非重挂载情况）
+    useEffect(() => {
+      const view = viewRef.current;
+      if (!view) {
+        console.log('[EditorPane] content sync skipped: no view yet, incoming len:', content.length);
+        return;
+      }
+
+      const currentContent = view.state.doc.toString();
+      console.log('[EditorPane] content sync check currentLen:', currentContent.length, 'incomingLen:', content.length, 'same:', currentContent === content);
+      if (currentContent !== content) {
+        console.log('[EditorPane] dispatching content sync');
+        isUpdatingFromPropsRef.current = true;
+        view.dispatch({
+          changes: { from: 0, to: currentContent.length, insert: content }
+        });
+        console.log('[EditorPane] after dispatch, editorLen:', view.state.doc.length, 'first200:', view.state.doc.sliceString(0, 200), '|| incomingFirst200:', content.slice(0, 200));
+      }
+    }, [content]);
+
     useEffect(() => {
       if (!editorRef.current) return;
 
       const startState = EditorState.create({
         doc: content,
         extensions: [
-          basicSetup,
+          Prec.highest(keymap.of([
+            {
+              key: 'Mod-f',
+              run: () => {
+                window.dispatchEvent(new CustomEvent('prism-search', { detail: { action: 'open' } }));
+                return true;
+              }
+            }
+          ])),
+          lineFlashField,
+          lineNumbers(),
+          highlightActiveLineGutter(),
+          highlightSpecialChars(),
+          history(),
+          drawSelection(),
+          dropCursor(),
+          EditorState.allowMultipleSelections.of(true),
+          indentOnInput(),
+          syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+          bracketMatching(),
+          closeBrackets(),
+          rectangularSelection(),
+          crosshairCursor(),
+          highlightActiveLine(),
+          highlightSelectionMatches(),
+          foldGutter(),
+          keymap.of([
+            ...closeBracketsKeymap,
+            ...defaultKeymap,
+            ...historyKeymap,
+            ...foldKeymap,
+            indentWithTab,
+          ]),
           EditorView.lineWrapping,
           markdown(),
           theme === 'dark' ? oneDark : [],
+          EditorView.theme({
+            '&': { flex: 1, minHeight: 0, fontSize: '16px', fontFamily: 'inherit', backgroundColor: 'transparent' },
+            '.cm-scroller': { overflow: 'auto', fontFamily: 'inherit', lineHeight: '1.7' },
+            '.cm-content': { padding: '32px 48px', color: 'var(--text-primary)', maxWidth: '860px', margin: '0 auto' },
+            '.cm-line-flash': { animation: 'cm-flash 2s cubic-bezier(0.16, 1, 0.3, 1)' },
+            '.cm-gutters': { display: 'none' },
+            '.cm-activeLineGutter': { backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' },
+            '.cm-activeLine': { backgroundColor: 'var(--bg-hover)', borderLeft: '2px solid var(--accent)', marginLeft: '-2px' },
+            '.cm-cursor': { borderLeftColor: 'var(--accent)', borderLeftWidth: '2px' },
+            '&.cm-focused': { outline: 'none' },
+            '.cm-selectionBackground': { backgroundColor: 'var(--accent-tint-strong) !important' },
+            '&.cm-focused .cm-selectionBackground': { backgroundColor: 'var(--accent-tint-strong) !important' }
+          }),
           theme === 'dark'
-            ? EditorView.theme(
-                {
-                  '&': { backgroundColor: '#191919' },
-                  '.cm-content': { color: '#E2E8F0' },
-                  '.cm-gutters': {
-                    backgroundColor: '#191919',
-                    borderRight: '1px solid var(--border-color)',
-                  },
-                  '.cm-activeLineGutter': {
-                    backgroundColor: 'var(--bg-hover)',
-                  },
-                  '.cm-activeLine': {
-                    backgroundColor: 'var(--bg-hover)',
-                  },
-                },
-                { dark: true },
-              )
+            ? EditorView.theme({ '.cm-content': { color: '#E2E8F0' }, '.cm-gutters': { borderRight: '1px solid var(--stroke-surface)' } }, { dark: true })
             : [],
+          EditorState.phrases.of({
+            "Find": "查找内容", "Replace": "替换为", "next": "下一个", "previous": "上一个", "all": "全部",
+            "match case": "大小写", "regexp": "正则", "by word": "全词", "replace": "替换", "replace all": "全部替换"
+          }),
           EditorView.updateListener.of((update: ViewUpdate) => {
             if (update.docChanged) {
-              onChangeRef.current(update.state.doc.toString());
-            }
-
-            if (update.docChanged || update.selectionSet) {
-              onCursorChangeRef.current?.(getCursorPosition(update.view));
-
-              // 检测选区变化，显示/隐藏浮动工具栏
-              const selection = update.state.selection.main;
-              if (selection.from !== selection.to) {
-                const coords = update.view.coordsAtPos(selection.from);
-                if (coords) {
-                  setToolbarState({
-                    visible: true,
-                    x: coords.left,
-                    y: coords.top - 40,
-                  });
-                }
+              if (isUpdatingFromPropsRef.current) {
+                console.log('[EditorPane] updateListener: ignoring prop-driven docChanged');
+                isUpdatingFromPropsRef.current = false;
               } else {
-                setToolbarState({ visible: false, x: 0, y: 0 });
+                console.log('[EditorPane] updateListener: forwarding onChange, len:', update.state.doc.length);
+                onChangeRef.current(update.state.doc.toString());
               }
             }
-          }),
-          EditorView.theme({
-            '&': {
-              height: '100%',
-              fontSize: '16px',
-              fontFamily: 'JetBrains Mono, Cascadia Code, Consolas, monospace',
-            },
-            '.cm-scroller': {
-              overflow: 'auto',
-            },
+            if (update.docChanged || update.selectionSet) {
+              onCursorChangeRef.current?.(getCursorPosition(update.view));
+              if (typewriterMode && update.selectionSet) {
+                update.view.dispatch({ effects: EditorView.scrollIntoView(update.state.selection.main.head, { y: 'center' }) });
+              }
+              const selection = update.state.selection.main;
+              if (selection.from === selection.to) {
+                setToolbarState((prev) => (prev.visible ? { ...prev, visible: false } : prev));
+              }
+            }
           }),
         ],
       });
@@ -399,58 +515,40 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       });
 
       viewRef.current = view;
-      onCursorChangeRef.current?.(getCursorPosition(view));
 
-      const handleScroll = () => {
-        const scroller = view.scrollDOM;
-        const maxScroll = scroller.scrollHeight - scroller.clientHeight;
-        const ratio = maxScroll > 0 ? scroller.scrollTop / maxScroll : 0;
-        onScrollRatioChangeRef.current?.(ratio);
+      const handleMouseUp = () => {
+        const selection = view.state.selection.main;
+        if (selection.from !== selection.to) {
+          const coordsFrom = view.coordsAtPos(selection.from);
+          const coordsTo = view.coordsAtPos(selection.to);
+          if (coordsFrom && coordsTo) {
+            setToolbarState({ visible: true, x: (coordsFrom.left + coordsTo.left) / 2, y: Math.min(coordsFrom.top, coordsTo.top) });
+          }
+        }
       };
 
+      view.dom.addEventListener('mouseup', handleMouseUp);
+      const handleScroll = () => {
+        if (isProgrammaticScrollRef.current) { isProgrammaticScrollRef.current = false; return; }
+        const scroller = view.scrollDOM;
+        const maxScroll = scroller.scrollHeight - scroller.clientHeight;
+        onScrollRatioChangeRef.current?.(maxScroll > 0 ? scroller.scrollTop / maxScroll : 0);
+      };
       view.scrollDOM.addEventListener('scroll', handleScroll);
 
       return () => {
+        view.dom.removeEventListener('mouseup', handleMouseUp);
         view.scrollDOM.removeEventListener('scroll', handleScroll);
         view.destroy();
         viewRef.current = null;
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [theme]);
-
-    useEffect(() => {
-      const view = viewRef.current;
-      if (!view) return;
-
-      const currentContent = view.state.doc.toString();
-      if (currentContent !== content) {
-        view.dispatch({
-          changes: {
-            from: 0,
-            to: currentContent.length,
-            insert: content,
-          },
-        });
-      }
-    }, [content]);
+    }, [theme, typewriterMode]);
 
     return (
       <>
-        <div
-          ref={editorRef}
-          style={{
-            flex: 1,
-            minHeight: 0,
-            minWidth: 0,
-            overflow: 'hidden',
-          }}
-        />
-        <FloatingToolbar
-          visible={toolbarState.visible}
-          x={toolbarState.x}
-          y={toolbarState.y}
-          onFormat={handleFormat}
-        />
+        <div ref={editorRef} style={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} />
+        <FloatingToolbar visible={toolbarState.visible} x={toolbarState.x} y={toolbarState.y} onFormat={handleFormat} />
       </>
     );
   },

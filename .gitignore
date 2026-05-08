@@ -7,3 +7,6 @@ src-tauri/gen/
 .DS_Store
 Thumbs.db
 .claude/
+release-latest/
+scripts/
+src-tauri/icons_backup/

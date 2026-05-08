@@ -16,10 +16,14 @@ function dirname(path: string): string {
 }
 
 export function useBootstrap() {
+  const currentDocument = useDocumentStore((s) => s.currentDocument);
   const openDocument = useDocumentStore((s) => s.openDocument);
   const { setRootPath, setFileTree } = useWorkspaceStore();
 
   useEffect(() => {
+    if (currentDocument) return;
+
+    let cancelled = false;
     const params = new URLSearchParams(window.location.search);
     const filePath = params.get('file');
     const folderPath = params.get('folder');
@@ -29,12 +33,15 @@ export function useBootstrap() {
         console.log('[useBootstrap] Loading file:', filePath);
         try {
           const content = await readTextFile(filePath);
+          if (cancelled || useDocumentStore.getState().currentDocument) return;
+
           openDocument(filePath, basename(filePath), content);
 
           const parentDir = dirname(filePath);
           console.log('[useBootstrap] Loading parent dir:', parentDir);
           setRootPath(parentDir);
           const tree = await loadFolderTree(parentDir);
+          if (cancelled) return;
           setFileTree(tree);
         } catch (err) {
           console.error('[useBootstrap] Failed to load file:', err);
@@ -44,11 +51,16 @@ export function useBootstrap() {
         try {
           setRootPath(folderPath);
           const tree = await loadFolderTree(folderPath);
+          if (cancelled) return;
           setFileTree(tree);
         } catch (err) {
           console.error('[useBootstrap] Failed to load folder:', err);
         }
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [openDocument, setRootPath, setFileTree]);
 }

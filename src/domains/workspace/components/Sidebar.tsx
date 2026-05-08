@@ -1,171 +1,118 @@
-import { useState } from 'react';
-import { FileNode } from '../types';
+import { FileNode, SidebarTab } from '../types';
 import { FileTree } from './FileTree';
 import { OutlinePanel } from './OutlinePanel';
 
 interface SidebarProps {
   fileTree: FileNode[];
+  sidebarTab: SidebarTab;
+  setSidebarTab: (tab: SidebarTab) => void;
   documentContent: string;
   activePath?: string | null;
   onFileClick?: (path: string) => void;
   onOutlineClick?: (line: number) => void;
 }
 
-type SidebarTab = 'files' | 'outline' | 'search';
-
 export function Sidebar({
   fileTree,
+  sidebarTab,
+  setSidebarTab,
   documentContent,
   activePath,
   onFileClick,
   onOutlineClick,
 }: SidebarProps) {
-  const [activeTab, setActiveTab] = useState<SidebarTab>('files');
-  const [searchQuery, setSearchQuery] = useState('');
-
   return (
     <div
+      className="sidebar"
       style={{
-        width: 'clamp(220px, 24vw, 280px)',
-        minWidth: '220px',
+        width: 'clamp(240px, 26vw, 300px)',
+        minWidth: '240px',
         flexShrink: 0,
-        borderRight: '1px solid var(--border-color)',
-        background: 'var(--bg-surface-solid)',
+        borderRight: '1px solid var(--theme-divider, var(--stroke-surface))',
+        background: 'var(--mica-bg)',
         backdropFilter: 'blur(20px)',
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
+        flex: 1,
       }}
     >
+      {/* 选项卡容器 */}
       <div
+        className="sidebar-tabs"
         style={{
           display: 'flex',
-          borderBottom: '1px solid var(--border-color)',
+          padding: '12px 16px 4px',
+          gap: '12px',
+          position: 'relative',
+          background: 'transparent',
         }}
       >
         {[
           { key: 'files', label: '文件' },
           { key: 'outline', label: '大纲' },
-          { key: 'search', label: '搜索' },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key as SidebarTab)}
-            style={{
-              flex: 1,
-              minWidth: 0,
-              padding: '10px 0',
-              fontSize: '12px',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              border: 'none',
-              background:
-                activeTab === tab.key ? 'var(--bg-active)' : 'transparent',
-              cursor: 'pointer',
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
+        ].map((tab) => {
+          const isActive = sidebarTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setSidebarTab(tab.key as SidebarTab)}
+              style={{
+                flex: 1,
+                padding: '10px 4px',
+                fontSize: '13px',
+                fontWeight: isActive ? 600 : 500,
+                border: 'none',
+                borderRadius: 'var(--radius-md)',
+                background: isActive ? 'var(--bg-surface-solid)' : 'transparent',
+                boxShadow: isActive ? 'var(--elevation-card)' : 'none',
+                color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
+                cursor: 'pointer',
+                transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                zIndex: 1,
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transform: isActive ? 'scale(1.05)' : 'scale(1)',
+                margin: '0 4px',
+              }}
+            >
+              {tab.label}
+              {isActive && (
+                <div 
+                  style={{ 
+                    position: 'absolute', 
+                    bottom: '4px', 
+                    left: '42%', 
+                    right: '42%', 
+                    height: '3px', 
+                    background: 'var(--accent)',
+                    borderRadius: '4px',
+                    boxShadow: '0 1px 3px var(--accent-tint-strong)'
+                  }} 
+                />
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-        {activeTab === 'files' && (
-          <FileTree
-            nodes={fileTree}
-            activePath={activePath}
-            onFileClick={onFileClick || (() => {})}
-          />
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+        {sidebarTab === 'files' && (
+          <div style={{ padding: '0 8px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <FileTree
+              nodes={fileTree}
+              activePath={activePath}
+              onFileClick={onFileClick || (() => {})}
+            />
+          </div>
         )}
-        {activeTab === 'outline' && (
+        {sidebarTab === 'outline' && (
           <OutlinePanel
             content={documentContent}
             onHeadingClick={onOutlineClick}
           />
-        )}
-        {activeTab === 'search' && (
-          <div style={{ padding: '12px' }}>
-            <input
-              type="text"
-              placeholder="搜索文档内容..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px',
-                fontSize: '13px',
-                border: '1px solid var(--border-color)',
-                borderRadius: '4px',
-                background: 'var(--bg-surface)',
-                color: 'inherit',
-                marginBottom: '12px',
-              }}
-            />
-            <div style={{ fontSize: '13px' }}>
-              {searchQuery.trim() === '' ? (
-                <div style={{ color: 'var(--text-muted)', padding: '8px' }}>
-                  输入关键词搜索
-                </div>
-              ) : (
-                (() => {
-                  const lines = documentContent.split('\n');
-                  const results = lines
-                    .map((line, idx) => ({ line, lineNumber: idx + 1 }))
-                    .filter(({ line }) =>
-                      line.toLowerCase().includes(searchQuery.toLowerCase()),
-                    );
-
-                  if (results.length === 0) {
-                    return (
-                      <div style={{ color: 'var(--text-muted)', padding: '8px' }}>
-                        无匹配结果
-                      </div>
-                    );
-                  }
-
-                  return results.map(({ line, lineNumber }) => (
-                    <div
-                      key={lineNumber}
-                      onClick={() => onOutlineClick?.(lineNumber)}
-                      style={{
-                        padding: '6px 8px',
-                        cursor: 'pointer',
-                        borderRadius: '4px',
-                        marginBottom: '4px',
-                        background: 'transparent',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'var(--bg-hover)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: '11px',
-                          color: 'var(--text-muted)',
-                          marginBottom: '2px',
-                        }}
-                      >
-                        行 {lineNumber}
-                      </div>
-                      <div
-                        style={{
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {line || '(空行)'}
-                      </div>
-                    </div>
-                  ));
-                })()
-              )}
-            </div>
-          </div>
         )}
       </div>
     </div>

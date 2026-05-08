@@ -27,6 +27,8 @@ export async function openPrismWindow(params: {
     height: 760,
     minWidth: 900,
     minHeight: 620,
+    decorations: false,
+    transparent: true,
   });
 
   await webview.once('tauri://created', () => {

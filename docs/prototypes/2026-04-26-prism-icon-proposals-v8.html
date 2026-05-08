@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prism 状态栏图标选型方案 - 10 组提案</title>
+    <script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+    <style>
+        :root {
+            --bg: #f3f3f3;
+            --card-bg: #ffffff;
+            --accent: #0067c0;
+            --text-p: #1a1a1a;
+            --text-s: #666666;
+            --border: #e5e5e5;
+            --radius: 8px;
+        }
+
+        body {
+            font-family: 'Segoe UI', "Microsoft YaHei", sans-serif;
+            background: var(--bg);
+            color: var(--text-p);
+            margin: 0;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header { text-align: center; margin-bottom: 40px; }
+        .header h1 { font-weight: 300; margin: 0; color: var(--text-p); }
+        .header p { color: var(--text-s); margin-top: 10px; }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 20px;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .proposal-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+        }
+
+        .proposal-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+
+        .proposal-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+        }
+
+        .proposal-title span { color: var(--accent); }
+
+        /* 模拟状态栏布局 */
+        .mock-status-bar {
+            height: 32px;
+            background: #fafafa;
+            border: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            gap: 15px;
+            border-radius: 4px;
+        }
+
+        .icon-font {
+            font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets';
+            font-size: 14px;
+            color: #555;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+
+        .icon-font:hover { background: #e5e5e5; color: #000; }
+        .icon-font.active { color: var(--accent); background: #e1f0ff; }
+
+        .group { display: flex; align-items: center; gap: 4px; }
+        .divider { width: 1px; height: 14px; background: #ddd; margin: 0 4px; }
+
+        .label-desc {
+            font-size: 11px;
+            color: #999;
+            margin-top: 15px;
+            line-height: 1.6;
+        }
+
+        .sidebar-state {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            font-size: 12px;
+            color: #444;
+            align-items: center;
+        }
+        .tag { background: #eee; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        const proposals = [
+            {
+                id: "01",
+                name: "复刻方案 (Typora Classic)",
+                desc: "完全遵循 Typora 原始语义：箭头指引方向，源码/分栏/预览使用递进几何图形。",
+                sidebar: { on: "\uE76B", off: "\uE76C" }, // ChevronLeft, ChevronRight
+                modes: [
+                    { name: "源码", icon: "\uE943" }, // Code
+                    { name: "分栏", icon: "\uE174" }, // ViewAll
+                    { name: "预览", icon: "\uE7C3" }  // Document
+                ],
+                focus: "\uE7E6" // Highlighter
+            },
+            {
+                id: "02",
+                name: "物理空间方案 (Panel Physics)",
+                desc: "侧边栏使用面板图标，视图模式强调窗口布局的物理变化（单列/双列/全幅）。",
+                sidebar: { on: "\uE996", off: "\uE997" }, // PaneLeft, PaneRight
+                modes: [
+                    { name: "源码", icon: "\uE737" }, // SingleColumn
+                    { name: "分栏", icon: "\uE738" }, // TwoColumns
+                    { name: "预览", icon: "\uE739" }  // ThreeColumns (as full)
+                ],
+                focus: "\uE1D3" // FullScreen
+            },
+            {
+                id: "03",
+                name: "极简线性方案 (Ultra-Thin)",
+                desc: "使用最细线条的图标。源码用尖括号，分栏用对比线，预览用书本。",
+                sidebar: { on: "\uE10E", off: "\uE111" }, // Back, Forward
+                modes: [
+                    { name: "源码", icon: "\uE731" }, // XML
+                    { name: "分栏", icon: "\uE784" }, // Compare
+                    { name: "预览", icon: "\uE736" }  // ReadingMode
+                ],
+                focus: "\uE706" // Eye
+            },
+            {
+                id: "04",
+                name: "现代桌面方案 (Modern Desktop)",
+                desc: "侧边栏采用侧边停靠语义。视图模式采用现代化的卡片堆叠逻辑。",
+                sidebar: { on: "\uE996", off: "\uE997" }, 
+                modes: [
+                    { name: "源码", icon: "\uE8D2" }, // Edit
+                    { name: "分栏", icon: "\uE14C" }, // Split
+                    { name: "预览", icon: "\uE8A5" }  // Webly
+                ],
+                focus: "\uEA3B" // Zen Mode Pulse
+            },
+            {
+                id: "05",
+                name: "开发者优先 (Dev Focus)",
+                desc: "源码使用代码标签，分栏用分支对比，预览用显示器图形。",
+                sidebar: { on: "\uE00E", off: "\uE00F" }, // ArrowLeft, ArrowRight
+                modes: [
+                    { name: "源码", icon: "\uE950" }, // Terminal
+                    { name: "分栏", icon: "\uE80A" }, // Columns
+                    { name: "预览", icon: "\uE7F4" }  // Website
+                ],
+                focus: "\uE9D5" // Target
+            },
+            {
+                id: "06",
+                name: "工业设计方案 (Industrial)",
+                desc: "强调界面结构的拆解。源码是砖块，分栏是契合，预览是成品。",
+                sidebar: { on: "\uE892", off: "\uE893" }, // AlignLeft, AlignRight
+                modes: [
+                    { name: "源码", icon: "\uE943" }, 
+                    { name: "分栏", icon: "\uE7F0" }, // SideBySide
+                    { name: "预览", icon: "\uE8A1" }  // PostPage
+                ],
+                focus: "\uE915" // CircleRing
+            },
+            {
+                id: "07",
+                name: "文档生命周期 (Lifecycle)",
+                desc: "图标代表文档演进：草稿盒 -> 剪报 -> 最终出版物。",
+                sidebar: { on: "\uE8A0", off: "\uE8A0" }, 
+                modes: [
+                    { name: "源码", icon: "\uE8C3" }, // Draft
+                    { name: "分栏", icon: "\uE931" }, // Multitask
+                    { name: "预览", icon: "\uE160" }  // Library
+                ],
+                focus: "\uE723" // Brightness
+            },
+            {
+                id: "08",
+                name: "语义直觉方案 (Pure Semantic)",
+                desc: "用最通用的 UI 语言。左箭头缩进，铅笔改源码，分栏符对齐，眼睛看成品。",
+                sidebar: { on: "\uE76B", off: "\uE76C" },
+                modes: [
+                    { name: "源码", icon: "\uE70F" }, // Pencil
+                    { name: "分栏", icon: "\uE174" }, 
+                    { name: "预览", icon: "\uE72E" }  // View
+                ],
+                focus: "\uE712" // More (as Focus center)
+            },
+            {
+                id: "09",
+                name: "衬线书卷感 (Serif Style)",
+                desc: "侧边栏为书签，源码为钢笔，分栏为打开的折页，预览为装帧书。",
+                sidebar: { on: "\uE718", off: "\uE718" }, // Bookmarks
+                modes: [
+                    { name: "源码", icon: "\uED63" }, // PenWorkspace
+                    { name: "分栏", icon: "\uE114" }, // OpenPane
+                    { name: "预览", icon: "\uE1D3" } 
+                ],
+                focus: "\uE701" // Star
+            },
+            {
+                id: "10",
+                name: "星际黑曜风格 (Cosmic)",
+                desc: "专注模式为星球。视图为不同维度的观测。侧边栏为星云探测器。",
+                sidebar: { on: "\uE709", off: "\uE709" }, // World
+                modes: [
+                    { name: "源码", icon: "\uE712" }, 
+                    { name: "分栏", icon: "\uE774" }, // Globe
+                    { name: "预览", icon: "\uE91C" }  // Cloud
+                ],
+                focus: "\uE128" // Satellite
+            }
+        ];
+
+        function App() {
+            return (
+                <div className="container">
+                    <div className="header">
+                        <h1>Prism 状态栏图标选型</h1>
+                        <p>请点击图标查看效果。所有图标均来自 Windows 11 Segoe Fluent 库。</p>
+                    </div>
+                    <div className="grid">
+                        {proposals.map(p => (
+                            <div key={p.id} className="proposal-card">
+                                <div className="proposal-title">
+                                    {p.name} <span>#{p.id}</span>
+                                </div>
+                                
+                                <div className="sidebar-state">
+                                    <span className="tag">侧边栏展开时:</span>
+                                    <span className="icon-font">{p.sidebar.on}</span>
+                                    <span style={{margin:'0 10px'}}>→</span>
+                                    <span className="tag">侧边栏折叠后:</span>
+                                    <span className="icon-font active">{p.sidebar.off}</span>
+                                </div>
+
+                                <div className="mock-status-bar">
+                                    <div className="icon-font">{p.sidebar.on}</div>
+                                    <div className="divider" />
+                                    <div className="group">
+                                        {p.modes.map((m, idx) => (
+                                            <div key={m.name} className={`icon-font ${idx===1 ? 'active' : ''}`}>{m.icon}</div>
+                                        ))}
+                                    </div>
+                                    <div style={{flex:1}} />
+                                    <div className="group">
+                                      <div style={{fontSize:'10px', color:'#999', marginRight:'10px'}}>419 词</div>
+                                      <div className="divider" />
+                                      <div className="icon-font">{p.focus}</div>
+                                    </div>
+                                </div>
+
+                                <div className="label-desc">{p.desc}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

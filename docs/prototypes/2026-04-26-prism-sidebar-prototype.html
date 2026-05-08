@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Typora 交互逻辑还原预演 v2</title>
+    <script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+    <style>
+        :root {
+            --bg-surface: #f8f9fa; 
+            --bg-sidebar: #f0f1f2;
+            --bg-hover: rgba(0, 0, 0, 0.05);
+            --bg-active: rgba(0, 0, 0, 0.08);
+            --bg-menu: rgba(255, 255, 255, 0.95);
+            --text-primary: #333333;
+            --text-secondary: #555555;
+            --text-tertiary: #888888;
+            --stroke-divider: #e5e5e5;
+            --accent: #0067c0;
+            --radius-sm: 4px;
+            --radius-md: 6px;
+            --font-ui: 'Segoe UI', system-ui, sans-serif;
+            --sidebar-width: 260px;
+        }
+
+        body {
+            margin: 0;
+            font-family: var(--font-ui);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #dcdcdc;
+        }
+
+        .app-window {
+            width: 900px;
+            height: 600px;
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid var(--stroke-divider);
+        }
+
+        /* Context Menu Styles */
+        .context-menu {
+            position: fixed;
+            background: var(--bg-menu);
+            border: 1px solid var(--stroke-divider);
+            border-radius: var(--radius-md);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            padding: 4px 0;
+            min-width: 220px;
+            z-index: 1000;
+            font-size: 12px;
+            backdrop-filter: blur(10px);
+            color: var(--text-primary);
+        }
+
+        .menu-item {
+            padding: 6px 32px 6px 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            position: relative;
+        }
+        
+        .menu-item:hover { background: var(--bg-hover); }
+        .menu-separator { height: 1px; background: var(--stroke-divider); margin: 4px 0; }
+        .menu-item .check { position: absolute; left: 8px; font-size: 10px; color: var(--text-primary); }
+        .menu-item .label { margin-left: 20px; }
+
+        /* Icon Font */
+        @font-face {
+            font-family: 'Segoe Fluent Icons';
+            src: local('Segoe Fluent Icons');
+        }
+        .icon {
+            font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets', sans-serif;
+            font-style: normal;
+            font-weight: normal;
+            display: inline-block;
+        }
+
+        /* Layout */
+        .main-content {
+            display: flex;
+            flex: 1;
+            height: calc(100% - 28px); /* 状态栏高度 */
+        }
+
+        /* 侧边栏 */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--stroke-divider);
+            display: flex;
+            flex-direction: column;
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .sidebar.collapsed {
+            width: 0;
+            border-right: none;
+            overflow: hidden;
+        }
+
+        .editor-area {
+            flex: 1;
+            padding: 40px;
+            background: #ffffff;
+            font-size: 15px;
+            line-height: 1.7;
+        }
+
+        /* 文件树/列表 */
+        .file-tree-container {
+            flex: 1;
+            padding: 10px 0;
+            overflow-y: auto;
+            position: relative; 
+        }
+        .file-item {
+            padding: 4px 12px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 1px 8px;
+            border-radius: var(--radius-sm);
+        }
+        .file-item:hover {
+            background: rgba(0,0,0,0.03);
+            color: var(--text-primary);
+        }
+        .file-item.active {
+            background: rgba(0,0,0,0.06);
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        .folder-header {
+            padding: 4px 12px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 4px;
+        }
+
+        /* 状态栏 */
+        .status-bar {
+            height: 28px;
+            display: flex;
+            border-top: 1px solid var(--stroke-divider);
+            background: var(--bg-surface);
+            user-select: none;
+        }
+
+        /* 1. 侧边栏地基 (物理联动) */
+        .left-base {
+            width: var(--sidebar-width);
+            border-right: 1px solid var(--stroke-divider);
+            background: rgba(0,0,0,0.02); /* 略微深一点体现层次 */
+            display: flex;
+            align-items: center;
+            padding: 0 6px;
+            box-sizing: border-box;
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .left-base.collapsed {
+            width: 0;
+            padding: 0;
+            border-right: none;
+            opacity: 0;
+        }
+
+        /* 2. 编辑器地基 */
+        .right-base {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            justify-content: space-between;
+        }
+
+        /* 左侧地基图标按钮 */
+        .btn-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            border-radius: var(--radius-sm);
+            color: var(--text-tertiary);
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.15s;
+        }
+        .btn-icon:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+        /* 复合大按钮：工作区名称 + ⋮ */
+        .workspace-hotzone {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 24px;
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+            margin: 0 4px;
+            transition: background 0.15s;
+        }
+        .workspace-hotzone:hover { background: var(--bg-hover); }
+        .workspace-hotzone .name {
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+        
+        /* --- 静默 UI 逻辑 (Hover Reveal) --- */
+        /* 默认隐藏 Documents、⋮ 和树视图切换图标 */
+        .workspace-hotzone .name,
+        .workspace-hotzone .more-icon,
+        .tree-list-btn {
+            opacity: 0; 
+            transition: opacity 0.2s ease;
+        }
+        
+        /* 侧边栏+左地基 悬停时显现 */
+        .sidebar-hover-context:hover .workspace-hotzone .name,
+        .sidebar-hover-context:hover .workspace-hotzone .more-icon,
+        .sidebar-hover-context:hover .tree-list-btn {
+            opacity: 1;
+        }
+        
+        /* 右侧地基控件 */
+        .slider-toggle { font-size: 10px; margin-right: 8px; }
+        .slider-toggle.is-collapsed { color: var(--accent); }
+        
+        .mock-h1 { font-size: 28px; font-weight: bold; margin-bottom: 24px; }
+        .mock-p { margin-bottom: 12px; color: #444; }
+        
+        .toast {
+            position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%);
+            background: #333; color: #fff; padding: 6px 12px; border-radius: 20px; font-size: 12px;
+            animation: fadein 0.3s;
+        }
+        @keyframes fadein { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+        /* Icon SVG replacements for pure outline precision */
+        svg.outline-icon { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // 统一右键菜单组件
+        const ContextMenu = ({ x, y, items, onClose, onAction }) => {
+            const menuRef = useRef(null);
+            
+            useEffect(() => {
+                const handleClickOutside = (e) => {
+                    if (menuRef.current && !menuRef.current.contains(e.target)) onClose();
+                };
+                document.addEventListener('mousedown', handleClickOutside);
+                return () => document.removeEventListener('mousedown', handleClickOutside);
+            }, [onClose]);
+
+            return (
+                <div ref={menuRef} className="context-menu" style={{ top: `${y}px`, left: `${x}px` }}>
+                    {items.map((item, idx) => {
+                        if (item.type === 'separator') return <div key={idx} className="menu-separator" />;
+                        return (
+                            <div key={idx} className="menu-item" onClick={(e) => {
+                                e.stopPropagation();
+                                onAction(item.label);
+                                onClose();
+                            }}>
+                                {item.checked && <span className="icon check">&#xE73E;</span>}
+                                <span className="label">{item.label}</span>
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        };
+
+        // 精密图标库
+        const IconAdd = () => <svg className="outline-icon" width="15" height="15" viewBox="0 0 24 24" strokeWidth="1.2" shapeRendering="crispEdges"><path d="M12 4v16M4 12h16" /></svg>;
+        const IconMore = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5.5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="18.5" r="1.3"/></svg>;
+        const IconViewToggle = () => (
+            <svg className="outline-icon" width="15" height="15" viewBox="0 0 24 24" strokeWidth="1.2" shapeRendering="crispEdges">
+                <rect x="4" y="4" width="16" height="16" rx="0.5" />
+                <line x1="4" y1="9.3" x2="20" y2="9.3" />
+                <line x1="4" y1="14.7" x2="20" y2="14.7" />
+            </svg>
+        );
+        const IconCollapse = () => <svg className="outline-icon" width="12" height="12" viewBox="0 0 24 24" strokeWidth="1.5"><path d="M15 18l-6-6 6-6" /></svg>;
+        const IconExpand = () => <svg className="outline-icon" width="12" height="12" viewBox="0 0 24 24" strokeWidth="1.5"><path d="M9 18l6-6-6-6" /></svg>;
+        const IconSource = () => <span style={{fontFamily:'Consolas, monospace', fontSize:'12px', fontWeight:'bold', letterSpacing: '-0.5px'}}>&lt;/&gt;</span>;
+        const IconSplit = () => <svg className="outline-icon" width="14" height="14" viewBox="0 0 24 24"><path d="M4 4h16v16H4z M12 4v16" /></svg>;
+        const IconPreview = () => <svg className="outline-icon" width="14" height="14" viewBox="0 0 24 24"><path d="M5 3h14v18H5z M9 8h6 M9 12h6 M9 16h4" /></svg>;
+        const IconFocus = () => <svg className="outline-icon" width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/></svg>;
+        const IconList = () => <svg className="outline-icon" width="14" height="14" viewBox="0 0 24 24"><path d="M8 6h10 M8 12h10 M8 18h10 M4 6h1 M4 12h1 M4 18h1" /></svg>;
+        const IconTree = () => <svg className="outline-icon" width="14" height="14" viewBox="0 0 24 24"><path d="M4 4v16 M4 8h4 M4 14h8 M4 20h12" /></svg>;
+
+        const App = () => {
+            const [sidebarVisible, setSidebarVisible] = useState(true);
+            const [viewType, setViewType] = useState('list'); // 'list' | 'tree'
+            const [contextMenu, setContextMenu] = useState(null);
+            const [activeFile, setActiveFile] = useState('UI设计学习资源.md');
+            const [toast, setToast] = useState('');
+
+            const files = [
+                'UI设计学习资源.md',
+                'Windows11极简美化方案.md'
+            ];
+
+            const showToast = (msg) => {
+                setToast(msg);
+                setTimeout(() => setToast(''), 2000);
+            };
+
+            const handleAction = (action) => {
+                showToast(`执行：${action}`);
+            };
+
+            // 1. 工作区大按钮菜单
+            const handleWorkspaceMenu = (e) => {
+                e.preventDefault(); e.stopPropagation();
+                setContextMenu({
+                    x: e.clientX, y: e.clientY - 230,
+                    items: [
+                        { label: '新建文件' },
+                        { label: '搜索' },
+                        { label: '在资源管理器中显示' },
+                        { label: '打开文件夹...' },
+                        { label: '刷新' },
+                        { type: 'separator' },
+                        { label: '排序' },
+                        { label: '最近使用的目录' }
+                    ]
+                });
+            };
+
+            // 2. 文件项独立菜单
+            const handleFileContextMenu = (e, file) => {
+                e.preventDefault(); e.stopPropagation();
+                setContextMenu({
+                    x: e.clientX, y: e.clientY,
+                    items: [
+                        { label: '打开' },
+                        { label: '在新窗口中打开' },
+                        { type: 'separator' },
+                        { label: '新建文件' },
+                        { label: '新建文件夹' },
+                        { label: '搜索' },
+                        { type: 'separator' },
+                        { label: '文档列表', checked: viewType === 'list' },
+                        { label: '文档树', checked: viewType === 'tree' },
+                        { type: 'separator' },
+                        { label: `重命名` },
+                        { label: '创建副本' },
+                        { label: '删除' },
+                        { type: 'separator' },
+                        { label: '属性' },
+                        { label: '复制文件路径' },
+                        { label: '打开文件位置' },
+                    ]
+                });
+            };
+
+            // 3. 空白处全局菜单
+            const handleEmptyContextMenu = (e) => {
+                e.preventDefault();
+                setContextMenu({
+                    x: e.clientX, y: e.clientY,
+                    items: [
+                        { label: '在新窗口中打开' },
+                        { type: 'separator' },
+                        { label: '新建文件' },
+                        { label: '新建文件夹' },
+                        { label: '搜索' },
+                        { type: 'separator' },
+                        { label: '文档列表', checked: viewType === 'list' },
+                        { label: '文档树', checked: viewType === 'tree' },
+                        { type: 'separator' },
+                        { label: '复制文件路径' },
+                        { label: '打开文件位置' },
+                    ]
+                });
+            };
+
+            const toggleViewType = () => {
+                const nextType = viewType === 'list' ? 'tree' : 'list';
+                setViewType(nextType);
+                showToast(`已切换至: 文档${nextType === 'list' ? '列表' : '树'}`);
+            };
+
+            return (
+                <div className="app-window">
+                    <div className="main-content">
+                        {/* 侧边栏 Hover 感应区 */}
+                        <div className={`sidebar sidebar-hover-context ${sidebarVisible ? '' : 'collapsed'}`}>
+                            <div style={{padding: '16px 12px 8px', display: 'flex', gap: '16px'}}>
+                                <div style={{fontSize: '13px', fontWeight: 'bold', borderBottom: '2px solid var(--text-primary)', paddingBottom: '4px'}}>文件</div>
+                                <div style={{fontSize: '13px', color: '#999'}}>大纲</div>
+                            </div>
+                            
+                            <div className="file-tree-container" onContextMenu={handleEmptyContextMenu}>
+                                {viewType === 'tree' ? (
+                                    <>
+                                        <div className="folder-header">
+                                            <span className="icon">&#xE8D5;</span> Documents
+                                        </div>
+                                        {files.map(f => (
+                                            <div 
+                                                key={f} 
+                                                className={`file-item ${activeFile === f ? 'active' : ''}`}
+                                                style={{ paddingLeft: '24px' }}
+                                                onClick={() => setActiveFile(f)}
+                                                onContextMenu={(e) => handleFileContextMenu(e, f)}
+                                            >
+                                                <span className="icon" style={{fontSize: '12px', color: '#999'}}>&#xE8A5;</span>
+                                                {f}
+                                            </div>
+                                        ))}
+                                    </>
+                                ) : (
+                                    files.map(f => (
+                                        <div 
+                                            key={f} 
+                                            className={`file-item ${activeFile === f ? 'active' : ''}`}
+                                            onClick={() => setActiveFile(f)}
+                                            onContextMenu={(e) => handleFileContextMenu(e, f)}
+                                        >
+                                            <span className="icon" style={{fontSize: '12px', color: '#999'}}>&#xE8A5;</span>
+                                            <div style={{display: 'flex', flexDirection: 'column', gap: '2px'}}>
+                                                <span>{f.replace('.md', '')}</span>
+                                                <span style={{fontSize: '10px', color: '#999', opacity: 0.8}}>{f.replace('.md', '')}</span>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                        
+                        <div className="editor-area">
+                            <div className="mock-h1">{activeFile.replace('.md', '')}</div>
+                            <div className="mock-p">原型预演已更新：</div>
+                            <ul style={{color: '#444', lineHeight: 1.8}}>
+                                <li><strong>图标更新：</strong>完全匹配截图：源码为 <code>&lt;/&gt;</code>，分栏为左右分割矩形，预览为书页，专注为聚焦点。侧边栏拨片使用纯粹的 <code>&lt;</code> 和 <code>&gt;</code> 箭头语义。</li>
+                                <li><strong>深度静默：</strong>现在连底部的 <code>Documents</code> 文件夹名也是透明隐藏的。鼠标不进入左侧时，左下角只剩下一个孤零零的 <code>+</code> 号，这做到了极致的视觉降噪。</li>
+                                <li><strong>视图切换：</strong>点击左下角最右侧的图标（或在右键菜单中选择），文件区将在“文档树”和“文档列表”之间真实切换，展示不同的 UI 结构。</li>
+                            </ul>
+                            {toast && <div className="toast">{toast}</div>}
+                        </div>
+                    </div>
+
+                    <div className="status-bar">
+                        {/* 1. 侧边栏地基 */}
+                        <div className={`left-base sidebar-hover-context ${sidebarVisible ? '' : 'collapsed'}`}>
+                            <button className="btn-icon" title="新建文件" onClick={() => showToast('执行：新建文件')}><IconAdd /></button>
+                            
+                            {/* 合并热区：Documents + ⋮ (两者平时均隐藏) */}
+                            <div 
+                                className="workspace-hotzone"
+                                onClick={handleWorkspaceMenu}
+                                onContextMenu={handleWorkspaceMenu}
+                                title="工作区操作"
+                            >
+                                <span className="name">Documents</span>
+                                <span className="more-icon" style={{marginLeft: '4px', display: 'flex'}}><IconMore /></span>
+                            </div>
+
+                            {/* 树/列表切换按钮 (平时隐藏) */}
+                            <button 
+                                className="btn-icon tree-list-btn" 
+                                title="切换列表 / 树视图" 
+                                onClick={toggleViewType}
+                            >
+                                <IconViewToggle />
+                            </button>
+                        </div>
+                        
+                        {/* 2. 编辑器地基 */}
+                        <div className="right-base">
+                            <div style={{display:'flex', alignItems:'center', gap: '6px'}}>
+                                <button 
+                                    className={`btn-icon slider-toggle ${!sidebarVisible ? 'is-collapsed' : ''}`}
+                                    onClick={() => setSidebarVisible(!sidebarVisible)}
+                                    title={sidebarVisible ? "收起侧边栏" : "展开侧边栏"}
+                                >
+                                    {sidebarVisible ? <IconCollapse /> : <IconExpand />}
+                                </button>
+                                
+                                <button className="btn-icon" title="源代码模式"><IconSource /></button>
+                                <button className="btn-icon" title="分栏模式"><IconSplit /></button>
+                                <button className="btn-icon" title="预览模式"><IconPreview /></button>
+                                <button className="btn-icon" title="专注模式" style={{marginLeft: '4px'}}><IconFocus /></button>
+                            </div>
+                            
+                            <div style={{fontSize: '11px', color: '#888'}}>
+                                0 词
+                            </div>
+                        </div>
+                    </div>
+
+                    {contextMenu && (
+                        <ContextMenu 
+                            x={contextMenu.x} 
+                            y={contextMenu.y} 
+                            items={contextMenu.items} 
+                            onClose={() => setContextMenu(null)}
+                            onAction={handleAction}
+                        />
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

@@ -41,24 +41,39 @@ export function OutlinePanel({ content, onHeadingClick }: OutlinePanelProps) {
   }
 
   return (
-    <div style={{ padding: '8px 0' }}>
+    <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: '1px' }}>
       {headings.map((h, i) => (
         <div
           key={i}
           onClick={() => onHeadingClick?.(h.line)}
+          className="outline-item"
           style={{
-            padding: '4px 8px',
-            paddingLeft: `${8 + (h.level - 1) * 12}px`,
+            padding: '6px 12px',
+            paddingLeft: `${16 + (h.level - 1) * 12}px`,
             cursor: 'pointer',
             fontSize: '13px',
+            color: 'var(--text-secondary)',
+            borderRadius: 'var(--radius-md)',
+            margin: '0 8px',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            transition: 'all var(--duration-fast) var(--ease-out)',
           }}
         >
           {h.text}
         </div>
       ))}
+      <style>{`
+        .outline-item:hover {
+          background: var(--bg-hover);
+          color: var(--text-primary);
+        }
+        .outline-item:active {
+          background: var(--bg-active);
+          transform: scale(0.98);
+        }
+      `}</style>
     </div>
   );
 }

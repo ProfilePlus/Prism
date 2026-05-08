@@ -9,37 +9,32 @@
   background: transparent;
 }
 
-body.dark .menubar {
-  border-bottom-color: var(--stroke-surface);
-}
-
 .menuItemWrapper {
   position: relative;
 }
 
 .menuItem {
-  padding: 5px 11px;
-  font-size: 13px;
+  padding: 6px 12px;
+  font-size: 13px; /* 标准桌面菜单字号 */
+  font-weight: 400;
   border-radius: var(--radius-sm);
   cursor: pointer;
   color: var(--text-primary);
-  transition: background 0.12s ease;
+  transition: all var(--duration-fast) var(--ease-out);
+  margin: 0 2px;
 }
 
 .menuItem:hover {
-  background: var(--accent-tint);
+  background: var(--bg-hover); /* 更符合原生行为的轻微悬浮底色 */
 }
 
-body.dark .menuItem:hover {
-  background: var(--accent-tint);
+.menuItem:active {
+  transform: scale(0.96);
+  background: var(--bg-active);
 }
 
 .menuItem.active {
-  background: var(--accent-tint-strong);
-  color: var(--accent);
-}
-
-body.dark .menuItem.active {
-  background: var(--accent-tint-strong);
-  color: var(--accent);
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  font-weight: 500;
 }

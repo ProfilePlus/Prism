@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { SettingsState, DEFAULT_SETTINGS } from './types';
+import { SettingsState, DEFAULT_SETTINGS, ContentTheme, AppearanceMode } from './types';
 import {
   readTextFile,
   writeTextFile,
@@ -16,7 +16,8 @@ async function getConfigPath(): Promise<string> {
 }
 
 interface SettingsStore extends SettingsState {
-  setTheme: (theme: 'light' | 'dark') => void;
+  setTheme: (theme: AppearanceMode) => void;
+  setContentTheme: (theme: ContentTheme) => void;
   setFontSize: (size: number) => void;
   setEditorFontFamily: (family: string) => void;
   setAutoSaveInterval: (interval: number) => void;
@@ -29,7 +30,25 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   setTheme: (theme) => {
     set({ theme });
-    document.body.className = theme;
+    // 更新 body class，主要影响 UI 外壳
+    const classes = Array.from(document.body.classList).filter(c => c !== 'light' && c !== 'dark');
+    document.body.className = [...classes, theme].join(' ');
+    get().saveSettings();
+  },
+
+  setContentTheme: (contentTheme) => {
+    set({ contentTheme });
+    
+    // 设置 data-theme 属性，主要影响内容预览区
+    document.documentElement.setAttribute('data-content-theme', contentTheme);
+    
+    // 如果设置了 Night 主题，自动切换 UI 到深色模式，反之切换到浅色模式
+    if (contentTheme === 'night') {
+      get().setTheme('dark');
+    } else {
+      get().setTheme('light');
+    }
+    
     get().saveSettings();
   },
 
@@ -56,13 +75,20 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
       set({ ...DEFAULT_SETTINGS, ...saved });
 
+      // 应用保存的主题
       if (saved.theme) {
-        document.body.className = saved.theme;
+        document.body.classList.add(saved.theme);
+      }
+      if (saved.contentTheme) {
+        document.documentElement.setAttribute('data-content-theme', saved.contentTheme);
       }
 
       console.log('[Settings] Loaded from:', configPath);
     } catch {
       console.log('[Settings] No config found, using defaults');
+      // 默认应用
+      document.body.classList.add(DEFAULT_SETTINGS.theme);
+      document.documentElement.setAttribute('data-content-theme', DEFAULT_SETTINGS.contentTheme);
     }
   },
 
@@ -75,9 +101,9 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       }
 
       const configPath = await getConfigPath();
-      const { theme, fontSize, editorFontFamily, autoSaveInterval, windowState } = get();
+      const { theme, contentTheme, fontSize, editorFontFamily, autoSaveInterval, windowState } = get();
       const data = JSON.stringify(
-        { theme, fontSize, editorFontFamily, autoSaveInterval, windowState },
+        { theme, contentTheme, fontSize, editorFontFamily, autoSaveInterval, windowState },
         null,
         2,
       );

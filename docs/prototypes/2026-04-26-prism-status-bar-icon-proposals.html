@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prism 状态栏图标重设计 - 5 组方案</title>
+    <style>
+        :root {
+            --bg: #000;
+            --status-bg: #1a1a1a;
+            --accent: #0078d4;
+            --text: #ccc;
+            --stroke: 1.2px;
+        }
+        body { margin: 0; background: var(--bg); font-family: -apple-system, sans-serif; color: #fff; padding: 40px; }
+        
+        .container { max-width: 1000px; margin: 0 auto; }
+        h1 { font-size: 24px; margin-bottom: 40px; text-align: center; }
+
+        .theme-section {
+            background: #111;
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 40px;
+            border: 1px solid #222;
+        }
+        .theme-info { margin-bottom: 20px; }
+        .theme-title { font-size: 18px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 10px; }
+        .theme-desc { font-size: 13px; color: #666; margin-top: 5px; }
+
+        /* 模拟状态栏布局 */
+        .status-bar-mock {
+            height: 32px;
+            background: var(--status-bg);
+            border: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            color: var(--text);
+            transition: all 0.3s;
+        }
+
+        .part-sidebar { width: 200px; display: flex; align-items: center; gap: 8px; border-right: 1px solid rgba(255,255,255,0.1); margin-right: 10px; padding-right: 10px; }
+        .part-editor { flex: 1; display: flex; align-items: center; justify-content: space-between; }
+        .group { display: flex; align-items: center; gap: 4px; }
+        
+        .icon { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 4px; transition: 0.2s; }
+        .icon:hover { background: rgba(255,255,255,0.05); }
+        .icon.active { color: var(--accent); background: rgba(0,120,212,0.1); }
+
+        svg { fill: none; stroke: currentColor; stroke-width: var(--stroke); stroke-linecap: round; stroke-linejoin: round; }
+
+        /* --- 各方案特有样式 --- */
+        
+        /* 1. 极简 */
+        .theme-minimal { --stroke: 0.8px; --accent: #E60012; }
+        
+        /* 2. 工业 */
+        .theme-industrial { --stroke: 2.2px; --accent: #fff; }
+        .theme-industrial svg { stroke-linecap: square; stroke-linejoin: miter; }
+
+        /* 3. 棱镜 */
+        .theme-prism { --stroke: 1.5px; --accent: #4facfe; }
+        .theme-prism .prism-line { opacity: 0.5; stroke-dasharray: 2 2; }
+
+        /* 4. Fluent */
+        .theme-fluent { --stroke: 1.2px; --accent: #0078d4; }
+        .theme-fluent .icon.active { box-shadow: 0 2px 8px rgba(0,120,212,0.3); transform: translateY(-1px); background: #222; }
+
+        /* 5. Retro/ASCII */
+        .theme-retro { --text: #00ff00; --status-bg: #050505; }
+        .theme-retro .icon { font-family: monospace; font-size: 10px; font-weight: bold; width: auto; padding: 0 4px; }
+        .theme-retro .icon.active { background: #00ff00; color: #000; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Prism 状态栏图标 5 组设计方案</h1>
+
+    <!-- 方案 1: 东方极简 -->
+    <div class="theme-section">
+        <div class="theme-info">
+            <div class="theme-title">1. 东方极简 (Kenya Hara Style)</div>
+            <div class="theme-desc">纤细、断笔、留白。适合追求极致清爽感的写作环境。</div>
+        </div>
+        <div class="status-bar-mock theme-minimal">
+            <div class="part-sidebar">
+                <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div>
+                <div style="flex:1; text-align:center; opacity:0.3; font-size:9px;">DOCS</div>
+                <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></div>
+                <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M3 7h18M3 12h12M3 17h18"/></svg></div>
+            </div>
+            <div class="part-editor">
+                <div class="group">
+                    <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></div>
+                    <div style="width:1px; height:10px; background:#333; margin:0 4px;"></div>
+                    <div class="icon active"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M8 9l-3 3 3 3M16 9l3 3-3 3"/></svg></div>
+                    <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M10 5h1M13 5h6v14h-6M10 19h1"/></svg></div>
+                    <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/></svg></div>
+                </div>
+                <div style="opacity:0.5">1,024 Words</div>
+                <div class="group">
+                    <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="1"/></svg></div>
+                    <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 方案 2: 工业精密 -->
+    <div class="theme-section">
+        <div class="theme-info">
+            <div class="theme-title">2. 工业精密 (Industrial Design)</div>
+            <div class="theme-desc">粗线条、几何对齐、功能主义。赋予界面机械般的可靠感。</div>
+        </div>
+        <div class="status-bar-mock theme-industrial">
+            <div class="part-sidebar">
+                <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/></svg></div>
+                <div style="flex:1; text-align:center; font-weight:bold; letter-spacing:1px; font-size:9px;">PRISM</div>
+                <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/><path d="M9 9h6v6H9z"/></svg></div>
+                <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></div>
+            </div>
+            <div class="part-editor">
+                <div class="group">
+                    <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M19 12H5"/></svg></div>
+                    <div class="icon active"><svg width="14" height="14" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18"/><path d="M8 12h8"/></svg></div>
+                    <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18"/><path d="M12 3v18"/></svg></div>
+                    <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18"/><path d="M12 12h.01"/></svg></div>
+                </div>
+                <div class="group">
+                    <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M12 8v8M8 12h8"/><circle cx="12" cy="12" r="10"/></svg></div>
+                    <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/><path d="M12 4l4 4-4 4"/></svg></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 方案 3: 棱镜折射 -->
+    <div class="theme-section">
+        <div class="theme-info">
+            <div class="theme-title">3. 棱镜品牌 (Prism Brand DNA)</div>
+            <div class="theme-desc">利用斜线、折射、虚实对比。高度呼应产品品牌形象。</div>
+        </div>
+        <div class="status-bar-mock theme-prism">
+            <div class="part-sidebar">
+                <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M12 5L19 19H5Z"/></svg></div>
+                <div style="flex:1; text-align:center; font-style:italic;">Documents</div>
+                <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7l-10 10"/></svg></div>
+            </div>
+            <div class="part-editor">
+                <div class="group">
+                    <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M11 19L5 12l6-7"/></svg></div>
+                    <div class="icon active"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M7 8l-2 4 2 4M17 8l2 4-2 4M12 5l-2 14"/></svg></div>
+                    <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M4 5h7v14H4ZM13 5h7v14h-7Z"/></svg></div>
+                    <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M12 4L4 20h16Z"/><path class="prism-line" d="M12 4v16"/></svg></div>
+                </div>
+                <div class="group">
+                    <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M12 2L2 12l10 10 10-10Z"/></svg></div>
+                    <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M13 5l7 7-7 7M5 12h15"/></svg></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 方案 4: Fluent Next -->
+    <div class="theme-section">
+        <div class="theme-info">
+            <div class="theme-title">4. Fluent 进阶 (Fluent 2.0 Material)</div>
+            <div class="theme-desc">柔和圆角、软阴影、微层级。最完美的 Windows 11 原生体验。</div>
+        </div>
+        <div class="status-bar-mock theme-fluent">
+            <div class="part-sidebar">
+                <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M12 8v8M8 12h8"/></svg></div>
+                <div style="flex:1; text-align:center; opacity:0.6;">C:\Dev\Prism</div>
+                <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l2 2"/></svg></div>
+            </div>
+            <div class="part-editor">
+                <div class="group">
+                    <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6" stroke-width="2"/></svg></div>
+                    <div class="icon active"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M10 9l-3 3 3 3M14 9l3 3-3 3"/></svg></div>
+                    <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M9 5H5v14h4M15 5h4v14h-4"/></svg></div>
+                    <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></div>
+                </div>
+                <div class="group">
+                    <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Z"/><path d="M12 8v8M8 12h8"/></svg></div>
+                    <div class="icon"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M4 12h16M14 6l6 6-6 6"/></svg></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 方案 5: 极客 Retro -->
+    <div class="theme-section">
+        <div class="theme-info">
+            <div class="theme-title">5. 极客 Retro (Terminal ASCII)</div>
+            <div class="theme-desc">代码字符构成。纯粹的黑客生产力风格。</div>
+        </div>
+        <div class="status-bar-mock theme-retro">
+            <div class="part-sidebar">
+                <div class="icon">[+]</div>
+                <div style="flex:1; text-align:center; font-family:monospace;">~/prism_proj</div>
+                <div class="icon">{*}</div>
+                <div class="icon">---</div>
+            </div>
+            <div class="part-editor">
+                <div class="group">
+                    <div class="icon">&lt;&lt;</div>
+                    <div style="width:1px; height:10px; background:#00ff00; opacity:0.3;"></div>
+                    <div class="icon active">&lt;/&gt;</div>
+                    <div class="icon">[|]</div>
+                    <div class="icon">(o)</div>
+                </div>
+                <div style="font-family:monospace;">5.2k CHARS</div>
+                <div class="group">
+                    <div class="icon">:: FOCUS ::</div>
+                    <div class="icon"># EXPORT</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+</body>
+</html>
