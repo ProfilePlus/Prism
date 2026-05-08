@@ -18,6 +18,8 @@ import { executeMenuAction } from './lib/menuActions';
 import { executeFileAction, FileActionInput } from './lib/fileActions';
 import { ContextMenu } from './components/shell/ContextMenu';
 import { ShortcutPanel } from './components/shell/ShortcutPanel';
+import { CommandPalette } from './components/shell/CommandPalette';
+import { ALL_COMMANDS } from './lib/commands';
 
 function basename(path: string): string {
   const parts = path.split(/[\\/]/);
@@ -40,6 +42,7 @@ function App() {
   const [globalContextMenu, setGlobalContextMenu] = useState<{ x: number, y: number, items: any[] } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [shortcutPanelVisible, setShortcutPanelVisible] = useState(false);
+  const [commandPaletteVisible, setCommandPaletteVisible] = useState(false);
 
   useBootstrap();
   useAutoSave(2000);
@@ -50,6 +53,11 @@ function App() {
       if ((e.ctrlKey || e.metaKey) && e.key === '/') {
         e.preventDefault();
         setShortcutPanelVisible(true);
+      }
+      // Ctrl+Shift+P 命令面板
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
+        e.preventDefault();
+        setCommandPaletteVisible(true);
       }
     };
 
@@ -305,6 +313,20 @@ function App() {
       <ShortcutPanel
         visible={shortcutPanelVisible}
         onClose={() => setShortcutPanelVisible(false)}
+      />
+
+      <CommandPalette
+        visible={commandPaletteVisible}
+        commands={ALL_COMMANDS}
+        onClose={() => setCommandPaletteVisible(false)}
+        onExecute={(commandId) => {
+          executeMenuAction(commandId, {
+            documentStore: useDocumentStore.getState(),
+            workspaceStore: useWorkspaceStore.getState(),
+            settingsStore: useSettingsStore.getState(),
+            showToast,
+          });
+        }}
       />
     </WindowShell>
   );
