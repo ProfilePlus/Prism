@@ -1,10 +1,11 @@
 import { MenuActionContext } from './menuActions.types';
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
+import { readTextFile, writeTextFile, stat } from '@tauri-apps/plugin-fs';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { loadFolderTree } from '../domains/workspace/lib/loadFolderTree';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { openPrismWindow } from './openWindow';
+import { ask } from '@tauri-apps/plugin-dialog';
 
 export async function executeMenuAction(
   action: string,
@@ -222,19 +223,45 @@ async function handleOpen(context: MenuActionContext): Promise<void> {
 
   if (!selected || Array.isArray(selected)) return;
 
-  if (!context.documentStore.currentDocument) {
-    const content = await readTextFile(selected);
-    const name = selected.split(/[\\/]/).pop() ?? 'Untitled.md';
-    context.documentStore.openDocument(selected, name, content);
+  // 检查文件大小
+  try {
+    const fileInfo = await stat(selected);
+    const fileSizeMB = fileInfo.size / (1024 * 1024);
 
-    // 加载父目录的文件树
+    if (fileSizeMB > 10) {
+      const shouldContinue = await ask(
+        `文件大小为 ${fileSizeMB.toFixed(2)} MB，可能影响性能。是否继续打开？`,
+        { title: '大文件警告', kind: 'warning' }
+      );
+      if (!shouldContinue) return;
+    }
+  } catch (err) {
+    console.error('[Menu] Failed to check file size:', err);
+  }
+
+  if (!context.documentStore.currentDocument) {
     try {
-      const parentDir = dirname(selected);
-      context.workspaceStore.setRootPath(parentDir);
-      const tree = await loadFolderTree(parentDir);
-      context.workspaceStore.setFileTree(tree);
-    } catch (err) {
-      console.error('[Menu] Failed to load parent folder tree:', err);
+      const content = await readTextFile(selected);
+      const name = selected.split(/[\\/]/).pop() ?? 'Untitled.md';
+      context.documentStore.openDocument(selected, name, content);
+
+      // 加载父目录的文件树
+      try {
+        const parentDir = dirname(selected);
+        context.workspaceStore.setRootPath(parentDir);
+        const tree = await loadFolderTree(parentDir);
+        context.workspaceStore.setFileTree(tree);
+      } catch (err) {
+        console.error('[Menu] Failed to load parent folder tree:', err);
+      }
+    } catch (err: any) {
+      console.error('[Menu] Failed to open file:', err);
+      const errorMsg = err.message?.includes('permission')
+        ? '无法打开文件：权限不足'
+        : err.message?.includes('not found')
+        ? '无法打开文件：文件不存在'
+        : `无法打开文件：${err.message || '未知错误'}`;
+      await ask(errorMsg, { title: '打开文件失败', kind: 'error' });
     }
   } else {
     await openPrismWindow({ filePath: selected });

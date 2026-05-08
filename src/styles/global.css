@@ -460,12 +460,22 @@ button:focus-visible {
   border: 1px solid var(--stroke-control);
   border-bottom: 1px solid var(--text-tertiary);
   border-radius: var(--radius-sm);
-  padding: 0 32px 0 10px;
+  padding: 0 80px 0 10px;
   font-family: var(--font-ui);
   font-size: 13px;
   color: var(--text-primary);
   outline: none;
   transition: all var(--duration-fast);
+}
+
+.notepad-search-result-count {
+  position: absolute;
+  right: 32px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 .notepad-search-input:focus {
@@ -1243,3 +1253,41 @@ body.dark [data-content-theme] .sidebar button:hover {
 .hljs-property, .hljs-attr { color: #e06c75; }
 .hljs-params, .hljs-title { color: #abb2bf; }
 .hljs-punctuation, .hljs-tag { color: #abb2bf; }
+/* 代码复制按钮 */
+.code-copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: all 0.2s;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets';
+  font-size: 14px;
+}
+
+.code-copy-btn::before {
+  content: "\E8C8"; /* Copy icon */
+}
+
+.code-copy-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.code-copy-btn:active {
+  transform: scale(0.9);
+}
+
+.code-copy-btn.copied::before {
+  content: "\E73E"; /* Checkmark icon */
+  color: #27c93f;
+}

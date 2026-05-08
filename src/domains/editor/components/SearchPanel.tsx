@@ -6,6 +6,8 @@ export interface SearchPanelProps {
   onClose: () => void;
   onSearch: (action: 'next' | 'prev' | 'all' | 'replace' | 'replaceAll', params: SearchParams) => void;
   initialQuery?: string;
+  matchCount?: number;
+  currentMatch?: number;
 }
 
 export interface SearchParams {
@@ -16,7 +18,7 @@ export interface SearchParams {
   wholeWord: boolean;
 }
 
-export function SearchPanel({ visible, viewMode, onClose, onSearch, initialQuery = '' }: SearchPanelProps) {
+export function SearchPanel({ visible, viewMode, onClose, onSearch, initialQuery = '', matchCount = 0, currentMatch = 0 }: SearchPanelProps) {
   const [query, setQuery] = useState(initialQuery);
   const [replaceWith, setReplaceWith] = useState('');
   const [matchCase, setMatchCase] = useState(false);
@@ -102,6 +104,11 @@ export function SearchPanel({ visible, viewMode, onClose, onSearch, initialQuery
               onKeyDown={onKeyDown}
               className="notepad-search-input"
             />
+            {query && (
+              <span className="notepad-search-result-count">
+                {matchCount === 0 ? '未找到匹配项' : `${currentMatch}/${matchCount}`}
+              </span>
+            )}
             <span className="notepad-search-icon-inside"></span>
           </div>
 

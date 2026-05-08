@@ -19,12 +19,24 @@ interface FloatingToolbarProps {
 export function FloatingToolbar({ visible, x, y, onFormat }: FloatingToolbarProps) {
   if (!visible) return null;
 
+  // 边界检测：避免工具栏超出窗口
+  const toolbarWidth = 280; // 工具栏大致宽度
+  const toolbarHeight = 40; // 工具栏大致高度
+  const menuBarHeight = 80; // 菜单栏 + 标题栏高度
+  const padding = 10; // 边缘留白
+
+  const safeX = Math.min(
+    Math.max(x, padding + toolbarWidth / 2),
+    window.innerWidth - padding - toolbarWidth / 2
+  );
+  const safeY = Math.max(y, menuBarHeight + toolbarHeight + padding);
+
   return (
     <div
       className={styles.toolbar}
       style={{
-        left: `${x}px`,
-        top: `${y}px`,
+        left: `${safeX}px`,
+        top: `${safeY}px`,
       }}
     >
       {/* 组 1：基础文本装饰 */}

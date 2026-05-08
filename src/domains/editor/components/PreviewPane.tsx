@@ -79,6 +79,34 @@ export function PreviewPane({ content }: PreviewPaneProps) {
     });
   }, [html]);
 
+  // 处理代码复制按钮点击
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleCopyClick = async (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const copyBtn = target.closest('.code-copy-btn') as HTMLButtonElement;
+
+      if (copyBtn) {
+        e.preventDefault();
+        const code = copyBtn.getAttribute('data-code');
+        if (code) {
+          try {
+            await navigator.clipboard.writeText(code);
+            copyBtn.classList.add('copied');
+            setTimeout(() => copyBtn.classList.remove('copied'), 2000);
+          } catch (err) {
+            console.error('[PreviewPane] Failed to copy code:', err);
+          }
+        }
+      }
+    };
+
+    container.addEventListener('click', handleCopyClick);
+    return () => container.removeEventListener('click', handleCopyClick);
+  }, [html]);
+
   return (
     <div
       ref={containerRef}

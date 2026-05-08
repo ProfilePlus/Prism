@@ -35,6 +35,32 @@ function remarkHeadingLines() {
   };
 }
 
+function rehypeCodeCopyButton() {
+  return (tree: any) => {
+    visit(tree, 'element', (node: any) => {
+      if (node.tagName === 'pre' && node.children?.[0]?.tagName === 'code') {
+        const codeNode = node.children[0];
+        const codeText = codeNode.children
+          .map((child: any) => child.value || '')
+          .join('');
+
+        // 添加复制按钮
+        node.children.push({
+          type: 'element',
+          tagName: 'button',
+          properties: {
+            className: ['code-copy-btn'],
+            'data-code': codeText,
+            title: '复制代码',
+            'aria-label': '复制代码',
+          },
+          children: [{ type: 'text', value: '' }],
+        });
+      }
+    });
+  };
+}
+
 export function markdownToHtml(content: string): string {
   const result = unified()
     .use(remarkParse)
@@ -44,6 +70,7 @@ export function markdownToHtml(content: string): string {
     .use(remarkMermaid)
     .use(remarkRehype, { allowDangerousHtml: true })
     .use(rehypeHighlight as any, { ignoreMissing: true })
+    .use(rehypeCodeCopyButton)
     .use(rehypeKatex)
     .use(rehypeStringify, { allowDangerousHtml: true })
     .processSync(content);
