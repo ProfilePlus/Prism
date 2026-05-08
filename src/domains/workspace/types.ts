@@ -1,6 +1,7 @@
 export type WorkspaceMode = 'single' | 'folder';
 export type SidebarTab = 'files' | 'outline' | 'search';
 export type FileTreeMode = 'tree' | 'list';
+export type FileSortMode = 'name' | 'modified' | 'created' | 'size';
 
 export interface FileNode {
   path: string;
@@ -15,6 +16,7 @@ export interface WorkspaceState {
   rootPath: string | null;
   fileTree: FileNode[];
   fileTreeMode: FileTreeMode;
+  fileSortMode: FileSortMode;
   sidebarVisible: boolean;
   sidebarTab: SidebarTab;
   focusMode: boolean;

@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef } from 'react';
+import { useMemo, useEffect, useRef, useState } from 'react';
 import { markdownToHtml } from '../../../lib/markdownToHtml';
 import { openUrl } from '@tauri-apps/plugin-opener';
 
@@ -8,6 +8,7 @@ interface PreviewPaneProps {
 
 export function PreviewPane({ content }: PreviewPaneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   const html = useMemo(() => {
     try {
@@ -107,18 +108,130 @@ export function PreviewPane({ content }: PreviewPaneProps) {
     return () => container.removeEventListener('click', handleCopyClick);
   }, [html]);
 
+  // 处理图片点击放大
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleImageClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'IMG') {
+        e.preventDefault();
+        const img = target as HTMLImageElement;
+        setLightboxImage(img.src);
+      }
+    };
+
+    container.addEventListener('click', handleImageClick);
+    return () => container.removeEventListener('click', handleImageClick);
+  }, [html]);
+
   return (
-    <div
-      ref={containerRef}
-      className="markdown-preview"
-      style={{
-        padding: '32px 48px',
-        color: 'var(--text-primary)',
-        maxWidth: '860px',
-        margin: '0 auto',
-        width: '100%',
-      }}
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
+    <>
+      <div
+        ref={containerRef}
+        className="markdown-preview"
+        style={{
+          padding: '32px 48px',
+          color: 'var(--text-primary)',
+          maxWidth: '860px',
+          margin: '0 auto',
+          width: '100%',
+        }}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+
+      {lightboxImage && (
+        <div
+          className="lightbox-overlay"
+          onClick={() => setLightboxImage(null)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setLightboxImage(null);
+          }}
+          tabIndex={0}
+        >
+          <img src={lightboxImage} alt="放大图片" className="lightbox-image" />
+          <button
+            className="lightbox-close"
+            onClick={() => setLightboxImage(null)}
+            aria-label="关闭"
+          >
+            ×
+          </button>
+          <style>{`
+            .lightbox-overlay {
+              position: fixed;
+              inset: 0;
+              background: rgba(0, 0, 0, 0.9);
+              backdrop-filter: blur(8px);
+              z-index: 10000;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              cursor: zoom-out;
+              animation: fadeIn 0.2s ease;
+            }
+
+            .lightbox-image {
+              max-width: 90vw;
+              max-height: 90vh;
+              object-fit: contain;
+              border-radius: var(--radius-lg);
+              box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+              animation: zoomIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            }
+
+            .lightbox-close {
+              position: fixed;
+              top: 24px;
+              right: 24px;
+              width: 48px;
+              height: 48px;
+              border: none;
+              background: rgba(255, 255, 255, 0.1);
+              color: white;
+              font-size: 32px;
+              border-radius: 50%;
+              cursor: pointer;
+              transition: all 0.2s;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              backdrop-filter: blur(10px);
+            }
+
+            .lightbox-close:hover {
+              background: rgba(255, 255, 255, 0.2);
+              transform: scale(1.1);
+            }
+
+            @keyframes fadeIn {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+
+            @keyframes zoomIn {
+              from {
+                opacity: 0;
+                transform: scale(0.8);
+              }
+              to {
+                opacity: 1;
+                transform: scale(1);
+              }
+            }
+
+            .markdown-preview img {
+              cursor: zoom-in;
+              transition: transform 0.2s;
+            }
+
+            .markdown-preview img:hover {
+              transform: scale(1.02);
+            }
+          `}</style>
+        </div>
+      )}
+    </>
   );
 }

@@ -1,10 +1,11 @@
 import { create } from 'zustand';
-import { WorkspaceState, FileNode, SidebarTab, FileTreeMode } from './types';
+import { WorkspaceState, FileNode, SidebarTab, FileTreeMode, FileSortMode } from './types';
 
 interface WorkspaceStore extends WorkspaceState {
   setRootPath: (path: string) => void;
   setFileTree: (tree: FileNode[]) => void;
   setFileTreeMode: (mode: FileTreeMode) => void;
+  setFileSortMode: (mode: FileSortMode) => void;
   toggleSidebar: () => void;
   setSidebarVisible: (visible: boolean) => void;
   toggleStatusBar: () => void;
@@ -20,6 +21,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
   rootPath: null,
   fileTree: [],
   fileTreeMode: 'tree',
+  fileSortMode: 'name',
   sidebarVisible: true,
   sidebarTab: 'files',
   focusMode: false,
@@ -38,6 +40,10 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
 
   setFileTreeMode: (fileTreeMode) => {
     set({ fileTreeMode });
+  },
+
+  setFileSortMode: (fileSortMode) => {
+    set({ fileSortMode });
   },
 
   toggleSidebar: () => {
