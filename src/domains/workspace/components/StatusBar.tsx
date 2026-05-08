@@ -1,5 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useWorkspaceStore } from '../../workspace/store';
+import { useDocumentStore } from '../../document/store';
 
 // --- 精密图标库 (SVG) ---
 const IconAdd = () => <svg className="outline-icon" width="15" height="15" viewBox="0 0 24 24" strokeWidth="1.2" shapeRendering="crispEdges"><path d="M12 4v16M4 12h16" /></svg>;
@@ -54,10 +55,32 @@ export function StatusBar({
 }: StatusBarProps) {
   const rootPath = useWorkspaceStore((s) => s.rootPath);
   const fileTreeMode = useWorkspaceStore((s) => s.fileTreeMode);
+  const currentDocument = useDocumentStore((s) => s.currentDocument);
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
+
   const rootName = useMemo(() => {
     if (!rootPath) return 'Documents';
     return rootPath.split(/[\\/]/).pop() || rootPath;
   }, [rootPath]);
+
+  // 监听文档保存状态
+  useEffect(() => {
+    if (!currentDocument) {
+      setSaveStatus('saved');
+      return;
+    }
+
+    if (currentDocument.isDirty) {
+      setSaveStatus('unsaved');
+      // 模拟保存中状态（实际应该从 auto-save hook 获取）
+      const timer = setTimeout(() => {
+        setSaveStatus('saving');
+      }, 1500);
+      return () => clearTimeout(timer);
+    } else {
+      setSaveStatus('saved');
+    }
+  }, [currentDocument?.isDirty, currentDocument?.lastSavedAt]);
 
   const modes = [
     { key: 'edit', label: '源码', icon: <IconSource /> },
@@ -124,6 +147,13 @@ export function StatusBar({
         </div>
 
         <div className="center-stats-display">
+          {/* 保存状态 */}
+          <span className={`save-status ${saveStatus}`}>
+            {saveStatus === 'saved' && '已保存'}
+            {saveStatus === 'saving' && '保存中...'}
+            {saveStatus === 'unsaved' && '未保存'}
+          </span>
+          <div className="vertical-sep" style={{ opacity: 0.3, margin: '0 8px' }} />
           <span className="val">{wordCount}</span>
           <span className="lbl">词</span>
           <div className="vertical-sep" style={{ opacity: 0.3, margin: '0 8px' }} />
@@ -222,6 +252,16 @@ export function StatusBar({
         }
         .val { font-family: var(--font-mono); font-size: 11px; font-weight: 500; }
         .lbl { font-size: 9px; color: var(--text-tertiary); font-weight: 700; }
+
+        .save-status {
+          font-size: 10px;
+          color: var(--text-tertiary);
+          font-weight: 500;
+          transition: color 0.2s;
+        }
+        .save-status.saved { color: var(--text-tertiary); }
+        .save-status.saving { color: var(--accent); }
+        .save-status.unsaved { color: #f59e0b; }
 
         .mode-switcher-set, .left-controls, .right-controls { display: flex; align-items: center; gap: 4px; }
         

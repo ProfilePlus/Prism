@@ -82,6 +82,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     const onCursorChangeRef = useRef(onCursorChange);
     const onScrollRatioChangeRef = useRef(onScrollRatioChange);
     const theme = useSettingsStore((s) => s.theme);
+    const showLineNumbers = useSettingsStore((s) => s.showLineNumbers);
     const typewriterMode = useWorkspaceStore((s) => s.typewriterMode);
     
     // 关键标记：用于拦截因同步内容触发的 onChange
@@ -439,8 +440,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             }
           ])),
           lineFlashField,
-          lineNumbers(),
-          highlightActiveLineGutter(),
+          ...(showLineNumbers ? [lineNumbers(), highlightActiveLineGutter()] : []),
           highlightSpecialChars(),
           history(),
           drawSelection(),
@@ -543,7 +543,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         viewRef.current = null;
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [theme, typewriterMode]);
+    }, [theme, typewriterMode, showLineNumbers]);
 
     return (
       <>

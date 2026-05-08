@@ -21,6 +21,7 @@ interface SettingsStore extends SettingsState {
   setFontSize: (size: number) => void;
   setEditorFontFamily: (family: string) => void;
   setAutoSaveInterval: (interval: number) => void;
+  setShowLineNumbers: (show: boolean) => void;
   loadSettings: () => Promise<void>;
   saveSettings: () => Promise<void>;
 }
@@ -67,6 +68,11 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     get().saveSettings();
   },
 
+  setShowLineNumbers: (showLineNumbers) => {
+    set({ showLineNumbers });
+    get().saveSettings();
+  },
+
   loadSettings: async () => {
     try {
       const configPath = await getConfigPath();
@@ -101,9 +107,9 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       }
 
       const configPath = await getConfigPath();
-      const { theme, contentTheme, fontSize, editorFontFamily, autoSaveInterval, windowState } = get();
+      const { theme, contentTheme, fontSize, editorFontFamily, autoSaveInterval, showLineNumbers, windowState } = get();
       const data = JSON.stringify(
-        { theme, contentTheme, fontSize, editorFontFamily, autoSaveInterval, windowState },
+        { theme, contentTheme, fontSize, editorFontFamily, autoSaveInterval, showLineNumbers, windowState },
         null,
         2,
       );

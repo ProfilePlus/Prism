@@ -1291,3 +1291,13 @@ body.dark [data-content-theme] .sidebar button:hover {
   content: "\E73E"; /* Checkmark icon */
   color: #27c93f;
 }
+
+/* 专注模式渐变遮罩 */
+body.focus-mode .cm-line:not(.cm-activeLine) {
+  opacity: 0.3;
+  transition: opacity 0.3s ease;
+}
+
+body.focus-mode .cm-activeLine {
+  opacity: 1;
+}

@@ -13,6 +13,7 @@ export interface SettingsState {
   fontSize: number;
   editorFontFamily: string;
   autoSaveInterval: number;
+  showLineNumbers: boolean;
   windowState: {
     width: number;
     height: number;
@@ -27,6 +28,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   fontSize: 16,
   editorFontFamily: 'Cascadia Code, Consolas, monospace',
   autoSaveInterval: 2000,
+  showLineNumbers: false,
   windowState: {
     width: 1200,
     height: 800,
