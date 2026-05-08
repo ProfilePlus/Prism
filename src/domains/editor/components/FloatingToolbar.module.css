@@ -3,11 +3,11 @@
   display: flex;
   align-items: center;
   gap: 0;
-  padding: 4px;
+  padding: 3px;
   background: var(--layer-2);
   border: 1px solid var(--stroke-control);
-  border-radius: var(--radius-lg);
-  box-shadow: 
+  border-radius: var(--radius-md);
+  box-shadow:
     0 8px 16px rgba(0, 0, 0, 0.12),
     0 2px 4px rgba(0, 0, 0, 0.08);
   backdrop-filter: blur(40px) saturate(180%);
@@ -37,8 +37,8 @@
 }
 
 .button {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;

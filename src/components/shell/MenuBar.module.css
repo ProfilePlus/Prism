@@ -15,8 +15,8 @@
 
 .menuItem {
   padding: 6px 12px;
-  font-size: 13px; /* 标准桌面菜单字号 */
-  font-weight: 400;
+  font-size: 14px; /* Windows 11 标准菜单字号 */
+  font-weight: 500;
   border-radius: var(--radius-sm);
   cursor: pointer;
   color: var(--text-primary);

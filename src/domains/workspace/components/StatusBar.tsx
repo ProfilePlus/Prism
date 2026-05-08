@@ -146,10 +146,9 @@ export function StatusBar({
 
       <style>{`
         .typora-status-bar-outer {
-          height: 30px;
+          height: 32px;
           display: flex;
-          background: var(--bg-surface);
-          backdrop-filter: blur(40px) saturate(180%);
+          background: var(--bg-surface-solid);
           color: var(--text-secondary);
           user-select: none;
           font-family: var(--font-ui);
