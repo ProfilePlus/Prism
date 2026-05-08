@@ -31,9 +31,18 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   setTheme: (theme) => {
     set({ theme });
+
+    // 计算实际应用的主题
+    let actualTheme: 'light' | 'dark' = 'light';
+    if (theme === 'auto') {
+      actualTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    } else {
+      actualTheme = theme;
+    }
+
     // 更新 body class，主要影响 UI 外壳
     const classes = Array.from(document.body.classList).filter(c => c !== 'light' && c !== 'dark');
-    document.body.className = [...classes, theme].join(' ');
+    document.body.className = [...classes, actualTheme].join(' ');
     get().saveSettings();
   },
 
@@ -82,19 +91,46 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       set({ ...DEFAULT_SETTINGS, ...saved });
 
       // 应用保存的主题
-      if (saved.theme) {
-        document.body.classList.add(saved.theme);
+      const theme = saved.theme || DEFAULT_SETTINGS.theme;
+      let actualTheme: 'light' | 'dark' = 'light';
+      if (theme === 'auto') {
+        actualTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      } else {
+        actualTheme = theme as 'light' | 'dark';
       }
+      document.body.classList.add(actualTheme);
+
       if (saved.contentTheme) {
         document.documentElement.setAttribute('data-content-theme', saved.contentTheme);
+      }
+
+      // 监听系统主题变化
+      if (theme === 'auto') {
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleChange = (e: MediaQueryListEvent) => {
+          const newTheme = e.matches ? 'dark' : 'light';
+          const classes = Array.from(document.body.classList).filter(c => c !== 'light' && c !== 'dark');
+          document.body.className = [...classes, newTheme].join(' ');
+        };
+        mediaQuery.addEventListener('change', handleChange);
       }
 
       console.log('[Settings] Loaded from:', configPath);
     } catch {
       console.log('[Settings] No config found, using defaults');
       // 默认应用
-      document.body.classList.add(DEFAULT_SETTINGS.theme);
+      const actualTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.body.classList.add(actualTheme);
       document.documentElement.setAttribute('data-content-theme', DEFAULT_SETTINGS.contentTheme);
+
+      // 监听系统主题变化
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleChange = (e: MediaQueryListEvent) => {
+        const newTheme = e.matches ? 'dark' : 'light';
+        const classes = Array.from(document.body.classList).filter(c => c !== 'light' && c !== 'dark');
+        document.body.className = [...classes, newTheme].join(' ');
+      };
+      mediaQuery.addEventListener('change', handleChange);
     }
   },
 

@@ -17,6 +17,7 @@ import { MenuBar } from './components/shell/MenuBar';
 import { executeMenuAction } from './lib/menuActions';
 import { executeFileAction, FileActionInput } from './lib/fileActions';
 import { ContextMenu } from './components/shell/ContextMenu';
+import { ShortcutPanel } from './components/shell/ShortcutPanel';
 
 function basename(path: string): string {
   const parts = path.split(/[\\/]/);
@@ -38,9 +39,23 @@ function App() {
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [globalContextMenu, setGlobalContextMenu] = useState<{ x: number, y: number, items: any[] } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [shortcutPanelVisible, setShortcutPanelVisible] = useState(false);
 
   useBootstrap();
   useAutoSave(2000);
+
+  // Ctrl+/ 快捷键面板
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+        e.preventDefault();
+        setShortcutPanelVisible(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -286,6 +301,11 @@ function App() {
           {toastMessage}
         </div>
       )}
+
+      <ShortcutPanel
+        visible={shortcutPanelVisible}
+        onClose={() => setShortcutPanelVisible(false)}
+      />
     </WindowShell>
   );
 }

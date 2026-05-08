@@ -6,6 +6,7 @@ import { loadFolderTree } from '../domains/workspace/lib/loadFolderTree';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { openPrismWindow } from './openWindow';
 import { ask } from '@tauri-apps/plugin-dialog';
+import { addRecentFile } from './recentFiles';
 
 export async function executeMenuAction(
   action: string,
@@ -244,6 +245,9 @@ async function handleOpen(context: MenuActionContext): Promise<void> {
       const content = await readTextFile(selected);
       const name = selected.split(/[\\/]/).pop() ?? 'Untitled.md';
       context.documentStore.openDocument(selected, name, content);
+
+      // 添加到最近文件
+      addRecentFile(selected, name);
 
       // 加载父目录的文件树
       try {

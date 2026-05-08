@@ -1,4 +1,4 @@
-export type AppearanceMode = 'light' | 'dark';
+export type AppearanceMode = 'light' | 'dark' | 'auto';
 
 export type ContentTheme = 
   | 'github' 
@@ -23,7 +23,7 @@ export interface SettingsState {
 }
 
 export const DEFAULT_SETTINGS: SettingsState = {
-  theme: 'light',
+  theme: 'auto',
   contentTheme: 'github',
   fontSize: 16,
   editorFontFamily: 'Cascadia Code, Consolas, monospace',
