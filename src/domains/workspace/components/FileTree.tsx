@@ -74,9 +74,13 @@ function RenameField({ value, onCommit, onCancel }: RenameFieldProps) {
   const finishedRef = useRef(false);
 
   useEffect(() => {
-    inputRef.current?.focus();
-    inputRef.current?.select();
-  }, []);
+    if (inputRef.current) {
+      inputRef.current.focus();
+      // 自动选中文件名（不含扩展名）
+      const { stem } = stripExtension(value);
+      inputRef.current.setSelectionRange(0, stem.length);
+    }
+  }, [value]);
 
   const finish = (commit: boolean) => {
     if (finishedRef.current) return;
@@ -134,6 +138,20 @@ export function FileTree({ nodes, activePath, onFileClick }: FileTreeProps) {
     window.addEventListener('prism-file-rename-request', handler as EventListener);
     return () => window.removeEventListener('prism-file-rename-request', handler as EventListener);
   }, [nodes]);
+
+  // F2 快捷键重命名
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'F2' && activePath) {
+        event.preventDefault();
+        setRenamingPath(activePath);
+        setContextMenu(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activePath]);
 
   const flatFiles = useMemo(() => flattenFiles(nodes, rootPath, []), [nodes, rootPath]);
 
