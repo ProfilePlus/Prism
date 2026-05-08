@@ -118,6 +118,7 @@ function RenameField({ value, onCommit, onCancel }: RenameFieldProps) {
 export function FileTree({ nodes, activePath, onFileClick }: FileTreeProps) {
   const rootPath = useWorkspaceStore((s) => s.rootPath);
   const fileTreeMode = useWorkspaceStore((s) => s.fileTreeMode);
+  const fileSortMode = useWorkspaceStore((s) => s.fileSortMode);
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, items: ContextMenuItem[] } | null>(null);
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => collectDirectoryPaths(nodes));
@@ -192,6 +193,11 @@ export function FileTree({ nodes, activePath, onFileClick }: FileTreeProps) {
       { type: 'separator' },
       { label: '文档列表', action: 'viewList', checked: fileTreeMode === 'list' },
       { label: '文档树', action: 'viewTree', checked: fileTreeMode === 'tree' },
+      { type: 'separator' },
+      { label: '按名称排序', action: 'sortByName', checked: fileSortMode === 'name' },
+      { label: '按修改时间排序', action: 'sortByModified', checked: fileSortMode === 'modified' },
+      { label: '按创建时间排序', action: 'sortByCreated', checked: fileSortMode === 'created' },
+      { label: '按大小排序', action: 'sortBySize', checked: fileSortMode === 'size' },
       { type: 'separator' },
     );
 

@@ -436,6 +436,22 @@ export async function executeFileAction(
         context.workspaceStore.setFileTreeMode('tree');
         return;
 
+      case 'sortByName':
+        context.workspaceStore.setFileSortMode('name');
+        return;
+
+      case 'sortByModified':
+        context.workspaceStore.setFileSortMode('modified');
+        return;
+
+      case 'sortByCreated':
+        context.workspaceStore.setFileSortMode('created');
+        return;
+
+      case 'sortBySize':
+        context.workspaceStore.setFileSortMode('size');
+        return;
+
       case 'searchInFolder':
         if (!context.workspaceStore.rootPath) throw new Error('当前没有打开的工作区');
         window.dispatchEvent(new CustomEvent('prism-search', {
