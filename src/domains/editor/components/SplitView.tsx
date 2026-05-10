@@ -101,7 +101,7 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
     const renderBody = () => {
       if (viewMode === 'edit') {
         return (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-editor)' }}>
             <EditorPane
               ref={editorRef}
               content={content}
@@ -117,7 +117,7 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
           <div
             ref={previewContainerRef}
             onScroll={handlePreviewScroll}
-            style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}
+            style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto', background: 'var(--bg-preview)' }}
           >
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               <PreviewPane content={content} />
@@ -136,7 +136,8 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
-              borderRight: '1px solid var(--stroke-surface)',
+              borderRight: '1px solid var(--border-color)',
+              background: 'var(--bg-editor)',
             }}
           >
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -158,6 +159,7 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
               display: 'flex',
               flexDirection: 'column',
               overflow: 'auto',
+              background: 'var(--bg-preview)',
             }}
           >
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>

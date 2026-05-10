@@ -257,9 +257,9 @@ export function FileTree({ nodes, activePath, onFileClick }: FileTreeProps) {
     return (
       <div
         style={{
-          fontSize: '13.5px',
+          fontSize: '13px',
           fontWeight: isActive ? 600 : 500,
-          color: isActive ? 'var(--accent)' : 'var(--text-primary)',
+          color: isActive ? 'var(--text-primary)' : 'var(--text-primary)',
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -281,22 +281,25 @@ export function FileTree({ nodes, activePath, onFileClick }: FileTreeProps) {
         onContextMenu={(event) => handleContextMenu(event, node)}
         title={node.path}
         style={{
-          padding: '10px 14px',
+          padding: '8px 14px',
+          paddingLeft: isActive ? '11px' : '14px',
           margin: '2px 8px',
           marginLeft: fileTreeMode === 'tree' ? `${8 + depth * 14}px` : '8px',
           cursor: 'pointer',
-          borderRadius: 'var(--radius-lg)',
-          background: isActive ? 'var(--bg-surface-solid)' : 'transparent',
-          boxShadow: isActive ? 'var(--elevation-flyout)' : 'none',
-          transform: isActive ? 'scale(1.02)' : 'scale(1)',
+          borderRadius: 'var(--radius-md)',
+          background: isActive ? 'var(--bg-hover)' : 'transparent',
+          borderLeft: isActive ? '3px solid var(--accent)' : '3px solid transparent',
+          boxShadow: 'none',
+          transform: 'scale(1)',
           position: 'relative',
-          transition: 'all 0.24s cubic-bezier(0.34, 1.56, 0.64, 1)',
+          transition: 'background 0.2s var(--ease-out), border-left-color 0.2s var(--ease-out), padding-left 0.2s var(--ease-out)',
           display: 'flex',
           flexDirection: 'column',
-          gap: '4px',
+          gap: '3px',
           zIndex: isActive ? 10 : 1,
           animation: `fileItemEntry 0.36s cubic-bezier(0.34, 1.56, 0.64, 1) backwards`,
           animationDelay: `${Math.min(index, 24) * 0.02}s`,
+          minHeight: '32px',
         }}
         className="file-tree-item"
       >
@@ -436,13 +439,15 @@ export function FileTree({ nodes, activePath, onFileClick }: FileTreeProps) {
           color: var(--text-primary);
         }
         .file-tree-caret {
-          width: 12px;
+          width: 14px;
+          height: 14px;
           display: inline-flex;
+          align-items: center;
           justify-content: center;
           color: var(--text-tertiary);
           transform: rotate(0deg);
           transition: transform 0.15s;
-          font-size: 16px;
+          font-size: 14px;
           line-height: 1;
         }
         .file-tree-caret.is-expanded {

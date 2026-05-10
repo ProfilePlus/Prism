@@ -176,12 +176,13 @@ export function StatusBar({
 
       <style>{`
         .typora-status-bar-outer {
-          height: 32px;
+          height: 28px;
           display: flex;
-          background: var(--bg-surface-solid);
+          background: var(--bg-sidebar);
           color: var(--text-secondary);
           user-select: none;
           font-family: var(--font-ui);
+          font-size: 11px;
         }
 
         /* 侧边栏部分：无顶边框，确保垂直边框连贯 */
@@ -192,8 +193,8 @@ export function StatusBar({
           display: flex;
           align-items: center;
           padding: 0 6px;
-          border-right: 1px solid var(--theme-divider, var(--stroke-surface));
-          background: rgba(0,0,0,0.015);
+          border-right: 1px solid var(--theme-divider, var(--border-color));
+          background: transparent;
           box-sizing: border-box;
         }
 
@@ -222,19 +223,19 @@ export function StatusBar({
         /* 编辑器部分：应用顶边框 */
         .foundation-editor-part {
           flex: 1; height: 100%; display: flex; align-items: center; justify-content: space-between;
-          padding: 0 10px; position: relative; border-top: 1px solid var(--theme-divider, var(--stroke-surface));
+          padding: 0 10px; position: relative; border-top: 1px solid var(--theme-divider, var(--border-color));
         }
 
         .base-icon-btn, .mode-btn-styled, .slider-handle {
           background: transparent; border: none; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
-          transition: all 0.2s; border-radius: var(--radius-sm);
+          transition: all 0.15s var(--ease-out); border-radius: var(--radius-sm);
           color: var(--text-tertiary);
         }
 
-        .base-icon-btn { width: 24px; height: 24px; }
-        .mode-btn-styled { width: 28px; height: 26px; }
-        .slider-handle { width: 24px; height: 26px; }
+        .base-icon-btn { width: 22px; height: 22px; }
+        .mode-btn-styled { width: 26px; height: 22px; }
+        .slider-handle { width: 22px; height: 22px; }
 
         .base-icon-btn:hover, .mode-btn-styled:hover, .slider-handle:hover {
           background: var(--bg-hover); color: var(--text-primary);
@@ -248,16 +249,17 @@ export function StatusBar({
 
         .center-stats-display {
           position: absolute; left: 50%; transform: translateX(-50%);
-          display: flex; align-items: baseline; gap: 3px; pointer-events: none;
+          display: flex; align-items: center; gap: 4px; pointer-events: none;
         }
-        .val { font-family: var(--font-mono); font-size: 11px; font-weight: 500; }
-        .lbl { font-size: 9px; color: var(--text-tertiary); font-weight: 700; }
+        .val { font-family: var(--font-mono); font-size: 11px; font-weight: 500; color: var(--text-secondary); }
+        .lbl { font-size: 10px; color: var(--text-tertiary); font-weight: 600; letter-spacing: 0.3px; }
 
         .save-status {
-          font-size: 10px;
+          font-size: 11px;
           color: var(--text-tertiary);
           font-weight: 500;
           transition: color 0.2s;
+          padding-right: 4px;
         }
         .save-status.saved { color: var(--text-tertiary); }
         .save-status.saving { color: var(--accent); }

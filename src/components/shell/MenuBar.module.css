@@ -14,14 +14,14 @@
 }
 
 .menuItem {
-  padding: 6px 12px;
-  font-size: 14px; /* Windows 11 标准菜单字号 */
+  padding: 6px 14px;
+  font-size: 13px;
   font-weight: 500;
   border-radius: var(--radius-sm);
   cursor: pointer;
   color: var(--text-primary);
   transition: all var(--duration-fast) var(--ease-out);
-  margin: 0 2px;
+  margin: 0 4px;
 }
 
 .menuItem:hover {

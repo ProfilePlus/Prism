@@ -37,7 +37,7 @@
   cursor: pointer;
   font-size: 10px;
   font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets', sans-serif;
-  transition: all var(--duration-fast) var(--ease-out);
+  transition: background 120ms cubic-bezier(0.16, 1, 0.3, 1), color 120ms cubic-bezier(0.16, 1, 0.3, 1);
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }

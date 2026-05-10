@@ -1,0 +1,2288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Prism — 完整交互原型</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.24.0/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  :root {
+    --c-void: #000000;
+    --c-canvas: #ffffff;
+    --c-fog: #e5e7eb;
+    --c-chalk: #f1f1f1;
+    --c-graphite: #666666;
+    --c-ash: #8f8f8f;
+    --c-hair: rgba(0, 0, 0, 0.06);
+    --c-hover: rgba(0, 0, 0, 0.04);
+    --c-selection: rgba(0, 0, 0, 0.08);
+
+    --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    --r-card: 6.08px;
+    --r-pill: 9999px;
+    --r-soft: 40px;
+    --r-link: 4px;
+
+    --sidebar-w: 260px;
+
+    --shadow-faint: rgba(0, 0, 0, 0.02) 0 4px 6px 0, rgba(0, 0, 0, 0.05) 0 0 2px 0;
+    --shadow-flyout: rgba(0, 0, 0, 0.08) 0 16px 32px, rgba(0, 0, 0, 0.04) 0 4px 8px, rgba(0, 0, 0, 0.06) 0 0 0 1px;
+    --shadow-float: rgba(0, 0, 0, 0.12) 0 8px 24px, rgba(0, 0, 0, 0.08) 0 2px 6px;
+  }
+
+  body.dark {
+    --c-void: #ffffff;
+    --c-canvas: #0a0a0a;
+    --c-fog: #1f1f1f;
+    --c-chalk: #1a1a1a;
+    --c-graphite: #a0a0a0;
+    --c-ash: #6a6a6a;
+    --c-hair: rgba(255, 255, 255, 0.06);
+    --c-hover: rgba(255, 255, 255, 0.05);
+    --c-selection: rgba(255, 255, 255, 0.08);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+
+  body {
+    font-family: var(--font-sans);
+    background: var(--c-canvas);
+    color: var(--c-void);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    font-feature-settings: "calt", "liga";
+  }
+
+  button { font-family: inherit; }
+
+  /* ========== 窗口外壳 ========== */
+  .window {
+    height: 100vh;
+    display: grid;
+    grid-template-rows: 36px 40px 1fr 28px;
+    background: var(--c-canvas);
+    transition: filter 200ms ease;
+  }
+  .window.focus-mode { filter: none; }
+  .window.focus-mode .sidebar,
+  .window.focus-mode .menubar,
+  .window.focus-mode .titlebar {
+    opacity: 0.25;
+    transition: opacity 240ms ease;
+  }
+  .window.focus-mode .sidebar:hover,
+  .window.focus-mode .menubar:hover,
+  .window.focus-mode .titlebar:hover { opacity: 1; }
+
+  /* ========== 标题栏 ========== */
+  .titlebar {
+    display: flex;
+    align-items: center;
+    padding-left: 16px;
+    border-bottom: 1px solid var(--c-fog);
+    user-select: none;
+  }
+  .titlebar-brand { display: flex; align-items: center; gap: 10px; }
+  .titlebar-brand .logo {
+    width: 16px; height: 16px; border-radius: 2px;
+    background: var(--c-void); color: var(--c-canvas);
+    display: grid; place-items: center;
+    font-size: 10px; font-weight: 700;
+  }
+  .titlebar-title { font-size: 13px; font-weight: 500; }
+  .titlebar-title .doc-name { color: var(--c-void); }
+  .titlebar-title .dirty-dot {
+    display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--c-void);
+    margin-left: 6px; vertical-align: middle;
+  }
+  .titlebar-title .sep { color: var(--c-ash); margin: 0 8px; }
+  .titlebar-title .app { color: var(--c-graphite); }
+
+  .titlebar-controls { margin-left: auto; display: flex; }
+  .tb-btn {
+    width: 44px; height: 36px;
+    display: grid; place-items: center;
+    border: none; background: transparent;
+    color: var(--c-graphite); cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+  }
+  .tb-btn:hover { background: var(--c-chalk); color: var(--c-void); }
+  .tb-btn.close:hover { background: #e81123; color: #fff; }
+  .tb-btn svg { width: 12px; height: 12px; stroke-width: 1.3; }
+
+  /* ========== 菜单栏 ========== */
+  .menubar {
+    display: flex; align-items: center;
+    padding: 0 8px 0 12px;
+    border-bottom: 1px solid var(--c-fog);
+    gap: 2px;
+    position: relative;
+  }
+  .menu-item {
+    padding: 5px 10px; font-size: 13px; font-weight: 500;
+    color: var(--c-void); background: transparent; border: none;
+    border-radius: var(--r-link); cursor: pointer;
+    transition: background 120ms ease;
+  }
+  .menu-item:hover, .menu-item.open { background: var(--c-chalk); }
+  .menubar-spacer { flex: 1; }
+
+  .menubar-actions { display: flex; align-items: center; gap: 8px; margin-left: 10px; }
+  .pill-ghost {
+    padding: 6px 13px; font-size: 12px; font-weight: 500;
+    color: var(--c-void); background: transparent;
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: var(--r-pill); cursor: pointer;
+    transition: background 120ms ease;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  body.dark .pill-ghost { border-color: rgba(255,255,255,0.18); }
+  .pill-ghost:hover { background: var(--c-chalk); }
+  .pill-ghost svg { width: 11px; height: 11px; }
+
+  .pill-filled {
+    padding: 7px 15px; font-size: 12px; font-weight: 500;
+    color: var(--c-canvas); background: var(--c-void);
+    border: 1px solid var(--c-void);
+    border-radius: var(--r-pill); cursor: pointer;
+    box-shadow: var(--shadow-faint);
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: opacity 120ms ease;
+  }
+  .pill-filled:hover { opacity: 0.85; }
+  .pill-filled:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* ========== 菜单下拉 ========== */
+  .menu-dropdown {
+    position: absolute; top: 100%; left: 0;
+    min-width: 280px;
+    background: var(--c-canvas);
+    border: 1px solid var(--c-fog);
+    border-radius: var(--r-card);
+    box-shadow: var(--shadow-flyout);
+    padding: 6px;
+    z-index: 2000;
+    animation: dd-in 140ms ease;
+  }
+  @keyframes dd-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .dd-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 10px; border-radius: var(--r-link);
+    font-size: 13px; color: var(--c-void);
+    cursor: pointer; user-select: none;
+  }
+  .dd-item:hover, .dd-item.hover { background: var(--c-chalk); }
+  .dd-item.disabled { color: var(--c-ash); cursor: not-allowed; }
+  .dd-item.disabled:hover { background: transparent; }
+  .dd-item.danger { color: #c0392b; }
+  body.dark .dd-item.danger { color: #ff6b5e; }
+  .dd-item.danger:hover { background: rgba(192, 57, 43, 0.08); }
+  .dd-item .label { flex: 1; }
+  .dd-item .shortcut { font-family: var(--font-mono); font-size: 11px; color: var(--c-graphite); }
+  .dd-item .chev { color: var(--c-ash); font-size: 10px; }
+  .dd-check { width: 14px; display: inline-grid; place-items: center; color: var(--c-void); }
+  .dd-sep { height: 1px; background: var(--c-fog); margin: 4px 6px; }
+
+  .submenu-popover {
+    position: absolute; left: 100%; top: -6px;
+    min-width: 220px;
+    background: var(--c-canvas);
+    border: 1px solid var(--c-fog);
+    border-radius: var(--r-card);
+    box-shadow: var(--shadow-flyout);
+    padding: 6px;
+    animation: dd-in 140ms ease;
+  }
+
+  /* ========== 主体 ========== */
+  .body {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  /* 侧栏 */
+  .sidebar {
+    width: var(--sidebar-w);
+    box-shadow: 1px 0 0 var(--c-fog);
+    display: flex; flex-direction: column; overflow: hidden;
+    transition: width 200ms ease, box-shadow 200ms ease;
+    flex-shrink: 0;
+  }
+  .sidebar.collapsed { width: 0; box-shadow: none; }
+
+  .sidebar-tabs {
+    display: flex; padding: 12px 16px 0; gap: 20px;
+    border-bottom: 1px solid var(--c-fog);
+  }
+  .sidebar-tab {
+    padding: 8px 0; font-size: 13px; font-weight: 500;
+    color: var(--c-graphite); background: transparent; border: none;
+    border-bottom: 2px solid transparent; cursor: pointer;
+    transition: color 120ms ease, border-color 120ms ease;
+    margin-bottom: -1px;
+  }
+  .sidebar-tab:hover { color: var(--c-void); }
+  .sidebar-tab.active {
+    color: var(--c-void); border-bottom-color: var(--c-void); font-weight: 600;
+  }
+
+  .sidebar-search { padding: 12px 14px 6px; }
+  .search-input {
+    width: 100%; padding: 7px 14px 7px 34px;
+    font-family: var(--font-sans); font-size: 12px;
+    color: var(--c-void); background: transparent;
+    border: 1px solid var(--c-fog);
+    border-radius: var(--r-pill); outline: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%238f8f8f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><path d='m21 21-4.35-4.35'/></svg>");
+    background-repeat: no-repeat; background-position: 13px center;
+    transition: border-color 120ms ease;
+  }
+  .search-input:focus { border-color: var(--c-void); }
+  .search-input::placeholder { color: var(--c-ash); }
+
+  .sort-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 16px 4px; font-size: 11px; color: var(--c-ash);
+    white-space: nowrap;
+  }
+  .sort-row .sort-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: transparent; border: none; color: var(--c-graphite);
+    font-size: 11px; padding: 4px 8px; border-radius: var(--r-pill);
+    cursor: pointer; font-weight: 500;
+    white-space: nowrap;
+  }
+  .sort-row .sort-btn:hover { background: var(--c-chalk); color: var(--c-void); }
+
+  .file-tree { flex: 1; overflow-y: auto; padding: 6px 8px 12px; min-height: 0; }
+  .tree-section-label {
+    font-size: 10px; font-weight: 600; color: var(--c-ash);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 10px 10px 6px;
+  }
+  .tree-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 8px; border-radius: var(--r-link);
+    cursor: pointer; font-size: 13px; color: var(--c-void);
+    user-select: none; line-height: 20px;
+  }
+  .tree-row:hover { background: var(--c-chalk); }
+  .tree-row.active { background: var(--c-selection); font-weight: 500; }
+  .tree-row .caret {
+    width: 12px; height: 12px; display: inline-grid; place-items: center;
+    color: var(--c-ash); flex-shrink: 0;
+    transition: transform 150ms ease;
+  }
+  .tree-row .caret.expanded { transform: rotate(90deg); }
+  .tree-row .icon {
+    width: 14px; height: 14px; display: inline-grid; place-items: center;
+    color: var(--c-graphite); flex-shrink: 0;
+  }
+  .tree-row .icon svg { width: 13px; height: 13px; stroke-width: 1.5; fill: none; stroke: currentColor; }
+  .tree-row .label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tree-row .dirty { width: 5px; height: 5px; border-radius: 50%; background: var(--c-void); }
+  .tree-indent { padding-left: 24px; }
+  .tree-rename {
+    flex: 1; min-width: 0;
+    height: 22px; padding: 0 6px;
+    border: 1px solid var(--c-void); border-radius: var(--r-link);
+    background: var(--c-canvas); color: var(--c-void);
+    font: inherit; outline: none;
+    box-shadow: 0 0 0 2px var(--c-hair);
+  }
+
+  /* 大纲 */
+  .outline { padding: 12px 8px; overflow-y: auto; }
+  .outline-item {
+    padding: 5px 10px; border-radius: var(--r-link);
+    font-size: 13px; color: var(--c-void);
+    cursor: pointer; user-select: none;
+  }
+  .outline-item:hover { background: var(--c-chalk); }
+  .outline-item.active { background: var(--c-selection); font-weight: 500; }
+  .outline-item.h1 { font-weight: 600; }
+  .outline-item.h2 { padding-left: 22px; color: var(--c-graphite); }
+  .outline-item.h3 { padding-left: 34px; font-size: 12px; color: var(--c-graphite); }
+  .outline-item.h4 { padding-left: 46px; font-size: 12px; color: var(--c-ash); }
+
+  /* 搜索面板 */
+  .search-panel { padding: 12px 14px; overflow-y: auto; }
+  .search-panel-input { margin-bottom: 8px; }
+  .search-options {
+    display: flex; gap: 6px; margin-bottom: 10px;
+  }
+  .search-option {
+    padding: 3px 9px; font-size: 11px; font-weight: 500;
+    border: 1px solid var(--c-fog); border-radius: var(--r-pill);
+    background: transparent; color: var(--c-graphite); cursor: pointer;
+  }
+  .search-option.active { background: var(--c-void); color: var(--c-canvas); border-color: var(--c-void); }
+  .search-result {
+    padding: 6px 10px; border-radius: var(--r-link);
+    font-size: 12px; color: var(--c-graphite); cursor: pointer;
+  }
+  .search-result:hover { background: var(--c-chalk); }
+  .search-result mark { background: var(--c-void); color: var(--c-canvas); padding: 0 2px; border-radius: 2px; }
+  .search-result .path { display: block; font-size: 10px; color: var(--c-ash); margin-bottom: 2px; }
+
+  /* ========== 编辑区 ========== */
+  .main { display: grid; min-width: 0; overflow: hidden; }
+  .main.split { grid-template-columns: 1fr 1px 1fr; }
+  .main.edit, .main.preview { grid-template-columns: 1fr; }
+
+  .pane { overflow-y: auto; min-width: 0; }
+  .pane.editor {
+    padding: 48px clamp(32px, 5vw, 80px);
+    font-family: var(--font-mono); font-size: 14px; line-height: 1.75;
+    color: var(--c-void);
+  }
+  .main.edit .pane.editor { padding: 64px clamp(40px, 8vw, 120px); }
+  .pane.editor textarea {
+    width: 100%; min-height: 100%; border: none; outline: none; resize: none;
+    background: transparent; font: inherit; color: inherit; line-height: inherit;
+    caret-color: var(--c-void);
+  }
+  .pane.editor textarea::selection { background: var(--c-selection); }
+  .pane-divider { background: var(--c-fog); }
+
+  .pane.preview {
+    padding: 48px clamp(32px, 5vw, 80px);
+    font-size: 17px; line-height: 1.65;
+  }
+  .main.preview .pane.preview { padding: 64px clamp(40px, 8vw, 120px); }
+  .pane.preview h1 {
+    font-size: 48px; font-weight: 600; line-height: 1.16;
+    letter-spacing: -1.44px; margin: 0 0 24px;
+  }
+  .pane.preview h2 {
+    font-size: 28px; font-weight: 600; line-height: 1.21;
+    letter-spacing: -0.5px; margin: 48px 0 16px;
+    padding-top: 16px; border-top: 1px solid var(--c-fog);
+  }
+  .pane.preview h3 {
+    font-size: 22px; font-weight: 600; line-height: 1.26;
+    margin: 32px 0 12px;
+  }
+  .pane.preview h4 {
+    font-size: 16px; font-weight: 600; letter-spacing: 0;
+    margin: 24px 0 8px; color: var(--c-void);
+  }
+  .pane.preview h5 {
+    font-size: 13px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--c-graphite);
+    margin: 20px 0 6px;
+  }
+  .pane.preview h6 {
+    font-size: 12px; font-weight: 500; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--c-ash);
+    margin: 16px 0 6px;
+  }
+  .pane.preview p { margin: 0 0 20px; color: var(--c-void); }
+  .pane.preview p + p { margin-top: -8px; }
+  .pane.preview strong { font-weight: 600; }
+  .pane.preview em { font-style: italic; }
+  .pane.preview a {
+    color: var(--c-void);
+    text-decoration: underline; text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    border-radius: var(--r-link);
+    transition: background 0.15s;
+  }
+  .pane.preview a:hover { background: var(--c-chalk); }
+
+  /* 列表 */
+  .pane.preview ul, .pane.preview ol { padding-left: 28px; margin: 0 0 20px; }
+  .pane.preview li { margin-bottom: 6px; }
+  .pane.preview ul > li::marker { color: var(--c-graphite); content: '— '; }
+  .pane.preview ol { list-style: none; counter-reset: ol-count; padding-left: 0; }
+  .pane.preview ol > li {
+    counter-increment: ol-count;
+    padding-left: 36px; position: relative;
+  }
+  .pane.preview ol > li::before {
+    content: counter(ol-count);
+    position: absolute; left: 0; top: 0;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600; color: var(--c-void);
+    width: 24px; text-align: right;
+  }
+  .pane.preview ul ul, .pane.preview ol ol, .pane.preview ul ol, .pane.preview ol ul {
+    margin: 6px 0 6px;
+  }
+  .pane.preview li > input[type="checkbox"] {
+    appearance: none; -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border: 1.5px solid var(--c-void);
+    border-radius: 3px;
+    vertical-align: -2px; margin: 0 8px 0 -24px;
+    position: relative; cursor: default;
+  }
+  .pane.preview li > input[type="checkbox"]:checked {
+    background: var(--c-void);
+  }
+  .pane.preview li > input[type="checkbox"]:checked::after {
+    content: ''; position: absolute;
+    left: 3px; top: 0px;
+    width: 4px; height: 8px;
+    border: solid var(--c-canvas); border-width: 0 1.5px 1.5px 0;
+    transform: rotate(45deg);
+  }
+  .pane.preview li:has(> input[type="checkbox"]:checked) {
+    color: var(--c-ash); text-decoration: line-through;
+  }
+
+  /* 行内代码 */
+  .pane.preview code {
+    font-family: var(--font-mono); font-size: 0.86em;
+    background: var(--c-chalk);
+    padding: 1px 6px; border-radius: 4px;
+    border: 1px solid var(--c-fog);
+    color: var(--c-void);
+  }
+  body.dark .pane.preview code { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12); }
+
+  /* 代码块 */
+  .pane.preview pre.code-block {
+    background: var(--c-canvas);
+    border: 1px solid var(--c-fog);
+    border-radius: var(--r-card);
+    margin: 0 0 24px; padding: 0;
+    overflow: hidden;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+  }
+  body.dark .pane.preview pre.code-block { background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.1); }
+  .pane.preview .code-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 14px;
+    background: var(--c-chalk);
+    border-bottom: 1px solid var(--c-fog);
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--c-graphite); letter-spacing: 0.04em;
+  }
+  body.dark .pane.preview .code-header { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); }
+  .pane.preview .code-lang { text-transform: uppercase; font-weight: 600; }
+  .pane.preview .code-copy {
+    background: none; border: 0; cursor: pointer;
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--c-ash); padding: 2px 6px; border-radius: 4px;
+  }
+  .pane.preview .code-copy:hover { color: var(--c-void); background: var(--c-canvas); }
+  .pane.preview pre.code-block > code {
+    display: block;
+    background: none; border: 0; padding: 14px 16px;
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    overflow-x: auto;
+    border-radius: 0;
+    color: var(--c-void);
+  }
+  /* 向后兼容默认 pre */
+  .pane.preview pre:not(.code-block) {
+    background: var(--c-chalk); padding: 16px 20px;
+    border-radius: var(--r-card);
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.6;
+    overflow-x: auto; margin: 0 0 20px;
+    border: 1px solid var(--c-fog);
+  }
+  .pane.preview pre:not(.code-block) code { background: none; padding: 0; border: 0; }
+
+  /* blockquote */
+  .pane.preview blockquote {
+    margin: 0 0 24px;
+    padding: 14px 20px 14px 22px;
+    border-left: 3px solid var(--c-void);
+    background: var(--c-chalk);
+    border-radius: 0 var(--r-card) var(--r-card) 0;
+    color: var(--c-graphite);
+    font-style: italic;
+  }
+  body.dark .pane.preview blockquote { background: rgba(255,255,255,0.04); }
+  .pane.preview blockquote p { margin: 0; color: inherit; }
+  .pane.preview blockquote p + p { margin-top: 8px; }
+  .pane.preview blockquote blockquote {
+    margin: 10px 0 0;
+    border-left-color: var(--c-graphite);
+    background: var(--c-canvas);
+  }
+  body.dark .pane.preview blockquote blockquote { background: rgba(0,0,0,0.25); }
+
+  /* 高亮 mark (== ==) */
+  .pane.preview mark {
+    background: linear-gradient(transparent 60%, rgba(255,224,102,0.7) 60%);
+    color: var(--c-void); padding: 0 2px; border-radius: 1px;
+  }
+  body.dark .pane.preview mark { background: linear-gradient(transparent 60%, rgba(255,224,102,0.35) 60%); color: #fff; }
+
+  /* 删除线 / 下划线 / 键盘键 */
+  .pane.preview del { color: var(--c-ash); text-decoration: line-through; text-decoration-thickness: 1.5px; }
+  .pane.preview ins { text-decoration: none; border-bottom: 2px solid var(--c-void); padding-bottom: 1px; }
+  .pane.preview kbd {
+    font-family: var(--font-mono); font-size: 0.82em;
+    background: var(--c-canvas); color: var(--c-void);
+    border: 1px solid var(--c-ash);
+    border-bottom-width: 2px;
+    padding: 1px 6px; border-radius: 4px;
+    vertical-align: 1px;
+  }
+  body.dark .pane.preview kbd { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.3); }
+
+  /* 分割线:居中点 */
+  .pane.preview hr {
+    border: 0; margin: 48px 0;
+    height: 6px;
+    background:
+      radial-gradient(circle, var(--c-graphite) 1.5px, transparent 2px) center / 8px 6px repeat-x,
+      linear-gradient(transparent, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
+    max-width: 80px; margin-left: auto; margin-right: auto;
+  }
+
+  /* 表格:去竖线 + 强表头 */
+  .pane.preview table {
+    width: 100%; border-collapse: collapse; margin: 0 0 24px;
+    font-size: 14px;
+    border-top: 2px solid var(--c-void);
+    border-bottom: 2px solid var(--c-void);
+  }
+  .pane.preview thead th {
+    background: transparent; font-weight: 600; text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--c-void);
+    color: var(--c-void);
+    letter-spacing: 0.02em;
+  }
+  .pane.preview tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--c-fog);
+    color: var(--c-void);
+  }
+  .pane.preview tbody tr:last-child td { border-bottom: 0; }
+
+  /* 图片 */
+  .pane.preview img {
+    max-width: 100%; border-radius: var(--r-card); margin: 20px 0;
+    border: 1px solid var(--c-fog);
+  }
+
+  /* 定义列表 */
+  .pane.preview dl { margin: 0 0 20px; }
+  .pane.preview dt { font-weight: 600; color: var(--c-void); margin-top: 12px; }
+  .pane.preview dd { margin: 2px 0 0 16px; color: var(--c-graphite); }
+
+  /* 小字注 */
+  .pane.preview sup { font-size: 0.7em; vertical-align: super; color: var(--c-graphite); }
+
+  /* 文章主体宽度约束 — 仅在预览独占全屏时居中 72ch */
+  .main.preview .pane.preview > * { max-width: 72ch; margin-left: auto; margin-right: auto; }
+  .main.preview .pane.preview > pre.code-block,
+  .main.preview .pane.preview > pre { max-width: 72ch; margin-left: auto; margin-right: auto; }
+  .main.preview .pane.preview > table { max-width: 100%; }
+  .main.preview .pane.preview > hr { max-width: 80px; }
+
+  /* ========== 状态栏 ========== */
+  .statusbar {
+    display: flex; align-items: stretch;
+    border-top: 1px solid var(--c-fog);
+    padding: 0;
+    font-size: 11px; color: var(--c-graphite);
+    user-select: none; position: relative;
+    height: 28px;
+  }
+  .status-sidebar-zone {
+    width: var(--sidebar-w); flex-shrink: 0; height: 100%;
+    display: flex; align-items: center;
+    padding: 0 6px 0 8px;
+    box-shadow: 1px 0 0 var(--c-fog);
+    opacity: 0; transition: opacity 220ms ease, width 200ms ease, box-shadow 200ms ease;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+  .status-sidebar-zone.collapsed { width: 0; padding: 0; box-shadow: none; }
+  .status-sidebar-zone.visible { opacity: 1; }
+  .status-main { flex: 1; display: flex; align-items: center; padding: 0 8px; position: relative; min-width: 0; }
+  .status-section { display: flex; align-items: center; gap: 2px; }
+  .status-center {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 4px; pointer-events: none;
+  }
+  .status-right { margin-left: auto; display: flex; align-items: center; gap: 2px; }
+
+  .status-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    height: 22px; padding: 0 8px;
+    background: transparent; border: none;
+    border-radius: var(--r-pill);
+    color: var(--c-graphite); font-size: 11px; cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+  }
+  .status-btn:hover { background: var(--c-chalk); color: var(--c-void); }
+  .status-btn.active { color: var(--c-void); background: var(--c-chalk); }
+  .status-btn svg { width: 13px; height: 13px; stroke-width: 1.5; fill: none; stroke: currentColor; }
+
+  .status-btn-icon { width: 22px; padding: 0; justify-content: center; }
+
+  .status-folder {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+    height: 22px; padding: 0 10px; border-radius: var(--r-pill);
+    cursor: pointer; color: var(--c-graphite); font-size: 11px; font-weight: 500;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .status-folder:hover { background: var(--c-chalk); color: var(--c-void); }
+
+  .status-sep { width: 1px; height: 10px; background: var(--c-fog); margin: 0 6px; }
+
+  .mode-group {
+    display: inline-flex; align-items: center;
+    background: var(--c-chalk); border-radius: var(--r-pill); padding: 2px;
+  }
+  .mode-btn {
+    width: 26px; height: 18px; border: none; background: transparent;
+    color: var(--c-graphite); cursor: pointer; border-radius: var(--r-pill);
+    display: grid; place-items: center; transition: all 140ms ease;
+  }
+  .mode-btn:hover { color: var(--c-void); }
+  .mode-btn.active { background: var(--c-canvas); color: var(--c-void); box-shadow: var(--shadow-faint); }
+  .mode-btn svg { width: 11px; height: 11px; stroke-width: 1.5; fill: none; stroke: currentColor; }
+
+  .save-status { font-size: 11px; font-weight: 500; padding: 0 6px; }
+  .save-status.saved { color: var(--c-ash); }
+  .save-status.saving { color: var(--c-graphite); }
+  .save-status.unsaved { color: var(--c-void); }
+  .save-status.unsaved::before { content: '●'; margin-right: 4px; }
+
+  .stat-val { font-family: var(--font-mono); font-size: 11px; font-weight: 500; color: var(--c-graphite); }
+  .stat-lbl { font-size: 10px; color: var(--c-ash); font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+
+  /* ========== 浮动工具栏 ========== */
+  .float-toolbar {
+    position: fixed; z-index: 1500;
+    display: flex; align-items: center; gap: 2px;
+    background: var(--c-canvas);
+    border: 1px solid var(--c-fog);
+    border-radius: var(--r-pill);
+    box-shadow: var(--shadow-float);
+    padding: 4px;
+    animation: ft-in 140ms cubic-bezier(0.2, 0, 0, 1);
+    transform: translateX(-50%);
+  }
+  @keyframes ft-in {
+    from { opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.96); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  }
+  .ft-btn {
+    width: 28px; height: 28px; border: none; background: transparent;
+    border-radius: var(--r-pill); cursor: pointer; color: var(--c-void);
+    display: grid; place-items: center; font-size: 13px; font-weight: 500;
+    transition: background 120ms ease, transform 80ms ease;
+  }
+  .ft-btn:hover { background: var(--c-chalk); }
+  .ft-btn.active { background: var(--c-void); color: var(--c-canvas); transform: scale(0.92); }
+  .ft-btn svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+  .ft-divider { width: 1px; height: 16px; background: var(--c-fog); margin: 0 3px; }
+
+  /* ========== 命令面板 ========== */
+  .cmdk-overlay {
+    position: fixed; inset: 0; z-index: 3000;
+    background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+    animation: fade-in 180ms ease;
+  }
+  body.dark .cmdk-overlay { background: rgba(0,0,0,0.6); }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+  .cmdk {
+    position: fixed; top: 18%; left: 50%; transform: translateX(-50%);
+    width: 92%; max-width: 620px; z-index: 3001;
+    background: var(--c-canvas);
+    border: 1px solid var(--c-fog);
+    border-radius: var(--r-card);
+    box-shadow: var(--shadow-flyout);
+    overflow: hidden;
+    animation: cmdk-in 220ms cubic-bezier(0.34, 1.2, 0.64, 1);
+  }
+  @keyframes cmdk-in {
+    from { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(0.98); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  }
+  .cmdk-search {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 18px; border-bottom: 1px solid var(--c-fog);
+  }
+  .cmdk-search svg { width: 16px; height: 16px; color: var(--c-ash); fill: none; stroke: currentColor; stroke-width: 2; }
+  .cmdk-input {
+    flex: 1; border: none; outline: none; background: transparent;
+    font-family: inherit; font-size: 15px; color: var(--c-void);
+  }
+  .cmdk-input::placeholder { color: var(--c-ash); }
+  .cmdk-list { max-height: 360px; overflow-y: auto; padding: 6px; }
+  .cmdk-empty { padding: 40px; text-align: center; color: var(--c-ash); font-size: 13px; }
+  .cmdk-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; border-radius: var(--r-link);
+    cursor: pointer;
+  }
+  .cmdk-item.selected { background: var(--c-chalk); }
+  .cmdk-item .cmdk-icon { width: 16px; color: var(--c-graphite); }
+  .cmdk-item .cmdk-main { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .cmdk-item .cmdk-label { font-size: 13px; color: var(--c-void); font-weight: 500; }
+  .cmdk-item .cmdk-cat { font-size: 11px; color: var(--c-ash); }
+  .cmdk-item .cmdk-shortcut {
+    font-family: var(--font-mono); font-size: 11px; color: var(--c-graphite);
+  }
+  .kbd {
+    display: inline-block; padding: 2px 6px; border: 1px solid var(--c-fog);
+    border-radius: var(--r-link); font-family: var(--font-mono);
+    font-size: 11px; color: var(--c-graphite); line-height: 1;
+    margin-right: 2px;
+  }
+
+  /* ========== 快捷键面板 ========== */
+  .sp-overlay {
+    position: fixed; inset: 0; z-index: 3000;
+    background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+    animation: fade-in 180ms ease;
+  }
+  .sp {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 92%; max-width: 720px; max-height: 80vh;
+    background: var(--c-canvas); border: 1px solid var(--c-fog);
+    border-radius: var(--r-card); box-shadow: var(--shadow-flyout);
+    z-index: 3001; display: flex; flex-direction: column; overflow: hidden;
+    animation: cmdk-in 220ms cubic-bezier(0.34, 1.2, 0.64, 1);
+  }
+  .sp-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 22px; border-bottom: 1px solid var(--c-fog);
+  }
+  .sp-header h2 { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  .sp-close {
+    width: 28px; height: 28px; border: none; background: transparent;
+    border-radius: var(--r-pill); cursor: pointer;
+    color: var(--c-graphite); font-size: 18px;
+    display: grid; place-items: center;
+  }
+  .sp-close:hover { background: var(--c-chalk); color: var(--c-void); }
+  .sp-content { padding: 20px 22px; overflow-y: auto; }
+  .sp-category { margin-bottom: 24px; }
+  .sp-category h3 {
+    font-size: 10px; font-weight: 600; color: var(--c-ash);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .sp-list { display: flex; flex-direction: column; gap: 2px; }
+  .sp-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 10px; border-radius: var(--r-link);
+  }
+  .sp-item:hover { background: var(--c-chalk); }
+  .sp-item .desc { font-size: 13px; color: var(--c-void); }
+  .sp-item .keys {
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--c-graphite); background: var(--c-chalk);
+    padding: 3px 10px; border-radius: var(--r-pill); min-width: 100px; text-align: center;
+  }
+
+  /* ========== 上下文菜单 ========== */
+  .ctx-menu {
+    position: fixed; z-index: 4000;
+    min-width: 220px;
+    background: var(--c-canvas);
+    border: 1px solid var(--c-fog);
+    border-radius: var(--r-card);
+    box-shadow: var(--shadow-flyout);
+    padding: 6px;
+    animation: dd-in 120ms ease;
+  }
+
+  /* ========== 关于 & 设置 ========== */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 2900;
+    background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+    animation: fade-in 180ms ease;
+  }
+  .modal {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 92%; max-width: 640px; max-height: 80vh;
+    background: var(--c-canvas); border: 1px solid var(--c-fog);
+    border-radius: var(--r-card); box-shadow: var(--shadow-flyout);
+    z-index: 2901; display: flex; flex-direction: column; overflow: hidden;
+    animation: cmdk-in 220ms cubic-bezier(0.34, 1.2, 0.64, 1);
+  }
+  .modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 22px; border-bottom: 1px solid var(--c-fog);
+  }
+  .modal-title { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  .modal-body { padding: 24px 22px; overflow-y: auto; font-size: 14px; line-height: 1.7; }
+  .modal-body .display {
+    font-size: 48px; font-weight: 600; letter-spacing: -1.44px; line-height: 1.16;
+    margin-bottom: 16px;
+  }
+  .modal-body .caption { font-size: 13px; color: var(--c-ash); font-weight: 500; letter-spacing: 0.04em; margin-bottom: 24px; }
+  .settings-group { margin-bottom: 28px; }
+  .settings-group h4 {
+    font-size: 10px; color: var(--c-ash); font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px;
+  }
+  .settings-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 0; border-bottom: 1px solid var(--c-fog);
+  }
+  .settings-row:last-child { border-bottom: 0; }
+  .settings-row .row-label { font-size: 13px; font-weight: 500; }
+  .settings-row .row-hint { font-size: 12px; color: var(--c-ash); margin-top: 2px; }
+
+  .toggle {
+    width: 36px; height: 20px; border-radius: var(--r-pill);
+    background: var(--c-fog); position: relative; cursor: pointer;
+    transition: background 160ms ease;
+  }
+  .toggle.on { background: var(--c-void); }
+  .toggle::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--c-canvas); transition: transform 160ms ease;
+    box-shadow: var(--shadow-faint);
+  }
+  .toggle.on::after { transform: translateX(16px); }
+
+  /* ========== 通知 toast ========== */
+  .toast-area {
+    position: fixed; bottom: 56px; left: 50%; transform: translateX(-50%);
+    z-index: 5000; display: flex; flex-direction: column; gap: 8px;
+    pointer-events: none;
+  }
+  .toast {
+    padding: 10px 18px; background: var(--c-void); color: var(--c-canvas);
+    border-radius: var(--r-pill); font-size: 13px; font-weight: 500;
+    box-shadow: var(--shadow-float);
+    animation: toast-in 240ms cubic-bezier(0.34, 1.2, 0.64, 1);
+  }
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* 滚动条 */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--c-fog); border-radius: 6px; border: 2px solid var(--c-canvas); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--c-ash); }
+
+  /* 分栏滚动隐藏滚动条外框 */
+  .pane::-webkit-scrollbar-thumb { border-color: transparent; }
+
+  /* hint 文案 */
+  .proto-hint {
+    position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
+    z-index: 100; pointer-events: none;
+    font-size: 11px; color: var(--c-ash); letter-spacing: 0.04em;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+  const { useState, useEffect, useRef, useMemo, useCallback, Fragment } = React;
+
+  // ====== 图标组件 ======
+  const Icon = {
+    Min: () => <svg viewBox="0 0 12 12" fill="none" stroke="currentColor"><path d="M2.5 6h7"/></svg>,
+    Max: () => <svg viewBox="0 0 12 12" fill="none" stroke="currentColor"><rect x="2.5" y="2.5" width="7" height="7"/></svg>,
+    Close: () => <svg viewBox="0 0 12 12" fill="none" stroke="currentColor"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7"/></svg>,
+    Edit: () => <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M3 3h10M3 7h10M3 11h7"/></svg>,
+    Split: () => <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><rect x="2" y="2" width="12" height="12" rx="1"/><path d="M8 2v12"/></svg>,
+    Preview: () => <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><rect x="2" y="2" width="12" height="12" rx="1"/><path d="M5 6h6M5 9h6M5 12h4"/></svg>,
+    Focus: () => <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2" fill="currentColor"/></svg>,
+    Export: () => <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M8 10V2M8 2L5 5M8 2l3 3M3 10v3a1 1 0 001 1h8a1 1 0 001-1v-3"/></svg>,
+    Plus: () => <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M8 3v10M3 8h10"/></svg>,
+    Sun: () => <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><circle cx="8" cy="8" r="3"/><path d="M8 1v1.5M8 13.5V15M3.2 3.2l1.1 1.1M11.7 11.7l1.1 1.1M1 8h1.5M13.5 8H15M3.2 12.8l1.1-1.1M11.7 4.3l1.1-1.1"/></svg>,
+    Moon: () => <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M13 9A5 5 0 017 3a5.5 5.5 0 100 12 5 5 0 006-6z"/></svg>,
+    Search: () => <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>,
+    Folder: () => <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M2 4a1 1 0 011-1h3l2 2h5a1 1 0 011 1v6a1 1 0 01-1 1H3a1 1 0 01-1-1V4z"/></svg>,
+    File: () => <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M4 2h5l3 3v9H4V2z M9 2v3h3"/></svg>,
+    Caret: () => <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4.5 3l3 3-3 3"/></svg>,
+    Check: () => <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2.5 6.5l2.5 2.5 5-6"/></svg>,
+    Chev: () => <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 3l3 3-3 3"/></svg>,
+    Sort: () => <svg viewBox="0 0 12 12" fill="none" stroke="currentColor"><path d="M3 4h6M3 6h4M3 8h2"/></svg>,
+    Collapse: () => <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M7.5 3l-3 3 3 3"/></svg>,
+    Expand: () => <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4.5 3l3 3-3 3"/></svg>,
+    Settings: () => <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><circle cx="8" cy="8" r="2"/><path d="M8 1v2M8 13v2M3 3l1.5 1.5M11.5 11.5L13 13M1 8h2M13 8h2M3 13l1.5-1.5M11.5 4.5L13 3"/></svg>,
+    Cmd: () => <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><rect x="2" y="6" width="4" height="4" rx="2"/><rect x="10" y="6" width="4" height="4" rx="2"/><rect x="6" y="2" width="4" height="4" rx="2"/><rect x="6" y="10" width="4" height="4" rx="2"/></svg>,
+  };
+
+  // ====== 数据 ======
+  const MENU_DATA = {
+    '文件': [
+      { label: '新建', shortcut: 'Ctrl+N', action: 'new' },
+      { label: '新建窗口', shortcut: 'Ctrl+Shift+N', action: 'newWindow' },
+      { type: 'sep' },
+      { label: '打开…', shortcut: 'Ctrl+O', action: 'open' },
+      { label: '打开文件夹…', action: 'openFolder' },
+      { label: '快速打开…', shortcut: 'Ctrl+P', action: 'quickOpen' },
+      { label: '打开最近文件', submenu: 'recent' },
+      { type: 'sep' },
+      { label: '保存', shortcut: 'Ctrl+S', action: 'save' },
+      { label: '另存为…', shortcut: 'Ctrl+Shift+S', action: 'saveAs' },
+      { label: '移动到…', action: 'moveTo' },
+      { label: '保存全部打开的文件…', action: 'saveAll' },
+      { type: 'sep' },
+      { label: '导入…', action: 'import' },
+      { label: '导出', submenu: 'export' },
+      { type: 'sep' },
+      { label: '属性', action: 'properties' },
+    ],
+    '编辑': [
+      { label: '撤销', shortcut: 'Ctrl+Z', action: 'undo' },
+      { label: '重做', shortcut: 'Ctrl+Y', action: 'redo' },
+      { type: 'sep' },
+      { label: '剪切', shortcut: 'Ctrl+X', action: 'cut' },
+      { label: '复制', shortcut: 'Ctrl+C', action: 'copy' },
+      { label: '粘贴', shortcut: 'Ctrl+V', action: 'paste' },
+      { type: 'sep' },
+      { label: '复制为纯文本', action: 'copyPlain' },
+      { label: '复制为 Markdown', shortcut: 'Ctrl+Shift+C', action: 'copyMd' },
+      { label: '复制为 HTML 代码', action: 'copyHtml' },
+      { label: '粘贴为文本', shortcut: 'Ctrl+Shift+V', action: 'pastePlain' },
+      { type: 'sep' },
+      { label: '全选', shortcut: 'Ctrl+A', action: 'selectAll' },
+      { label: '查找', shortcut: 'Ctrl+F', action: 'find' },
+      { label: '替换', shortcut: 'Ctrl+H', action: 'replace' },
+      { type: 'sep' },
+      { label: '拼写检查…', action: 'spellCheck' },
+    ],
+    '段落': [
+      { label: '一级标题', shortcut: 'Ctrl+1', action: 'h1' },
+      { label: '二级标题', shortcut: 'Ctrl+2', action: 'h2' },
+      { label: '三级标题', shortcut: 'Ctrl+3', action: 'h3' },
+      { label: '四级标题', shortcut: 'Ctrl+4', action: 'h4' },
+      { label: '五级标题', shortcut: 'Ctrl+5', action: 'h5' },
+      { label: '六级标题', shortcut: 'Ctrl+6', action: 'h6' },
+      { type: 'sep' },
+      { label: '段落', shortcut: 'Ctrl+0', action: 'paragraph' },
+      { label: '提升标题级别', shortcut: 'Ctrl+=', action: 'incH' },
+      { label: '降低标题级别', shortcut: 'Ctrl+-', action: 'decH' },
+      { type: 'sep' },
+      { label: '公式块', shortcut: 'Ctrl+Shift+M', action: 'mathBlock' },
+      { label: '代码块', shortcut: 'Ctrl+Shift+K', action: 'codeBlock' },
+      { label: '引用', shortcut: 'Ctrl+Shift+Q', action: 'quote' },
+      { type: 'sep' },
+      { label: '有序列表', shortcut: 'Ctrl+Shift+[', action: 'ol' },
+      { label: '无序列表', shortcut: 'Ctrl+Shift+]', action: 'ul' },
+      { label: '任务列表', shortcut: 'Ctrl+Shift+X', action: 'task' },
+      { type: 'sep' },
+      { label: '水平分割线', action: 'hr' },
+      { label: '内容目录', action: 'toc' },
+      { label: 'YAML Front Matter', action: 'yaml' },
+    ],
+    '格式': [
+      { label: '加粗', shortcut: 'Ctrl+B', action: 'bold' },
+      { label: '斜体', shortcut: 'Ctrl+I', action: 'italic' },
+      { label: '下划线', shortcut: 'Ctrl+U', action: 'underline' },
+      { label: '代码', shortcut: 'Ctrl+Shift+`', action: 'code' },
+      { type: 'sep' },
+      { label: '删除线', shortcut: 'Alt+Shift+5', action: 'strike' },
+      { label: '高亮', action: 'highlight' },
+      { type: 'sep' },
+      { label: '清除样式', shortcut: 'Ctrl+\\', action: 'clearFormat' },
+    ],
+    '视图': [
+      { label: '显示 / 隐藏侧边栏', shortcut: 'Ctrl+Shift+L', action: 'toggleSidebar', checkable: true, checkKey: 'sidebar' },
+      { label: '大纲', shortcut: 'Ctrl+Shift+1', action: 'showOutline' },
+      { label: '文件树', shortcut: 'Ctrl+Shift+3', action: 'showFiles' },
+      { label: '搜索', shortcut: 'Ctrl+Shift+F', action: 'showSearch' },
+      { type: 'sep' },
+      { label: '源代码模式', shortcut: 'Ctrl+/', action: 'sourceMode', checkable: true, checkKey: 'modeEdit' },
+      { label: '分栏模式', action: 'splitMode', checkable: true, checkKey: 'modeSplit' },
+      { label: '预览模式', action: 'previewMode', checkable: true, checkKey: 'modePreview' },
+      { type: 'sep' },
+      { label: '专注模式', shortcut: 'F8', action: 'focusMode', checkable: true, checkKey: 'focus' },
+      { label: '打字机模式', shortcut: 'F9', action: 'typewriterMode', checkable: true, checkKey: 'typewriter' },
+      { type: 'sep' },
+      { label: '切换全屏', shortcut: 'F11', action: 'fullscreen' },
+      { label: '保持窗口在最前端', action: 'alwaysOnTop' },
+      { type: 'sep' },
+      { label: '实际大小', shortcut: 'Ctrl+Shift+9', action: 'zoomReset' },
+      { label: '放大', shortcut: 'Ctrl+Shift+=', action: 'zoomIn' },
+      { label: '缩小', shortcut: 'Ctrl+Shift+-', action: 'zoomOut' },
+    ],
+    '主题': [
+      { label: 'Newsprint', action: 'themeLight', checkable: true, checkKey: 'themeLight' },
+      { label: 'Night', action: 'themeDark', checkable: true, checkKey: 'themeDark' },
+      { type: 'sep' },
+      { label: 'Github', action: 'themeGithub' },
+      { label: 'Pixyll', action: 'themePixyll' },
+      { label: 'Whitey', action: 'themeWhitey' },
+    ],
+    '帮助': [
+      { label: 'Markdown 参考', action: 'mdReference' },
+      { label: '快捷键', shortcut: 'Ctrl+/', action: 'showShortcuts' },
+      { label: '命令面板', shortcut: 'Ctrl+Shift+P', action: 'showCmd' },
+      { type: 'sep' },
+      { label: '关于 Prism', action: 'about' },
+    ],
+  };
+
+  const SUBMENUS = {
+    recent: [
+      { label: '设计笔记.md', action: 'recent:1' },
+      { label: '产品路线图.md', action: 'recent:2' },
+      { label: '架构说明.md', action: 'recent:3' },
+      { type: 'sep' },
+      { label: '清除历史', action: 'clearRecent' },
+    ],
+    export: [
+      { label: 'HTML…', action: 'exportHtml' },
+      { label: 'PDF…', action: 'exportPdf' },
+      { label: 'Word (.docx)…', action: 'exportDocx' },
+      { label: '图片 (PNG)…', action: 'exportPng' },
+    ],
+  };
+
+  const SHORTCUTS_DATA = [
+    {
+      category: '文件',
+      items: [
+        { keys: 'Ctrl+N', desc: '新建文档' },
+        { keys: 'Ctrl+O', desc: '打开文件' },
+        { keys: 'Ctrl+S', desc: '保存' },
+        { keys: 'Ctrl+Shift+S', desc: '另存为' },
+        { keys: 'Ctrl+P', desc: '快速打开' },
+      ],
+    },
+    {
+      category: '编辑',
+      items: [
+        { keys: 'Ctrl+Z', desc: '撤销' },
+        { keys: 'Ctrl+Y', desc: '重做' },
+        { keys: 'Ctrl+F', desc: '查找' },
+        { keys: 'Ctrl+H', desc: '替换' },
+      ],
+    },
+    {
+      category: '格式',
+      items: [
+        { keys: 'Ctrl+B', desc: '加粗' },
+        { keys: 'Ctrl+I', desc: '斜体' },
+        { keys: 'Ctrl+U', desc: '下划线' },
+        { keys: 'Ctrl+K', desc: '插入链接' },
+        { keys: 'Ctrl+Shift+`', desc: '行内代码' },
+      ],
+    },
+    {
+      category: '视图',
+      items: [
+        { keys: 'Ctrl+/', desc: '源码模式' },
+        { keys: 'Ctrl+Shift+L', desc: '切换侧边栏' },
+        { keys: 'F8', desc: '专注模式' },
+        { keys: 'F9', desc: '打字机模式' },
+        { keys: 'F11', desc: '全屏' },
+      ],
+    },
+    {
+      category: '其他',
+      items: [
+        { keys: 'Ctrl+Shift+P', desc: '命令面板' },
+        { keys: 'Ctrl+/', desc: '快捷键面板' },
+        { keys: 'Esc', desc: '关闭浮层' },
+      ],
+    },
+  ];
+
+  const COMMANDS = [
+    { id: 'new', label: '新建文档', category: '文件', shortcut: 'Ctrl+N' },
+    { id: 'open', label: '打开文件…', category: '文件', shortcut: 'Ctrl+O' },
+    { id: 'openFolder', label: '打开文件夹…', category: '文件' },
+    { id: 'save', label: '保存', category: '文件', shortcut: 'Ctrl+S' },
+    { id: 'saveAs', label: '另存为…', category: '文件', shortcut: 'Ctrl+Shift+S' },
+    { id: 'exportHtml', label: '导出为 HTML', category: '文件' },
+    { id: 'exportPdf', label: '导出为 PDF', category: '文件' },
+    { id: 'sourceMode', label: '源码模式', category: '视图', shortcut: 'Ctrl+/' },
+    { id: 'splitMode', label: '分栏模式', category: '视图' },
+    { id: 'previewMode', label: '预览模式', category: '视图' },
+    { id: 'focusMode', label: '专注模式', category: '视图', shortcut: 'F8' },
+    { id: 'typewriter', label: '打字机模式', category: '视图', shortcut: 'F9' },
+    { id: 'fullscreen', label: '切换全屏', category: '视图', shortcut: 'F11' },
+    { id: 'toggleSidebar', label: '显示 / 隐藏侧边栏', category: '视图', shortcut: 'Ctrl+Shift+L' },
+    { id: 'toggleTheme', label: '切换主题', category: '视图' },
+    { id: 'showShortcuts', label: '快捷键面板', category: '帮助', shortcut: 'Ctrl+/' },
+    { id: 'about', label: '关于 Prism', category: '帮助' },
+    { id: 'h1', label: '一级标题', category: '段落', shortcut: 'Ctrl+1' },
+    { id: 'h2', label: '二级标题', category: '段落', shortcut: 'Ctrl+2' },
+    { id: 'bold', label: '加粗', category: '格式', shortcut: 'Ctrl+B' },
+    { id: 'italic', label: '斜体', category: '格式', shortcut: 'Ctrl+I' },
+    { id: 'mdReference', label: 'Markdown 参考', category: '帮助' },
+  ];
+
+  const SAMPLE_MD = `# 落笔之前的空白
+
+一种把留白视为最强元素的设计哲学,把所有色彩留给**用户内容**与*编辑性图像*。
+
+## 为何如此
+
+Prism 的写作界面应当消失。它是思想的画框,而非自身的舞台。我们遵守三条规则:
+
+1. 黑色是唯一的色彩锚点。
+2. 留白替代阴影。
+3. 药丸与近方形卡片是仅有的两种形状语言。
+
+### 字体
+
+大尺寸标题压紧字距 — \`letter-spacing: -0.03em\` — 让标题像被刻出而非排出。正文字距归零。400 / 500 / 600 三档字重承担一切层级。
+
+> 自定义字体扛起全部份量,其余元素彻底退场。
+
+## 一段代码
+
+\`\`\`ts
+export function tokens() {
+  return {
+    void: '#000000',
+    canvas: '#ffffff',
+    fog: '#e5e7eb',
+  };
+}
+\`\`\`
+
+## 一个列表
+
+- 选中任意文字 → 浮动工具栏
+- 按 **Ctrl+Shift+P** → 命令面板
+- 按 **Ctrl+/** → 快捷键速查
+- 按 **F8** → 专注模式
+- 按 **F11** → 全屏
+
+## 参考
+
+详见 [OpenAI 设计参考](https://openai.com) 中完整的设计令牌体系。
+
+## 排印范本
+
+#### 小标题 h4 — 用于语义分隔
+
+##### H5 风格标签
+
+###### H6 风格标签
+
+普通段落字体使用系统默认比例。行内样式可以组合:**加粗**、*斜体*、***加粗斜体***、~~删除线~~、==高亮片段== 以及 \`行内代码\` 和 [外链](https://example.com)。快捷键像 <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> 这样表达。
+
+> 引用块独占一格,自带微弱背景与左侧锚条。
+>
+> > 嵌套引用会换一层更淡的底,表示层级。
+
+### 有序 / 无序列表
+
+- 一级项用长破折号作为 marker
+- 次级项保持一致的层级感
+  - 二级项用缩进表达从属关系
+  - 回到一级后间距自然复位
+
+1. 有序列表使用粗体序号
+2. 序号右对齐,数字列整齐
+3. 嵌套时下级重新计数
+
+### 任务清单
+
+- [x] 浮动工具栏
+- [x] 命令面板
+- [ ] 分栏拖拽
+- [ ] 多标签页
+
+### 代码块
+
+\`\`\`ts
+export function tokens() {
+  return {
+    void: '#000000',
+    canvas: '#ffffff',
+    fog: '#e5e7eb',
+  };
+}
+\`\`\`
+
+\`\`\`bash
+pnpm install
+pnpm tauri dev
+\`\`\`
+
+### 表格
+
+| 元素 | 示例 | 说明 |
+|------|------|------|
+| 标题 | H1 48px | 压紧字距 |
+| 正文 | 17px | 零字距 |
+| 代码 | 13px mono | 语言标签 |
+
+---
+
+### 定义列表
+
+Prism
+: 一个把留白视为设计主体的 Markdown 编辑器。
+
+Token
+: 设计系统中最小的不可再分变量。
+`;
+
+  const SAMPLE_TREE = [
+    { id: '1', name: '文档', type: 'folder', expanded: true, children: [
+      { id: '1-1', name: '架构说明.md', type: 'file' },
+      { id: '1-2', name: '设计笔记.md', type: 'file', active: true, dirty: true },
+      { id: '1-3', name: '路线图.md', type: 'file' },
+    ]},
+    { id: '2', name: '随笔', type: 'folder', expanded: false, children: [
+      { id: '2-1', name: '周报.md', type: 'file' },
+      { id: '2-2', name: '读书笔记.md', type: 'file' },
+    ]},
+    { id: '3', name: '说明.md', type: 'file' },
+    { id: '4', name: 'TODO.md', type: 'file' },
+  ];
+
+  // ====== 工具函数 ======
+  function usePrevious(v) {
+    const r = useRef(); useEffect(() => { r.current = v; }); return r.current;
+  }
+  function flattenTree(nodes, depth = 0, out = []) {
+    nodes.forEach(n => {
+      out.push({ ...n, depth });
+      if (n.type === 'folder' && n.expanded && n.children) flattenTree(n.children, depth + 1, out);
+    });
+    return out;
+  }
+  function parseOutline(md) {
+    const lines = md.split('\n');
+    const items = [];
+    lines.forEach((line, idx) => {
+      const m = line.match(/^(#{1,4})\s+(.+)$/);
+      if (m) items.push({ level: m[1].length, text: m[2].trim(), line: idx });
+    });
+    return items;
+  }
+
+  // ====== 浮动工具栏 ======
+  function FloatingToolbar({ pos, onFormat }) {
+    if (!pos) return null;
+    const [pressed, setPressed] = useState(null);
+    const click = (k) => {
+      onFormat(k);
+      setPressed(k);
+      setTimeout(() => setPressed(null), 240);
+    };
+    const Btn = ({ k, title, children, style }) => (
+      <button className={'ft-btn ' + (pressed === k ? 'active' : '')} title={title} onMouseDown={e => e.preventDefault()} onClick={() => click(k)} style={style}>{children}</button>
+    );
+    return (
+      <div className="float-toolbar" style={{ left: pos.x, top: pos.y }} onMouseDown={e => e.preventDefault()}>
+        <Btn k="bold" title="加粗 (Ctrl+B)" style={{ fontWeight: 700 }}>B</Btn>
+        <Btn k="italic" title="斜体 (Ctrl+I)" style={{ fontStyle: 'italic', fontFamily: 'serif' }}>I</Btn>
+        <Btn k="underline" title="下划线 (Ctrl+U)" style={{ textDecoration: 'underline' }}>U</Btn>
+        <Btn k="strike" title="删除线" style={{ textDecoration: 'line-through' }}>S</Btn>
+        <div className="ft-divider" />
+        <Btn k="highlight" title="高亮"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M3 11l5-5 3 3-5 5H3v-3z M10 4l2-2 2 2-2 2"/></svg></Btn>
+        <Btn k="code" title="行内代码"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M5 5L2 8l3 3M11 5l3 3-3 3"/></svg></Btn>
+        <div className="ft-divider" />
+        <Btn k="link" title="插入链接"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M6.5 9.5a2.5 2.5 0 003.5 0l2-2a2.5 2.5 0 00-3.5-3.5l-1 1"/><path d="M9.5 6.5a2.5 2.5 0 00-3.5 0l-2 2a2.5 2.5 0 003.5 3.5l1-1"/></svg></Btn>
+        <Btn k="quote" title="引用"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M4 5v3a2 2 0 01-2 2M10 5v3a2 2 0 01-2 2"/></svg></Btn>
+      </div>
+    );
+  }
+
+  // ====== 菜单下拉 ======
+  function MenuDropdown({ items, onAction, onClose, subKey, setSubKey, checks }) {
+    const [hoverIdx, setHoverIdx] = useState(-1);
+    const click = (it) => {
+      if (it.type === 'sep' || it.disabled) return;
+      if (it.submenu) { setSubKey(it.submenu); return; }
+      onAction(it.action);
+      onClose();
+    };
+    return (
+      <div className="menu-dropdown" onMouseLeave={() => { setHoverIdx(-1); setSubKey(null); }}>
+        {items.map((it, i) => {
+          if (it.type === 'sep') return <div key={i} className="dd-sep" />;
+          const isChecked = it.checkable && checks && checks[it.checkKey];
+          return (
+            <div key={i}
+              className={'dd-item ' + (it.disabled ? 'disabled ' : '') + (hoverIdx === i ? 'hover ' : '')}
+              onMouseEnter={() => { setHoverIdx(i); if (it.submenu) setSubKey(it.submenu); else setSubKey(null); }}
+              onClick={() => click(it)}>
+              {it.checkable && <span className="dd-check">{isChecked ? <Icon.Check /> : null}</span>}
+              <span className="label">{it.label}</span>
+              {it.shortcut && <span className="shortcut">{it.shortcut}</span>}
+              {it.submenu && <span className="chev"><Icon.Chev /></span>}
+              {hoverIdx === i && it.submenu && subKey === it.submenu && (
+                <div className="submenu-popover" onMouseEnter={e => e.stopPropagation()}>
+                  {SUBMENUS[it.submenu].map((si, j) => si.type === 'sep'
+                    ? <div key={j} className="dd-sep" />
+                    : <div key={j} className="dd-item" onClick={e => { e.stopPropagation(); onAction(si.action); onClose(); }}>
+                        <span className="label">{si.label}</span>
+                        {si.shortcut && <span className="shortcut">{si.shortcut}</span>}
+                      </div>)}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ====== 菜单栏 ======
+  function MenuBar({ viewMode, setViewMode, onAction, focusMode, alwaysOnTop, sidebarVisible, themeMode, isDirty }) {
+    const [openIdx, setOpenIdx] = useState(-1);
+    const [subKey, setSubKey] = useState(null);
+    const barRef = useRef(null);
+    const keys = Object.keys(MENU_DATA);
+    const checks = {
+      toggleSidebar: sidebarVisible, focusMode, alwaysOnTop, statusBar: true,
+      sourceMode: viewMode === 'edit', splitMode: viewMode === 'split', previewMode: viewMode === 'preview',
+      themeLight: themeMode === 'light', themeDark: themeMode === 'dark',
+    };
+    useEffect(() => {
+      const onDoc = (e) => { if (barRef.current && !barRef.current.contains(e.target)) { setOpenIdx(-1); setSubKey(null); } };
+      document.addEventListener('mousedown', onDoc);
+      return () => document.removeEventListener('mousedown', onDoc);
+    }, []);
+
+    return (
+      <div className="menubar" ref={barRef}>
+        {keys.map((k, i) => (
+          <div key={k} style={{ position: 'relative' }}>
+            <button className={'menu-item ' + (openIdx === i ? 'open' : '')}
+              onClick={() => setOpenIdx(openIdx === i ? -1 : i)}
+              onMouseEnter={() => { if (openIdx !== -1 && openIdx !== i) { setOpenIdx(i); setSubKey(null); } }}
+            >{k}</button>
+            {openIdx === i && (
+              <MenuDropdown items={MENU_DATA[k]} onAction={onAction} onClose={() => { setOpenIdx(-1); setSubKey(null); }} subKey={subKey} setSubKey={setSubKey} checks={checks} />
+            )}
+          </div>
+        ))}
+        <div className="menubar-spacer" />
+        <div className="menubar-actions">
+          <button className="pill-filled" onClick={() => onAction('save')} disabled={!isDirty}>
+            保存
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ====== 文件树 ======
+  function stripExt(name) { const i = name.lastIndexOf('.'); return i > 0 ? [name.slice(0, i), name.slice(i)] : [name, '']; }
+
+  function RenameInput({ value, onCommit, onCancel }) {
+    const [v, setV] = useState(value);
+    const ref = useRef(null);
+    useEffect(() => {
+      if (ref.current) {
+        ref.current.focus();
+        const [stem] = stripExt(value);
+        ref.current.setSelectionRange(0, stem.length);
+      }
+    }, []);
+    return (
+      <input ref={ref} className="tree-rename" value={v}
+        onChange={e => setV(e.target.value)}
+        onBlur={() => onCommit(v)}
+        onClick={e => e.stopPropagation()}
+        onKeyDown={e => {
+          if (e.key === 'Enter') { e.preventDefault(); onCommit(v); }
+          else if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+        }}
+      />
+    );
+  }
+
+  function FileTreeRow({ node, active, onClick, onToggle, onContext, renaming, onRename, onCancelRename, mode }) {
+    const [stem, ext] = stripExt(node.name);
+    return (
+      <div className={'tree-row ' + (active ? 'active' : '')}
+        style={{ paddingLeft: mode === 'list' ? 12 : 8 + node.depth * 16 }}
+        onClick={() => node.type === 'folder' ? onToggle(node.id) : onClick(node)}
+        onContextMenu={e => onContext(e, node)}
+        title={node.name}
+      >
+        {node.type === 'folder'
+          ? <span className={'caret ' + (node.expanded ? 'expanded' : '')}><Icon.Caret /></span>
+          : <span className="caret" style={{ visibility: 'hidden' }}><Icon.Caret /></span>}
+        <span className="icon">{node.type === 'folder' ? <Icon.Folder /> : <Icon.File />}</span>
+        {renaming
+          ? <RenameInput value={node.name} onCommit={onRename} onCancel={onCancelRename} />
+          : <span className="label">{stem}<span style={{ opacity: 0.4, fontWeight: 400 }}>{ext}</span></span>}
+        {node.dirty && !renaming && <span className="dirty" title="未保存修改" />}
+      </div>
+    );
+  }
+
+  function FileTree({ tree, setTree, activePath, onFileClick, onContext, onBlankContext, sortMode, setSortMode, fileTreeMode, setFileTreeMode, renamingId, setRenamingId, renameNode }) {
+    const [sortMenu, setSortMenu] = useState(null);
+    const sortLabel = { name: '按名称', modified: '按修改时间', created: '按创建时间', size: '按大小' }[sortMode];
+
+    const sortedTree = useMemo(() => {
+      const cmp = (a, b) => {
+        if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
+        if (sortMode === 'name') return a.name.localeCompare(b.name, 'zh');
+        return 0;
+      };
+      const walk = (nodes) => [...nodes].sort(cmp).map(n => n.children ? { ...n, children: walk(n.children) } : n);
+      return walk(tree);
+    }, [tree, sortMode]);
+
+    const flat = useMemo(() => {
+      if (fileTreeMode === 'list') {
+        // 文档列表:只展示文件,拍平
+        const out = [];
+        const walk = (nodes) => nodes.forEach(n => {
+          if (n.type === 'folder') walk(n.children || []);
+          else out.push({ ...n, depth: 0 });
+        });
+        walk(sortedTree);
+        return out;
+      }
+      return flattenTree(sortedTree);
+    }, [sortedTree, fileTreeMode]);
+
+    const toggleFolder = (id) => {
+      const walk = (nodes) => nodes.map(n => n.id === id ? { ...n, expanded: !n.expanded } : n.children ? { ...n, children: walk(n.children) } : n);
+      setTree(walk(tree));
+    };
+
+    return (
+      <>
+        <div className="sort-row">
+          <span>工作区</span>
+          <button className="sort-btn" onClick={e => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setSortMenu({ x: r.left, y: r.bottom + 4 });
+          }} title="排序方式">
+            <Icon.Sort /> {sortLabel}
+          </button>
+        </div>
+        <div className="file-tree" onContextMenu={(e) => {
+          if (e.target.closest('.tree-row')) return;
+          onBlankContext(e);
+        }}>
+          {flat.map(n => (
+            <FileTreeRow key={n.id} node={n}
+              active={activePath === n.id}
+              onClick={onFileClick}
+              onToggle={toggleFolder}
+              onContext={onContext}
+              mode={fileTreeMode}
+              renaming={renamingId === n.id}
+              onRename={(name) => renameNode(n.id, name)}
+              onCancelRename={() => setRenamingId(null)}
+            />
+          ))}
+          {flat.length === 0 && (
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--c-ash)', fontSize: 12 }}>
+              空文件夹<br /><span style={{ fontSize: 11 }}>右键此处新建文件</span>
+            </div>
+          )}
+        </div>
+        {sortMenu && (
+          <div className="ctx-menu" style={{ left: sortMenu.x, top: sortMenu.y, minWidth: 180 }} onMouseDown={e => e.stopPropagation()}>
+            {[
+              { k: 'name', l: '按名称' },
+              { k: 'modified', l: '按修改时间' },
+              { k: 'created', l: '按创建时间' },
+              { k: 'size', l: '按大小' },
+            ].map(o => (
+              <div key={o.k} className="dd-item" onClick={() => { setSortMode(o.k); setSortMenu(null); }}>
+                <span className="dd-check">{sortMode === o.k ? <Icon.Check /> : null}</span>
+                <span className="label">{o.l}</span>
+              </div>
+            ))}
+            <div className="dd-sep" />
+            {[
+              { k: 'tree', l: '文档树' },
+              { k: 'list', l: '文档列表' },
+            ].map(o => (
+              <div key={o.k} className="dd-item" onClick={() => { setFileTreeMode(o.k); setSortMenu(null); }}>
+                <span className="dd-check">{fileTreeMode === o.k ? <Icon.Check /> : null}</span>
+                <span className="label">{o.l}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {sortMenu && <div style={{ position: 'fixed', inset: 0, zIndex: 3999 }} onClick={() => setSortMenu(null)} onContextMenu={e => { e.preventDefault(); setSortMenu(null); }} />}
+      </>
+    );
+  }
+
+  // ====== 大纲 ======
+  function OutlinePanel({ content, activeLine, onClick }) {
+    const items = useMemo(() => parseOutline(content), [content]);
+    if (!items.length) return <div className="outline"><div style={{ color: 'var(--c-ash)', fontSize: 12, padding: 12 }}>暂无标题</div></div>;
+    return (
+      <div className="outline">
+        {items.map((it, i) => (
+          <div key={i} className={'outline-item h' + it.level + (activeLine === it.line ? ' active' : '')} onClick={() => onClick(it.line)}>
+            {it.text}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // ====== 侧栏搜索 ======
+  function SearchPanel({ content }) {
+    const [q, setQ] = useState('');
+    const [caseSens, setCaseSens] = useState(false);
+    const [whole, setWhole] = useState(false);
+    const results = useMemo(() => {
+      if (!q) return [];
+      const lines = content.split('\n');
+      const out = [];
+      const needle = caseSens ? q : q.toLowerCase();
+      lines.forEach((line, idx) => {
+        const hay = caseSens ? line : line.toLowerCase();
+        let matches = false;
+        if (whole) matches = new RegExp('\\b' + needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').test(hay);
+        else matches = hay.includes(needle);
+        if (matches) out.push({ line: idx + 1, text: line });
+      });
+      return out;
+    }, [q, caseSens, whole, content]);
+    return (
+      <div className="search-panel">
+        <div className="search-panel-input">
+          <input className="search-input" placeholder="在文档中搜索" value={q} onChange={e => setQ(e.target.value)} autoFocus />
+        </div>
+        <div className="search-options">
+          <button className={'search-option ' + (caseSens ? 'active' : '')} onClick={() => setCaseSens(v => !v)}>Aa</button>
+          <button className={'search-option ' + (whole ? 'active' : '')} onClick={() => setWhole(v => !v)}>全字</button>
+          {q && <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--c-ash)', alignSelf: 'center' }}>{results.length} 项</span>}
+        </div>
+        <div>
+          {results.map((r, i) => (
+            <div key={i} className="search-result">
+              <span className="path">行 {r.line}</span>
+              {r.text.trim().slice(0, 120)}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ====== 侧栏 ======
+  function Sidebar({ tab, setTab, tree, setTree, activePath, onFileClick, onContext, onBlankContext, content, activeLine, onOutlineClick, sortMode, setSortMode, fileTreeMode, setFileTreeMode, renamingId, setRenamingId, renameNode }) {
+    return (
+      <>
+        <div className="sidebar-tabs">
+          {[{ k: 'files', l: '文件' }, { k: 'outline', l: '大纲' }, { k: 'search', l: '搜索' }].map(t => (
+            <button key={t.k} className={'sidebar-tab ' + (tab === t.k ? 'active' : '')} onClick={() => setTab(t.k)}>{t.l}</button>
+          ))}
+        </div>
+        {tab === 'files' && (
+          <>
+            <div className="sidebar-search">
+              <input className="search-input" placeholder="搜索文件" />
+            </div>
+            <FileTree
+              tree={tree} setTree={setTree}
+              activePath={activePath}
+              onFileClick={onFileClick}
+              onContext={onContext}
+              onBlankContext={onBlankContext}
+              sortMode={sortMode} setSortMode={setSortMode}
+              fileTreeMode={fileTreeMode} setFileTreeMode={setFileTreeMode}
+              renamingId={renamingId} setRenamingId={setRenamingId}
+              renameNode={renameNode}
+            />
+          </>
+        )}
+        {tab === 'outline' && <OutlinePanel content={content} activeLine={activeLine} onClick={onOutlineClick} />}
+        {tab === 'search' && <SearchPanel content={content} />}
+      </>
+    );
+  }
+
+  // ====== 状态栏 ======
+  function StatusBar({ sidebarVisible, isSidebarZoneHover, setIsSidebarZoneHover, onToggleSidebar, viewMode, setViewMode, wordCount, charCount, cursor, saveStatus, focusMode, onToggleFocus, onExport, onToggleTheme, themeMode, rootName, onFolderContext, onNewFile, fileTreeMode, onToggleFileTreeMode }) {
+    const modes = [
+      { k: 'edit', label: '源码', icon: <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M6 4L2 8l4 4M10 4l4 4-4 4"/></svg> },
+      { k: 'split', label: '分栏', icon: <Icon.Split /> },
+      { k: 'preview', label: '预览', icon: <Icon.Preview /> },
+    ];
+    return (
+      <div className="statusbar">
+        {sidebarVisible && (
+          <div className={'status-sidebar-zone ' + (isSidebarZoneHover ? 'visible' : '')}
+            onMouseEnter={() => setIsSidebarZoneHover(true)}
+            onMouseLeave={() => setIsSidebarZoneHover(false)}
+          >
+            <button className="status-btn status-btn-icon" title="新建文件" onClick={onNewFile}><Icon.Plus /></button>
+            <button className={'status-btn status-btn-icon ' + (fileTreeMode === 'tree' ? 'active' : '')} title={fileTreeMode === 'tree' ? '切换为文档列表' : '切换为文档树'} onClick={onToggleFileTreeMode}>
+              {fileTreeMode === 'tree'
+                ? <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M3 4h2M3 8h2M3 12h2M7 4h6M7 8h6M7 12h4"/></svg>
+                : <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M3 4h10M3 8h10M3 12h10"/></svg>}
+            </button>
+            <div className="status-folder" onContextMenu={onFolderContext} onClick={onFolderContext} title="工作区操作">
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{rootName}</span>
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor"><circle cx="3" cy="6" r="1"/><circle cx="6" cy="6" r="1"/><circle cx="9" cy="6" r="1"/></svg>
+            </div>
+          </div>
+        )}
+        <div className="status-main">
+          <div className="status-section">
+            <button className="status-btn status-btn-icon" onClick={onToggleSidebar} title={sidebarVisible ? '收起侧边栏' : '展开侧边栏'}>
+              {sidebarVisible ? <Icon.Collapse /> : <Icon.Expand />}
+            </button>
+            <div className="status-sep" />
+            <div className="mode-group">
+              {modes.map(m => (
+                <button key={m.k} className={'mode-btn ' + (viewMode === m.k ? 'active' : '')} onClick={() => setViewMode(m.k)} title={m.label}>{m.icon}</button>
+              ))}
+            </div>
+          </div>
+          <div className="status-center">
+            <span className={'save-status ' + saveStatus}>
+              {saveStatus === 'saved' && '已保存'}
+              {saveStatus === 'saving' && '保存中…'}
+              {saveStatus === 'unsaved' && '未保存'}
+            </span>
+            <div className="status-sep" />
+            <span className="stat-val">{wordCount}</span><span className="stat-lbl">词</span>
+            <div className="status-sep" />
+            <span className="stat-val">{charCount}</span><span className="stat-lbl">字符</span>
+            <div className="status-sep" />
+            <span className="stat-lbl">行</span><span className="stat-val">{cursor.line}</span>
+            <div className="status-sep" />
+            <span className="stat-lbl">列</span><span className="stat-val">{cursor.col}</span>
+          </div>
+          <div className="status-right">
+            <button className={'status-btn ' + (focusMode ? 'active' : '')} onClick={onToggleFocus} title="专注模式 (F8)"><Icon.Focus /></button>
+            <button className="status-btn" onClick={onExport} title="导出"><Icon.Export /></button>
+            <button className="status-btn" onClick={onToggleTheme} title={themeMode === 'dark' ? '切换浅色' : '切换深色'}>
+              {themeMode === 'dark' ? <Icon.Sun /> : <Icon.Moon />}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ====== 命令面板 ======
+  function CommandPalette({ visible, onClose, onExecute }) {
+    const [q, setQ] = useState('');
+    const [idx, setIdx] = useState(0);
+    const filtered = useMemo(() => {
+      if (!q) return COMMANDS;
+      const n = q.toLowerCase();
+      return COMMANDS.filter(c => (c.label + ' ' + c.category + ' ' + (c.shortcut || '')).toLowerCase().includes(n));
+    }, [q]);
+    useEffect(() => { if (visible) { setQ(''); setIdx(0); } }, [visible]);
+    useEffect(() => { setIdx(0); }, [q]);
+    useEffect(() => {
+      if (!visible) return;
+      const on = (e) => {
+        if (e.key === 'Escape') { e.preventDefault(); onClose(); }
+        else if (e.key === 'ArrowDown') { e.preventDefault(); setIdx(i => Math.min(i + 1, filtered.length - 1)); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); setIdx(i => Math.max(i - 1, 0)); }
+        else if (e.key === 'Enter') { e.preventDefault(); if (filtered[idx]) { onExecute(filtered[idx].id); onClose(); } }
+      };
+      window.addEventListener('keydown', on);
+      return () => window.removeEventListener('keydown', on);
+    }, [visible, idx, filtered, onClose, onExecute]);
+    if (!visible) return null;
+    return (
+      <>
+        <div className="cmdk-overlay" onClick={onClose} />
+        <div className="cmdk">
+          <div className="cmdk-search">
+            <Icon.Search />
+            <input className="cmdk-input" placeholder="输入命令或搜索…" value={q} onChange={e => setQ(e.target.value)} autoFocus />
+            <span className="kbd">Esc</span>
+          </div>
+          <div className="cmdk-list">
+            {filtered.length === 0 ? (
+              <div className="cmdk-empty">未找到匹配的命令</div>
+            ) : filtered.map((c, i) => (
+              <div key={c.id} className={'cmdk-item ' + (i === idx ? 'selected' : '')}
+                onMouseEnter={() => setIdx(i)}
+                onClick={() => { onExecute(c.id); onClose(); }}>
+                <div className="cmdk-main">
+                  <span className="cmdk-label">{c.label}</span>
+                  <span className="cmdk-cat">{c.category}</span>
+                </div>
+                {c.shortcut && <span className="cmdk-shortcut">{c.shortcut.split('+').map((k, j) => <span key={j} className="kbd">{k}</span>)}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ====== 快捷键面板 ======
+  function ShortcutPanel({ visible, onClose }) {
+    useEffect(() => {
+      if (!visible) return;
+      const on = (e) => { if (e.key === 'Escape') { e.preventDefault(); onClose(); } };
+      window.addEventListener('keydown', on);
+      return () => window.removeEventListener('keydown', on);
+    }, [visible, onClose]);
+    if (!visible) return null;
+    return (
+      <>
+        <div className="sp-overlay" onClick={onClose} />
+        <div className="sp">
+          <div className="sp-header">
+            <h2>快捷键</h2>
+            <button className="sp-close" onClick={onClose}>×</button>
+          </div>
+          <div className="sp-content">
+            {SHORTCUTS_DATA.map(cat => (
+              <div key={cat.category} className="sp-category">
+                <h3>{cat.category}</h3>
+                <div className="sp-list">
+                  {cat.items.map((it, i) => (
+                    <div key={i} className="sp-item">
+                      <span className="desc">{it.desc}</span>
+                      <span className="keys">{it.keys}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ====== 上下文菜单 ======
+  function ContextMenu({ menu, onClose }) {
+    useEffect(() => {
+      if (!menu) return;
+      const onDoc = () => onClose();
+      const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+      setTimeout(() => document.addEventListener('mousedown', onDoc), 0);
+      window.addEventListener('keydown', onKey);
+      return () => { document.removeEventListener('mousedown', onDoc); window.removeEventListener('keydown', onKey); };
+    }, [menu, onClose]);
+    if (!menu) return null;
+    const hasCheckable = menu.items.some(it => it.checkable);
+    const style = { left: Math.min(menu.x, window.innerWidth - 240), top: Math.min(menu.y, window.innerHeight - menu.items.length * 32 - 20) };
+    return (
+      <div className="ctx-menu" style={style} onMouseDown={e => e.stopPropagation()}>
+        {menu.items.map((it, i) => it.type === 'sep'
+          ? <div key={i} className="dd-sep" />
+          : <div key={i} className={'dd-item ' + (it.disabled ? 'disabled ' : '') + (it.danger ? 'danger' : '')} onClick={() => { if (!it.disabled) { it.action && it.action(); onClose(); } }}>
+              {hasCheckable && <span className="dd-check">{it.checked ? <Icon.Check /> : null}</span>}
+              <span className="label">{it.label}</span>
+              {it.shortcut && <span className="shortcut">{it.shortcut}</span>}
+            </div>)}
+      </div>
+    );
+  }
+
+  // ====== 关于 ======
+  function AboutModal({ visible, onClose }) {
+    useEffect(() => {
+      if (!visible) return;
+      const on = (e) => { if (e.key === 'Escape') { e.preventDefault(); onClose(); } };
+      window.addEventListener('keydown', on);
+      return () => window.removeEventListener('keydown', on);
+    }, [visible, onClose]);
+    if (!visible) return null;
+    return (
+      <>
+        <div className="modal-overlay" onClick={onClose} />
+        <div className="modal">
+          <div className="modal-header">
+            <div className="modal-title">关于</div>
+            <button className="sp-close" onClick={onClose}>×</button>
+          </div>
+          <div className="modal-body">
+            <div className="caption">PRISM · VERSION 1.1.0</div>
+            <div className="display">落笔之前的空白。</div>
+            <p style={{ color: 'var(--c-graphite)', marginBottom: 16 }}>
+              一个把留白视为最强元素的 Markdown 桌面编辑器,采用 Tauri 2 + React + TypeScript 构建。
+            </p>
+            <p style={{ color: 'var(--c-ash)', fontSize: 12 }}>
+              © 2026 Prism · MIT License
+            </p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ====== 设置 ======
+  function SettingsModal({ visible, onClose, settings, setSettings }) {
+    useEffect(() => {
+      if (!visible) return;
+      const on = (e) => { if (e.key === 'Escape') { e.preventDefault(); onClose(); } };
+      window.addEventListener('keydown', on);
+      return () => window.removeEventListener('keydown', on);
+    }, [visible, onClose]);
+    if (!visible) return null;
+    const T = (k) => ({ className: 'toggle ' + (settings[k] ? 'on' : ''), onClick: () => setSettings(s => ({ ...s, [k]: !s[k] })) });
+    return (
+      <>
+        <div className="modal-overlay" onClick={onClose} />
+        <div className="modal">
+          <div className="modal-header">
+            <div className="modal-title">偏好设置</div>
+            <button className="sp-close" onClick={onClose}>×</button>
+          </div>
+          <div className="modal-body">
+            <div className="settings-group">
+              <h4>编辑器</h4>
+              <div className="settings-row">
+                <div><div className="row-label">自动保存</div><div className="row-hint">文档修改后 1.5 秒自动保存</div></div>
+                <div {...T('autoSave')} />
+              </div>
+              <div className="settings-row">
+                <div><div className="row-label">打字机模式</div><div className="row-hint">当前行始终居中</div></div>
+                <div {...T('typewriter')} />
+              </div>
+              <div className="settings-row">
+                <div><div className="row-label">拼写检查</div><div className="row-hint">红色波浪线标记拼写错误</div></div>
+                <div {...T('spellCheck')} />
+              </div>
+            </div>
+            <div className="settings-group">
+              <h4>外观</h4>
+              <div className="settings-row">
+                <div><div className="row-label">显示行号</div></div>
+                <div {...T('lineNumbers')} />
+              </div>
+              <div className="settings-row">
+                <div><div className="row-label">软换行</div></div>
+                <div {...T('softWrap')} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ====== Toast ======
+  function ToastArea({ toasts }) {
+    return (
+      <div className="toast-area">
+        {toasts.map(t => <div key={t.id} className="toast">{t.text}</div>)}
+      </div>
+    );
+  }
+
+  // ====== 主应用 ======
+  function App() {
+    const [viewMode, setViewMode] = useState('split');
+    const [themeMode, setThemeMode] = useState('light');
+    const [sidebarVisible, setSidebarVisible] = useState(true);
+    const [sidebarTab, setSidebarTab] = useState('files');
+    const [focusMode, setFocusMode] = useState(false);
+    const [alwaysOnTop, setAlwaysOnTop] = useState(false);
+    const [content, setContent] = useState(SAMPLE_MD);
+    const [isDirty, setIsDirty] = useState(false);
+    const [saveStatus, setSaveStatus] = useState('saved');
+    const [cursor, setCursor] = useState({ line: 1, col: 1 });
+    const [tree, setTree] = useState(SAMPLE_TREE);
+    const [sortMode, setSortMode] = useState('name');
+    const [fileTreeMode, setFileTreeMode] = useState('tree');
+    const [renamingId, setRenamingId] = useState(null);
+    const [isSidebarZoneHover, setIsSidebarZoneHover] = useState(false);
+    const [floatPos, setFloatPos] = useState(null);
+    const [cmdOpen, setCmdOpen] = useState(false);
+    const [shortcutOpen, setShortcutOpen] = useState(false);
+    const [aboutOpen, setAboutOpen] = useState(false);
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    const [ctxMenu, setCtxMenu] = useState(null);
+    const [toasts, setToasts] = useState([]);
+    const [activeLine, setActiveLine] = useState(0);
+    const [settings, setSettings] = useState({ autoSave: true, typewriter: false, spellCheck: false, lineNumbers: false, softWrap: true });
+    const [currentFile, setCurrentFile] = useState({ id: '1-2', name: '设计笔记.md', path: '/文档/设计笔记.md' });
+    const textareaRef = useRef(null);
+
+    // 主题切换 body class
+    useEffect(() => {
+      document.body.classList.toggle('dark', themeMode === 'dark');
+    }, [themeMode]);
+
+    // 字数统计
+    const { wordCount, charCount } = useMemo(() => {
+      const plain = content.replace(/[#*`_>\-\[\]\(\)]/g, '');
+      const chinese = (plain.match(/[一-龥]/g) || []).length;
+      const english = (plain.match(/[a-zA-Z]+/g) || []).length;
+      return { wordCount: chinese + english, charCount: plain.replace(/\s/g, '').length };
+    }, [content]);
+
+    // 预览 HTML — 自定义 code block 包装 + 行内 == 高亮
+    const previewHtml = useMemo(() => {
+      if (!window.marked) return '';
+      const escape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      const renderer = new window.marked.Renderer();
+      renderer.code = (code, info) => {
+        const body = typeof code === 'string' ? code : (code && code.text) || '';
+        const lang = (typeof info === 'string' ? info : (code && code.lang)) || 'text';
+        return `<pre class="code-block"><div class="code-header"><span class="code-lang">${escape(lang)}</span><button class="code-copy" type="button">复制</button></div><code>${escape(body)}</code></pre>`;
+      };
+      const raw = window.marked.parse(content, { renderer, gfm: true, breaks: false });
+      // 转换 ==xxx== 为 <mark>
+      return raw.replace(/==([^=\n]+)==/g, '<mark>$1</mark>');
+    }, [content]);
+
+    // 自动保存模拟
+    useEffect(() => {
+      if (!isDirty) { setSaveStatus('saved'); return; }
+      setSaveStatus('unsaved');
+      if (!settings.autoSave) return;
+      const t1 = setTimeout(() => setSaveStatus('saving'), 1500);
+      const t2 = setTimeout(() => { setSaveStatus('saved'); setIsDirty(false); }, 2200);
+      return () => { clearTimeout(t1); clearTimeout(t2); };
+    }, [isDirty, content, settings.autoSave]);
+
+    // Toast
+    const pushToast = useCallback((text) => {
+      const id = Date.now() + Math.random();
+      setToasts(ts => [...ts, { id, text }]);
+      setTimeout(() => setToasts(ts => ts.filter(t => t.id !== id)), 1800);
+    }, []);
+
+    // 树操作
+    const uid = () => 'n' + Date.now().toString(36) + Math.floor(Math.random() * 1000);
+    const addNode = (parentId, type) => {
+      const name = type === 'folder' ? '新建文件夹' : '未命名.md';
+      const newNode = { id: uid(), name, type, ...(type === 'folder' ? { expanded: true, children: [] } : {}) };
+      const walk = (nodes) => {
+        if (parentId === null) return [...nodes, newNode];
+        return nodes.map(n => n.id === parentId
+          ? { ...n, expanded: true, children: [...(n.children || []), newNode] }
+          : n.children ? { ...n, children: walk(n.children) } : n);
+      };
+      setTree(t => walk(t));
+      setTimeout(() => setRenamingId(newNode.id), 50);
+    };
+    const removeNode = (id) => {
+      const walk = (nodes) => nodes.filter(n => n.id !== id).map(n => n.children ? { ...n, children: walk(n.children) } : n);
+      setTree(t => walk(t));
+    };
+    const duplicateNode = (id) => {
+      const walk = (nodes, list) => {
+        const out = [];
+        for (const n of nodes) {
+          out.push(n.children ? { ...n, children: walk(n.children, list) } : n);
+          if (n.id === id) {
+            const dot = n.name.lastIndexOf('.');
+            const copy = { ...n, id: uid(), name: dot > 0 ? n.name.slice(0, dot) + ' 副本' + n.name.slice(dot) : n.name + ' 副本' };
+            out.push(copy);
+          }
+        }
+        return out;
+      };
+      setTree(t => walk(t, null));
+    };
+    const renameNode = (id, newName) => {
+      if (!newName || !newName.trim()) { setRenamingId(null); return; }
+      const walk = (nodes) => nodes.map(n => n.id === id ? { ...n, name: newName.trim() } : n.children ? { ...n, children: walk(n.children) } : n);
+      setTree(t => walk(t));
+      setRenamingId(null);
+    };
+
+    // 文本格式化
+    const handleFormat = useCallback((fmt) => {
+      const ta = textareaRef.current;
+      if (!ta) return;
+      const { selectionStart: s, selectionEnd: e, value } = ta;
+      const sel = value.slice(s, e);
+      const wraps = { bold: ['**', '**'], italic: ['*', '*'], underline: ['<u>', '</u>'], strike: ['~~', '~~'], code: ['`', '`'], highlight: ['==', '=='], quote: ['> ', ''], link: ['[', '](url)'] };
+      const w = wraps[fmt];
+      if (!w) return;
+      const newText = value.slice(0, s) + w[0] + sel + w[1] + value.slice(e);
+      setContent(newText);
+      setIsDirty(true);
+      setFloatPos(null);
+      setTimeout(() => {
+        ta.focus();
+        ta.setSelectionRange(s + w[0].length, s + w[0].length + sel.length);
+      }, 0);
+    }, []);
+
+    // 选中文本显示浮动工具栏
+    const handleSelection = useCallback(() => {
+      const ta = textareaRef.current;
+      if (!ta) return;
+      const { selectionStart: s, selectionEnd: e } = ta;
+      if (s === e) { setFloatPos(null); return; }
+      const rect = ta.getBoundingClientRect();
+      const lineHeight = 24.5;
+      const lines = ta.value.slice(0, s).split('\n');
+      const row = lines.length;
+      const col = lines[lines.length - 1].length;
+      // 估算位置,放在编辑区上方浮动
+      const x = Math.min(Math.max(rect.left + 200, 180), window.innerWidth - 180);
+      const y = Math.max(rect.top + row * lineHeight - ta.scrollTop - 50, 120);
+      setFloatPos({ x, y });
+    }, []);
+
+    // 右键上下文菜单
+    const openFileContext = (e, node) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const isDir = node.type === 'folder';
+      const items = [];
+      if (!isDir) items.push({ label: '打开', action: () => { setCurrentFile({ name: node.name, path: '/' + node.name }); pushToast('已打开 ' + node.name); } });
+      items.push({ label: '在新窗口中打开', action: () => pushToast('新窗口打开 ' + node.name) });
+      items.push({ type: 'sep' });
+      items.push({ label: '新建文件', action: () => { addNode(isDir ? node.id : null, 'file'); pushToast('新建文件'); } });
+      items.push({ label: '新建文件夹', action: () => { addNode(isDir ? node.id : null, 'folder'); pushToast('新建文件夹'); } });
+      items.push({ type: 'sep' });
+      items.push({ label: '搜索', action: () => { setSidebarTab('search'); setSidebarVisible(true); } });
+      items.push({ type: 'sep' });
+      items.push({ label: '文档列表', checkable: true, checked: fileTreeMode === 'list', action: () => setFileTreeMode('list') });
+      items.push({ label: '文档树', checkable: true, checked: fileTreeMode === 'tree', action: () => setFileTreeMode('tree') });
+      items.push({ type: 'sep' });
+      items.push({ label: '按名称排序', checkable: true, checked: sortMode === 'name', action: () => setSortMode('name') });
+      items.push({ label: '按修改时间排序', checkable: true, checked: sortMode === 'modified', action: () => setSortMode('modified') });
+      items.push({ label: '按创建时间排序', checkable: true, checked: sortMode === 'created', action: () => setSortMode('created') });
+      items.push({ label: '按大小排序', checkable: true, checked: sortMode === 'size', action: () => setSortMode('size') });
+      items.push({ type: 'sep' });
+      items.push({ label: '重命名', shortcut: 'F2', action: () => setRenamingId(node.id) });
+      if (!isDir) items.push({ label: '创建副本', action: () => { duplicateNode(node.id); pushToast('副本已创建'); } });
+      items.push({ label: '删除', danger: true, action: () => { removeNode(node.id); pushToast('已删除 ' + node.name); } });
+      items.push({ type: 'sep' });
+      items.push({ label: '属性', action: () => pushToast('查看属性') });
+      items.push({ label: '复制文件路径', action: () => pushToast('路径已复制') });
+      items.push({ label: '打开文件位置', action: () => pushToast('已在资源管理器打开') });
+      setCtxMenu({ x: e.clientX, y: e.clientY, items });
+    };
+
+    const openBlankContext = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setCtxMenu({ x: e.clientX, y: e.clientY, items: [
+        { label: '在新窗口中打开', action: () => pushToast('新窗口') },
+        { type: 'sep' },
+        { label: '新建文件', action: () => { addNode(null, 'file'); pushToast('新建文件'); } },
+        { label: '新建文件夹', action: () => { addNode(null, 'folder'); pushToast('新建文件夹'); } },
+        { label: '搜索', action: () => { setSidebarTab('search'); setSidebarVisible(true); } },
+        { type: 'sep' },
+        { label: '文档列表', checkable: true, checked: fileTreeMode === 'list', action: () => setFileTreeMode('list') },
+        { label: '文档树', checkable: true, checked: fileTreeMode === 'tree', action: () => setFileTreeMode('tree') },
+        { type: 'sep' },
+        { label: '复制文件路径', action: () => pushToast('路径已复制') },
+        { label: '打开文件位置', action: () => pushToast('已定位') },
+      ]});
+    };
+
+    const openFolderContext = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setCtxMenu({ x: e.clientX, y: e.clientY, items: [
+        { label: '在新窗口中打开', action: () => pushToast('新窗口') },
+        { type: 'sep' },
+        { label: '新建文件', action: () => { addNode(null, 'file'); pushToast('新建文件'); } },
+        { label: '新建文件夹', action: () => { addNode(null, 'folder'); pushToast('新建文件夹'); } },
+        { type: 'sep' },
+        { label: '搜索', action: () => { setSidebarTab('search'); setSidebarVisible(true); } },
+        { type: 'sep' },
+        { label: '文档列表', checkable: true, checked: fileTreeMode === 'list', action: () => setFileTreeMode('list') },
+        { label: '文档树', checkable: true, checked: fileTreeMode === 'tree', action: () => setFileTreeMode('tree') },
+        { type: 'sep' },
+        { label: '刷新', action: () => pushToast('已刷新') },
+        { type: 'sep' },
+        { label: '复制文件路径', action: () => pushToast('路径已复制') },
+        { label: '打开文件位置', action: () => pushToast('已定位') },
+      ]});
+    };
+
+    // 动作分发
+    const handleAction = useCallback((action) => {
+      switch (action) {
+        case 'new': setContent(''); setIsDirty(false); pushToast('新建文档'); break;
+        case 'open': pushToast('打开文件…'); break;
+        case 'openFolder': pushToast('打开文件夹…'); break;
+        case 'save': setSaveStatus('saving'); setTimeout(() => { setIsDirty(false); setSaveStatus('saved'); pushToast('已保存'); }, 300); break;
+        case 'saveAs': pushToast('另存为…'); break;
+        case 'sourceMode': setViewMode('edit'); break;
+        case 'splitMode': setViewMode('split'); break;
+        case 'previewMode': setViewMode('preview'); break;
+        case 'focusMode': setFocusMode(v => !v); break;
+        case 'typewriterMode': setSettings(s => ({ ...s, typewriter: !s.typewriter })); pushToast('打字机模式已切换'); break;
+        case 'fullscreen': pushToast('全屏切换'); break;
+        case 'alwaysOnTop': setAlwaysOnTop(v => !v); pushToast('窗口置顶已切换'); break;
+        case 'toggleSidebar': setSidebarVisible(v => !v); break;
+        case 'showOutline': setSidebarTab('outline'); setSidebarVisible(true); break;
+        case 'showFiles': setSidebarTab('files'); setSidebarVisible(true); break;
+        case 'showSearch': setSidebarTab('search'); setSidebarVisible(true); break;
+        case 'showCmd': setCmdOpen(true); break;
+        case 'showShortcuts': setShortcutOpen(true); break;
+        case 'about': setAboutOpen(true); break;
+        case 'preferences': setSettingsOpen(true); break;
+        case 'themeLight': setThemeMode('light'); break;
+        case 'themeDark': setThemeMode('dark'); break;
+        case 'toggleTheme': setThemeMode(m => m === 'light' ? 'dark' : 'light'); break;
+        case 'exportHtml': pushToast('导出为 HTML'); break;
+        case 'exportPdf': pushToast('导出为 PDF'); break;
+        case 'exportDocx': pushToast('导出为 Word'); break;
+        case 'bold': handleFormat('bold'); break;
+        case 'italic': handleFormat('italic'); break;
+        case 'underline': handleFormat('underline'); break;
+        case 'inlineCode': handleFormat('code'); break;
+        case 'quote': handleFormat('quote'); break;
+        case 'h1': case 'h2': case 'h3': case 'h4': case 'h5': case 'h6': pushToast(action.toUpperCase()); break;
+        default: if (action && action.startsWith('recent:')) pushToast('打开 ' + action); else pushToast(action);
+      }
+    }, [handleFormat, pushToast]);
+
+    // 全局快捷键
+    useEffect(() => {
+      const on = (e) => {
+        const ctrl = e.ctrlKey || e.metaKey;
+        if (ctrl && e.shiftKey && e.key.toLowerCase() === 'p') { e.preventDefault(); setCmdOpen(true); return; }
+        if (ctrl && e.key === '/') { e.preventDefault(); setShortcutOpen(true); return; }
+        if (ctrl && e.shiftKey && e.key.toLowerCase() === 'l') { e.preventDefault(); setSidebarVisible(v => !v); return; }
+        if (e.key === 'F8') { e.preventDefault(); setFocusMode(v => !v); return; }
+        if (e.key === 'F2' && currentFile.id) { e.preventDefault(); setRenamingId(currentFile.id); setSidebarTab('files'); setSidebarVisible(true); return; }
+        if (ctrl && e.key.toLowerCase() === 's') { e.preventDefault(); handleAction('save'); return; }
+        if (ctrl && e.key.toLowerCase() === 'n' && !e.shiftKey) { e.preventDefault(); handleAction('new'); return; }
+      };
+      window.addEventListener('keydown', on);
+      return () => window.removeEventListener('keydown', on);
+    }, [handleAction, currentFile.id]);
+
+    // 点击外部关闭上下文菜单
+    const onMainClick = () => { setCtxMenu(null); setFloatPos(null); };
+
+    // 光标位置跟踪
+    const onTextareaKey = () => {
+      const ta = textareaRef.current;
+      if (!ta) return;
+      const before = ta.value.slice(0, ta.selectionStart);
+      const lines = before.split('\n');
+      setCursor({ line: lines.length, col: lines[lines.length - 1].length + 1 });
+    };
+
+    const rootName = '工作区';
+
+    return (
+      <div className={'window ' + (focusMode ? 'focus-mode' : '')} onClick={onMainClick}>
+        <div className="proto-hint">Prism · OpenAI 风格交互原型</div>
+
+        {/* 标题栏 */}
+        <div className="titlebar">
+          <div className="titlebar-brand">
+            <div className="logo">P</div>
+            <div className="titlebar-title">
+              <span className="doc-name">{currentFile.name}</span>
+              {isDirty && <span className="dirty-dot" title="未保存" />}
+              <span className="sep">—</span>
+              <span className="app">Prism</span>
+            </div>
+          </div>
+          <div className="titlebar-controls">
+            <button className="tb-btn" title="最小化" onClick={() => pushToast('最小化')}><Icon.Min /></button>
+            <button className="tb-btn" title="最大化" onClick={() => pushToast('最大化')}><Icon.Max /></button>
+            <button className="tb-btn close" title="关闭" onClick={() => pushToast('关闭')}><Icon.Close /></button>
+          </div>
+        </div>
+
+        {/* 菜单栏 */}
+        <MenuBar
+          viewMode={viewMode} setViewMode={setViewMode}
+          onAction={handleAction}
+          focusMode={focusMode} alwaysOnTop={alwaysOnTop} sidebarVisible={sidebarVisible}
+          themeMode={themeMode} isDirty={isDirty}
+        />
+
+        {/* 主体 */}
+        <div className="body">
+          <div className={'sidebar ' + (sidebarVisible ? '' : 'collapsed')}>
+            {sidebarVisible && <Sidebar
+              tab={sidebarTab} setTab={setSidebarTab}
+              tree={tree} setTree={setTree}
+              activePath={currentFile.id}
+              onFileClick={(n) => { setCurrentFile({ id: n.id, name: n.name, path: '/' + n.name }); pushToast('打开 ' + n.name); }}
+              onContext={openFileContext}
+              onBlankContext={openBlankContext}
+              content={content} activeLine={activeLine}
+              onOutlineClick={(line) => setActiveLine(line)}
+              sortMode={sortMode} setSortMode={setSortMode}
+              fileTreeMode={fileTreeMode} setFileTreeMode={setFileTreeMode}
+              renamingId={renamingId} setRenamingId={setRenamingId}
+              renameNode={renameNode}
+            />}
+          </div>
+
+          <div className={'main ' + viewMode}>
+            {(viewMode === 'edit' || viewMode === 'split') && (
+              <div className="pane editor">
+                <textarea
+                  ref={textareaRef}
+                  spellCheck={settings.spellCheck}
+                  value={content}
+                  onChange={e => { setContent(e.target.value); setIsDirty(true); }}
+                  onSelect={handleSelection}
+                  onMouseUp={handleSelection}
+                  onKeyUp={(e) => { onTextareaKey(); handleSelection(); }}
+                  onBlur={() => setTimeout(() => setFloatPos(null), 200)}
+                  style={{ minHeight: 600 }}
+                />
+              </div>
+            )}
+            {viewMode === 'split' && <div className="pane-divider" />}
+            {(viewMode === 'preview' || viewMode === 'split') && (
+              <div className="pane preview" dangerouslySetInnerHTML={{ __html: previewHtml }} />
+            )}
+          </div>
+        </div>
+
+        {/* 状态栏 */}
+        <StatusBar
+          sidebarVisible={sidebarVisible}
+          isSidebarZoneHover={isSidebarZoneHover}
+          setIsSidebarZoneHover={setIsSidebarZoneHover}
+          onToggleSidebar={() => setSidebarVisible(v => !v)}
+          viewMode={viewMode} setViewMode={setViewMode}
+          wordCount={wordCount} charCount={charCount}
+          cursor={cursor} saveStatus={saveStatus}
+          focusMode={focusMode} onToggleFocus={() => setFocusMode(v => !v)}
+          onExport={() => handleAction('exportHtml')}
+          onToggleTheme={() => setThemeMode(m => m === 'light' ? 'dark' : 'light')}
+          themeMode={themeMode}
+          rootName={rootName}
+          onFolderContext={openFolderContext}
+          onNewFile={() => addNode(null, 'file')}
+          fileTreeMode={fileTreeMode}
+          onToggleFileTreeMode={() => setFileTreeMode(m => m === 'tree' ? 'list' : 'tree')}
+        />
+
+        {/* 浮层 */}
+        <FloatingToolbar pos={floatPos} onFormat={handleFormat} />
+        <CommandPalette visible={cmdOpen} onClose={() => setCmdOpen(false)} onExecute={handleAction} />
+        <ShortcutPanel visible={shortcutOpen} onClose={() => setShortcutOpen(false)} />
+        <AboutModal visible={aboutOpen} onClose={() => setAboutOpen(false)} />
+        <SettingsModal visible={settingsOpen} onClose={() => setSettingsOpen(false)} settings={settings} setSettings={setSettings} />
+        <ContextMenu menu={ctxMenu} onClose={() => setCtxMenu(null)} />
+        <ToastArea toasts={toasts} />
+      </div>
+    );
+  }
+
+  const root = ReactDOM.createRoot(document.getElementById('root'));
+  root.render(<App />);
+</script>
+</body>
+</html>

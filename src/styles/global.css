@@ -8,13 +8,19 @@
 }
 
 :root {
+  /* 分层色彩系统 - 浅色主题 */
+  --bg-app: #F5F5F4;        /* 最底层 */
+  --bg-sidebar: #FAFAF9;    /* 侧边栏 */
+  --bg-editor: #FFFFFF;     /* 编辑区 */
+  --bg-preview: #FCFCFC;    /* 预览区 */
+
   /* 浅色主题 - 温暖清爽 */
   --bg-base: #FAFAF9;
   --bg-surface: rgba(255, 255, 255, 0.85);
   --bg-surface-solid: rgba(255, 255, 255, 0.95);
   --bg-hover: rgba(0, 0, 0, 0.04);
   --bg-active: rgba(59, 130, 246, 0.12);
-  --border-color: rgba(0, 0, 0, 0.08);
+  --border-color: rgba(0, 0, 0, 0.06);
   --text-primary: #18181B;
   --text-secondary: #71717A;
   --text-tertiary: #A1A1AA;
@@ -73,10 +79,7 @@ body {
   font-family: var(--font-ui);
   overflow: hidden;
   height: 100vh;
-  background:
-    radial-gradient(1200px 600px at 15% 0%, rgba(0, 103, 192, 0.08), transparent 60%),
-    radial-gradient(900px 500px at 100% 100%, rgba(138, 43, 226, 0.06), transparent 55%),
-    var(--mica-bg);
+  background: var(--bg-app);
   color: var(--text-primary);
   font-size: var(--text-base);
   line-height: 1.5;
@@ -85,13 +88,19 @@ body {
 }
 
 body.dark {
+  /* 分层色彩系统 - 深色主题 */
+  --bg-app: #171717;        /* 最底层 */
+  --bg-sidebar: #1C1C1C;    /* 侧边栏 */
+  --bg-editor: #1F1F1F;     /* 编辑区 */
+  --bg-preview: #1E1E1E;    /* 预览区 */
+
   /* 深色主题 - 现代深灰 */
   --bg-base: #191919;
   --bg-surface: rgba(32, 32, 32, 0.9);
   --bg-surface-solid: rgba(38, 38, 38, 0.95);
   --bg-hover: rgba(255, 255, 255, 0.06);
   --bg-active: rgba(96, 165, 250, 0.15);
-  --border-color: rgba(255, 255, 255, 0.08);
+  --border-color: rgba(255, 255, 255, 0.06);
   --text-primary: #F5F5F5;
   --text-secondary: #A3A3A3;
   --text-tertiary: #737373;
@@ -115,10 +124,7 @@ body.dark {
   --accent-tint: rgba(96, 205, 255, 0.10);
   --accent-tint-strong: rgba(96, 205, 255, 0.20);
 
-  background:
-    radial-gradient(1200px 600px at 15% 0%, rgba(96, 205, 255, 0.08), transparent 60%),
-    radial-gradient(900px 500px at 100% 100%, rgba(138, 43, 226, 0.08), transparent 55%),
-    var(--mica-bg);
+  background: var(--bg-app);
 }
 
 #root {
@@ -192,9 +198,9 @@ body.dark {
   padding: 46px 16px 16px;
   border-radius: 10px;
   overflow: auto;
-  background-color: var(--mac-bg, #282c34) !important;
+  background-color: var(--mac-bg, #2B2D30) !important;
   border: 1px solid var(--mac-border, rgba(0,0,0,0.2)) !important;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.15) !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.04) !important;
   position: relative;
   color: var(--mac-text, #abb2bf) !important;
 }
@@ -203,14 +209,15 @@ body.dark {
 .markdown-preview pre::before {
   content: '';
   position: absolute;
-  top: 15px;
-  left: 15px;
-  width: 11px;
-  height: 11px;
+  top: 14px;
+  left: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: #ff5f56;
-  box-shadow: 19px 0 0 #ffbd2e, 38px 0 0 #27c93f;
+  box-shadow: 20px 0 0 #ffbd2e, 40px 0 0 #27c93f;
   z-index: 2;
+  opacity: 0.85;
 }
 
 /* �������������� */
@@ -272,14 +279,17 @@ body.dark {
 
 .markdown-preview a {
   color: var(--accent);
-  text-decoration: none;
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(0, 103, 192, 0.35);
   font-weight: 500;
-  transition: color var(--duration-fast) var(--ease-out);
+  transition: color var(--duration-fast) var(--ease-out), text-decoration-color var(--duration-fast) var(--ease-out);
 }
 
 .markdown-preview a:hover {
   color: var(--accent-hover);
-  text-decoration: underline;
+  text-decoration-color: var(--accent-hover);
 }
 
 .markdown-preview table {
@@ -355,12 +365,16 @@ button:focus-visible {
 /* Fluent 风格的自适应滚动�?*/
 * {
   scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+*:hover {
   scrollbar-color: var(--text-tertiary) transparent;
 }
 
 *::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+  width: 8px;
+  height: 8px;
   background: transparent;
 }
 
@@ -369,15 +383,19 @@ button:focus-visible {
 }
 
 *::-webkit-scrollbar-thumb {
-  background-color: var(--text-tertiary);
-  border: 4px solid transparent;
+  background-color: transparent;
+  border: 2px solid transparent;
   background-clip: padding-box;
   border-radius: 8px;
-  opacity: 0.4;
+  transition: background-color 0.2s;
+}
+
+*:hover::-webkit-scrollbar-thumb {
+  background-color: var(--text-tertiary);
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  border: 2px solid transparent;
+  border: 1px solid transparent;
   background-color: var(--text-secondary);
 }
 
@@ -1202,23 +1220,23 @@ body.dark [data-content-theme] .sidebar button:hover {
   border-radius: 10px !important;
   overflow: auto;
   position: relative;
-  /* ע��ÿ������΢�����ı������Ҳ�������˵� One Dark */
-  background-color: var(--mac-bg, #282c34) !important;
+  background-color: var(--mac-bg, #2B2D30) !important;
   border: 1px solid var(--mac-border, rgba(0,0,0,0.2)) !important;
-  box-shadow: var(--mac-shadow, 0 10px 30px rgba(0,0,0,0.15)) !important;
+  box-shadow: var(--mac-shadow, 0 10px 30px rgba(0,0,0,0.12)), inset 0 1px 0 rgba(255,255,255,0.04) !important;
 }
 
 [data-content-theme] .markdown-preview pre::before {
   content: '';
   position: absolute;
-  top: 15px;
-  left: 15px;
-  width: 11px;
-  height: 11px;
+  top: 14px;
+  left: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: var(--mac-dot-close, #ff5f56);
-  box-shadow: 19px 0 0 var(--mac-dot-min, #ffbd2e), 38px 0 0 var(--mac-dot-max, #27c93f);
+  box-shadow: 20px 0 0 var(--mac-dot-min, #ffbd2e), 40px 0 0 var(--mac-dot-max, #27c93f);
   z-index: 2;
+  opacity: 0.85;
 }
 
 [data-content-theme] .markdown-preview pre::after {
