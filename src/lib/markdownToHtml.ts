@@ -23,13 +23,29 @@ function remarkMermaid() {
   };
 }
 
-function remarkHeadingLines() {
+function remarkBlockLines() {
+  const BLOCK_TYPES = new Set([
+    'heading',
+    'paragraph',
+    'blockquote',
+    'list',
+    'listItem',
+    'code',
+    'table',
+    'thematicBreak',
+  ]);
   return (tree: any) => {
-    visit(tree, 'heading', (node: any) => {
-      if (node.position) {
-        node.data = node.data || {};
-        node.data.hProperties = node.data.hProperties || {};
-        node.data.hProperties.dataLine = node.position.start.line;
+    visit(tree, (node: any) => {
+      if (!BLOCK_TYPES.has(node.type)) return;
+      if (!node.position) return;
+      node.data = node.data || {};
+      node.data.hProperties = node.data.hProperties || {};
+      const line = node.position.start.line;
+      if (node.data.hProperties['data-line'] === undefined) {
+        node.data.hProperties['data-line'] = String(line);
+      }
+      if (node.data.hProperties.dataLine === undefined) {
+        node.data.hProperties.dataLine = String(line);
       }
     });
   };
@@ -135,7 +151,7 @@ export function markdownToHtml(content: string): string {
     .use(remarkGfm)
     .use(remarkMath)
     .use(remarkMark)
-    .use(remarkHeadingLines)
+    .use(remarkBlockLines)
     .use(remarkMermaid)
     .use(remarkRehype, { allowDangerousHtml: true })
     .use(rehypeHighlight as any, { ignoreMissing: true })

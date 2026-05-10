@@ -129,6 +129,8 @@ export const menuData: MenuSection = {
     { label: '开发者工具', shortcut: 'Shift+F12', action: 'devTools' },
   ],
   '主题': [
+    { label: 'Classic（默认）', action: 'themeClassic' },
+    { type: 'separator' },
     { label: 'Github', action: 'themeGithub' },
     { label: 'Newsprint', action: 'themeNewsprint' },
     { label: 'Night', action: 'themeNight' },

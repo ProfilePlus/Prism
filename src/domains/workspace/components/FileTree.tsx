@@ -282,13 +282,11 @@ export function FileTree({ nodes, activePath, onFileClick }: FileTreeProps) {
         title={node.path}
         style={{
           padding: '8px 14px',
-          paddingLeft: isActive ? '11px' : '14px',
           margin: '2px 8px',
           marginLeft: fileTreeMode === 'tree' ? `${8 + depth * 14}px` : '8px',
           cursor: 'pointer',
           borderRadius: 'var(--radius-md)',
           background: isActive ? 'var(--bg-hover)' : 'transparent',
-          borderLeft: isActive ? '3px solid var(--accent)' : '3px solid transparent',
           boxShadow: 'none',
           transform: 'scale(1)',
           position: 'relative',

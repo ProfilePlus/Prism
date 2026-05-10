@@ -52,6 +52,7 @@ import { SearchParams } from './SearchPanel';
 export interface EditorPaneHandle {
   jumpToLine: (line: number) => void;
   setScrollRatio: (ratio: number) => void;
+  scrollToLine: (line: number) => void;
   execSearch?: (action: 'next' | 'prev' | 'all' | 'replace' | 'replaceAll', params: SearchParams) => void;
 }
 
@@ -60,6 +61,7 @@ interface EditorPaneProps {
   onChange: (content: string) => void;
   onCursorChange?: (cursor: { line: number; column: number }) => void;
   onScrollRatioChange?: (ratio: number) => void;
+  onTopLineChange?: (line: number) => void;
 }
 
 function getCursorPosition(view: EditorView) {
@@ -73,7 +75,7 @@ function getCursorPosition(view: EditorView) {
 
 export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
   function EditorPane(
-    { content, onChange, onCursorChange, onScrollRatioChange },
+    { content, onChange, onCursorChange, onScrollRatioChange, onTopLineChange },
     ref,
   ) {
     const editorRef = useRef<HTMLDivElement>(null);
@@ -81,6 +83,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     const onChangeRef = useRef(onChange);
     const onCursorChangeRef = useRef(onCursorChange);
     const onScrollRatioChangeRef = useRef(onScrollRatioChange);
+    const onTopLineChangeRef = useRef(onTopLineChange);
     const theme = useSettingsStore((s) => s.theme);
     const showLineNumbers = useSettingsStore((s) => s.showLineNumbers);
     const typewriterMode = useWorkspaceStore((s) => s.typewriterMode);
@@ -106,7 +109,32 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       onScrollRatioChangeRef.current = onScrollRatioChange;
     }, [onScrollRatioChange]);
 
+    useEffect(() => {
+      onTopLineChangeRef.current = onTopLineChange;
+    }, [onTopLineChange]);
+
     const isProgrammaticScrollRef = useRef(false);
+    const lastProgrammaticAtRef = useRef(0);
+    const scrollAnimRef = useRef<{ raf: number | null; target: number }>({ raf: null, target: 0 });
+
+    const smoothScrollTo = (scroller: HTMLElement, target: number) => {
+      scrollAnimRef.current.target = target;
+      if (scrollAnimRef.current.raf !== null) return;
+      const step = () => {
+        const goal = scrollAnimRef.current.target;
+        const current = scroller.scrollTop;
+        const delta = goal - current;
+        lastProgrammaticAtRef.current = Date.now();
+        if (Math.abs(delta) < 0.5) {
+          scroller.scrollTop = goal;
+          scrollAnimRef.current.raf = null;
+          return;
+        }
+        scroller.scrollTop = current + delta * 0.22;
+        scrollAnimRef.current.raf = requestAnimationFrame(step);
+      };
+      scrollAnimRef.current.raf = requestAnimationFrame(step);
+    };
 
     useImperativeHandle(ref, () => ({
       jumpToLine: (lineNumber: number) => {
@@ -142,8 +170,20 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         const maxScroll = scroller.scrollHeight - scroller.clientHeight;
         const targetScroll = Math.max(0, ratio) * maxScroll;
         if (Math.abs(scroller.scrollTop - targetScroll) > 1) {
-          isProgrammaticScrollRef.current = true;
-          scroller.scrollTop = targetScroll;
+          smoothScrollTo(scroller, targetScroll);
+        }
+      },
+      scrollToLine: (lineNumber: number) => {
+        const view = viewRef.current;
+        if (!view) return;
+        const targetLine = Math.max(1, Math.min(lineNumber, view.state.doc.lines));
+        const line = view.state.doc.line(targetLine);
+        const block = view.lineBlockAt(line.from);
+        const scroller = view.scrollDOM;
+        const editorTop = view.documentTop;
+        const targetScroll = Math.max(0, block.top - editorTop);
+        if (Math.abs(scroller.scrollTop - targetScroll) > 1) {
+          smoothScrollTo(scroller, targetScroll);
         }
       },
       execSearch: (action, params) => {
@@ -472,7 +512,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             '.cm-line-flash': { animation: 'cm-flash 2s cubic-bezier(0.16, 1, 0.3, 1)' },
             '.cm-gutters': { display: 'none' },
             '.cm-activeLineGutter': { backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' },
-            '.cm-activeLine': { backgroundColor: 'var(--bg-hover)', borderLeft: '2px solid var(--accent)', marginLeft: '-2px' },
+            '.cm-activeLine': { backgroundColor: 'var(--c-chalk, var(--bg-hover))' },
             '.cm-cursor': { borderLeftColor: 'var(--accent)', borderLeftWidth: '2px' },
             '&.cm-focused': { outline: 'none' },
             '.cm-selectionBackground': { backgroundColor: 'var(--accent-tint-strong) !important' },
@@ -529,10 +569,25 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
 
       view.dom.addEventListener('mouseup', handleMouseUp);
       const handleScroll = () => {
+        // 程序化滚动期间静音（避免回传形成反馈环）
+        if (Date.now() - lastProgrammaticAtRef.current < 160) return;
         if (isProgrammaticScrollRef.current) { isProgrammaticScrollRef.current = false; return; }
         const scroller = view.scrollDOM;
         const maxScroll = scroller.scrollHeight - scroller.clientHeight;
         onScrollRatioChangeRef.current?.(maxScroll > 0 ? scroller.scrollTop / maxScroll : 0);
+
+        if (onTopLineChangeRef.current) {
+          const rect = scroller.getBoundingClientRect();
+          const pos = view.posAtCoords({ x: rect.left + 10, y: rect.top + 4 }, false);
+          let topLine = 1;
+          if (pos !== null) {
+            topLine = view.state.doc.lineAt(pos).number;
+          } else {
+            const block = view.elementAtHeight(scroller.scrollTop + view.documentTop);
+            topLine = view.state.doc.lineAt(block.from).number;
+          }
+          onTopLineChangeRef.current(topLine);
+        }
       };
       view.scrollDOM.addEventListener('scroll', handleScroll);
 

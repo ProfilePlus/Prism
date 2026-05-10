@@ -122,12 +122,6 @@ export function PreviewPane({ content }: PreviewPaneProps) {
       <div
         ref={containerRef}
         className="markdown-preview"
-        style={{
-          padding: '48px clamp(32px, 5vw, 80px)',
-          maxWidth: '72ch',
-          margin: '0 auto',
-          width: '100%',
-        }}
         dangerouslySetInnerHTML={{ __html: html }}
       />
 

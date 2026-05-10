@@ -223,6 +223,12 @@ body.typewriter-mode .cm-editor {
   color: var(--c-void);
   font-size: 17px;
   line-height: 1.65;
+  padding: 48px clamp(32px, 5vw, 80px);
+  max-width: clamp(640px, 61.8vw, 1200px);
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  transition: background-color 0.3s var(--ease-out), color 0.3s var(--ease-out), font-family 0.3s var(--ease-out);
 }
 
 .markdown-preview h1,
@@ -320,10 +326,10 @@ body.dark .markdown-preview code {
 
 .markdown-preview blockquote {
   margin: 0 0 24px;
-  padding: 14px 20px 14px 22px;
-  border-left: 3px solid var(--c-void);
+  padding: 14px 20px;
+  border: 0;
   background: var(--c-chalk);
-  border-radius: 0 var(--r-card) var(--r-card) 0;
+  border-radius: var(--r-card);
   color: var(--c-graphite);
   font-style: italic;
 }
@@ -415,42 +421,15 @@ body.dark .markdown-preview kbd {
 .cm-searchMatch { background-color: rgba(255, 224, 102, 0.5); border-radius: 2px; }
 .cm-searchMatch-selected { background-color: var(--c-void) !important; color: var(--c-canvas) !important; }
 
-/* ============================================================
-   内容主题骨架（Batch 5 再逐套精修；当前仅保留切换机制）
-   原设计：[data-content-theme] 注入 --preview-bg / --preview-text /
-   --preview-font 供预览区使用。Batch 1 只留声明位，不堆实现。
-   ============================================================ */
+/* 内容主题的注入入口：预览区依照 --preview-* token 渲染。
+   具体主题定义见文件底部"内容主题（Batch 5 精修）"一节。 */
 [data-content-theme] .markdown-preview {
   background-color: var(--preview-bg, transparent);
   color: var(--preview-text, var(--c-void));
   font-family: var(--preview-font, var(--font-sans));
-  transition: background-color 0.3s var(--ease-out), color 0.3s var(--ease-out);
-}
-
-[data-content-theme='newsprint'] {
-  --preview-bg: var(--c-canvas);
-  --preview-text: var(--c-void);
-  --preview-font: var(--font-sans);
-}
-[data-content-theme='night'] {
-  --preview-bg: var(--c-canvas);
-  --preview-text: var(--c-void);
-  --preview-font: var(--font-sans);
-}
-[data-content-theme='github'] {
-  --preview-bg: var(--c-canvas);
-  --preview-text: var(--c-void);
-  --preview-font: var(--font-sans);
-}
-[data-content-theme='pixyll'] {
-  --preview-bg: var(--c-canvas);
-  --preview-text: var(--c-void);
-  --preview-font: var(--font-sans);
-}
-[data-content-theme='whitey'] {
-  --preview-bg: var(--c-canvas);
-  --preview-text: var(--c-void);
-  --preview-font: var(--font-sans);
+  font-size: var(--preview-font-size, 17px);
+  line-height: var(--preview-line-height, 1.65);
+  max-width: var(--preview-max-width, clamp(640px, 61.8vw, 1200px));
 }
 
 /* ============================================================
@@ -927,109 +906,571 @@ body.dark .markdown-preview .code-header {
   0% { background: rgba(255, 224, 102, 0.5); }
   100% { background: transparent; }
 }
-
 /* ============================================================
-   内容主题（Batch 5 精修 —— 五套）
-   - Newsprint：OpenAI 默认，纯白 + 近黑，无装饰
-   - Night：反相（黑画布）
-   - Github：浅灰代码块，仍保持黑白主色
-   - Pixyll：衬线标题，更宽的行高
-   - Whitey：强化超大标题与硬底线
+   内容主题（基于 VoltAgent/awesome-design-md 官方 DESIGN.md）
+   每套主题 **接管整屏**：
+   - 重定义 --c-void / --c-canvas / --c-fog / --c-chalk / --c-graphite /
+     --c-ash 等核心 token，外壳 titlebar / menubar / sidebar / statusbar
+     会自动跟着变色。
+   - 同时定义预览区专属的 --preview-* token 实现品牌特色。
    ============================================================ */
 
-/* Newsprint —— 默认就是原型本身 */
-[data-content-theme='newsprint'] {
+/* ---- 0. themeClassic → OpenAI 极简（默认） ---- */
+/* 不改任何 token，用 :root / body.dark 的原生值。显式写出仅为清晰。 */
+html[data-content-theme='classic'] {
   --preview-bg: var(--c-canvas);
   --preview-text: var(--c-void);
   --preview-font: var(--font-sans);
+  --preview-font-size: 17px;
+  --preview-line-height: 1.65;
+  --preview-max-width: clamp(640px, 61.8vw, 1200px);
 }
 
-/* Night —— 深色底的预览（与 body.dark 解耦，仅改预览区） */
-[data-content-theme='night'] {
-  --preview-bg: #0a0a0a;
-  --preview-text: #f5f5f5;
-  --preview-font: var(--font-sans);
-}
-[data-content-theme='night'] .markdown-preview h2 { border-top-color: #1f1f1f; }
-[data-content-theme='night'] .markdown-preview blockquote {
-  background: rgba(255, 255, 255, 0.04);
-  border-left-color: #f5f5f5;
-  color: #a0a0a0;
-}
-[data-content-theme='night'] .markdown-preview code {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
-  color: #f5f5f5;
-}
-[data-content-theme='night'] .markdown-preview pre.code-block { background: rgba(255, 255, 255, 0.03); border-color: rgba(255, 255, 255, 0.1); }
-[data-content-theme='night'] .markdown-preview .code-header { background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.08); }
-[data-content-theme='night'] .markdown-preview thead th,
-[data-content-theme='night'] .markdown-preview tbody td { color: #f5f5f5; }
-[data-content-theme='night'] .markdown-preview table { border-color: #f5f5f5; }
+/* ---- 1. themeNewsprint → The Verge（深色磁带 + 去饱和 mint + 紫罗兰） ---- */
+/* 遵循 Material Design 深色规范：基准表面 #1a1a1a（非纯黑），文字 rgba(255,255,255,0.87），强调色降饱和避免视觉震颤 */
+html[data-content-theme='newsprint'] {
+  --c-void: rgba(255, 255, 255, 0.92);
+  --c-canvas: #1a1a1a;
+  --c-fog: #2a2a2a;
+  --c-chalk: #242424;
+  --c-graphite: rgba(255, 255, 255, 0.72);
+  --c-ash: rgba(255, 255, 255, 0.48);
+  --c-hair: rgba(255, 255, 255, 0.08);
+  --c-hover: rgba(124, 212, 185, 0.08);
+  --c-selection: rgba(124, 212, 185, 0.18);
 
-/* Github —— 浅灰代码块，正文保持近黑 */
-[data-content-theme='github'] {
-  --preview-bg: var(--c-canvas);
-  --preview-text: #1f2328;
-  --preview-font: var(--font-sans);
+  --preview-bg: #1a1a1a;
+  --preview-text: rgba(255, 255, 255, 0.82);
+  --preview-font: 'Inter', sans-serif;
+  --preview-font-size: 17px;
+  --preview-line-height: 1.65;
+  --preview-max-width: clamp(640px, 61.8vw, 1200px);
 }
-[data-content-theme='github'] .markdown-preview pre.code-block {
-  background: #f6f8fa;
-  border-color: #d0d7de;
+html[data-content-theme='newsprint'] .markdown-preview h1,
+html[data-content-theme='newsprint'] .markdown-preview h2,
+html[data-content-theme='newsprint'] .markdown-preview h3 {
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 900;
+  letter-spacing: -0.02em;
 }
-[data-content-theme='github'] .markdown-preview .code-header {
-  background: #eaeef2;
-  border-color: #d0d7de;
+html[data-content-theme='newsprint'] .markdown-preview h1 {
+  font-size: 60px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
 }
-[data-content-theme='github'] .markdown-preview code {
-  background: #eaeef2;
-  border-color: #d0d7de;
-  color: #1f2328;
+html[data-content-theme='newsprint'] .markdown-preview h2 {
+  font-size: 26px;
+  border: 0;
+  border-top: 1px solid rgba(124, 212, 185, 0.4);
+  padding-top: 16px;
+  margin-top: 48px;
+  text-transform: uppercase;
 }
-[data-content-theme='github'] .markdown-preview h1,
-[data-content-theme='github'] .markdown-preview h2 {
-  border-bottom: 1px solid #d0d7de;
-  padding-bottom: 0.3em;
-  border-top: 0;
-  margin-top: 32px;
+html[data-content-theme='newsprint'] .markdown-preview h3 { font-size: 20px; }
+html[data-content-theme='newsprint'] .markdown-preview h5,
+html[data-content-theme='newsprint'] .markdown-preview h6 {
+  color: #7cd4b9;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.1em;
+}
+html[data-content-theme='newsprint'] .markdown-preview p { color: rgba(255, 255, 255, 0.78); }
+html[data-content-theme='newsprint'] .markdown-preview a {
+  color: #7cd4b9;
+  text-decoration-color: rgba(124, 212, 185, 0.45);
+}
+html[data-content-theme='newsprint'] .markdown-preview a:hover {
+  background: rgba(124, 212, 185, 0.1);
+  color: #9be0ca;
+}
+html[data-content-theme='newsprint'] .markdown-preview strong {
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 800;
+}
+html[data-content-theme='newsprint'] .markdown-preview blockquote {
+  border: 1px solid rgba(124, 212, 185, 0.35);
+  border-radius: 12px;
+  background: rgba(124, 212, 185, 0.05);
+  color: rgba(255, 255, 255, 0.8);
+  font-style: normal;
+  padding: 16px 20px;
+}
+html[data-content-theme='newsprint'] .markdown-preview code {
+  background: #2a2a2a;
+  border: 1px solid rgba(124, 212, 185, 0.22);
+  color: #9be0ca;
+  font-family: 'JetBrains Mono', monospace;
+}
+html[data-content-theme='newsprint'] .markdown-preview pre.code-block {
+  background: #242424;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+}
+html[data-content-theme='newsprint'] .markdown-preview .code-header {
+  background: #1a1a1a;
+  border-color: #2a2a2a;
+  color: #7cd4b9;
+  font-family: 'JetBrains Mono', monospace;
+}
+html[data-content-theme='newsprint'] .markdown-preview pre.code-block > code { color: rgba(255, 255, 255, 0.82); }
+html[data-content-theme='newsprint'] .markdown-preview thead th {
+  color: #7cd4b9;
+  border-bottom-color: rgba(124, 212, 185, 0.4);
+}
+html[data-content-theme='newsprint'] .markdown-preview tbody td {
+  color: rgba(255, 255, 255, 0.8);
+  border-bottom-color: #2a2a2a;
+}
+html[data-content-theme='newsprint'] .markdown-preview table {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+html[data-content-theme='newsprint'] .markdown-preview hr {
+  background: rgba(149, 117, 205, 0.6);
+  mask-image: none;
+  -webkit-mask-image: none;
+  height: 2px;
+  max-width: 100%;
+}
+html[data-content-theme='newsprint'] .markdown-preview mark {
+  background: rgba(149, 117, 205, 0.3);
+  color: rgba(255, 255, 255, 0.92);
+  padding: 0 4px;
+  border-radius: 3px;
 }
 
-/* Pixyll —— 衬线 + 宽松行高 + 居中标题 */
-[data-content-theme='pixyll'] {
-  --preview-bg: var(--c-canvas);
-  --preview-text: #333333;
-  --preview-font: Georgia, 'Merriweather', serif;
-}
-[data-content-theme='pixyll'] .markdown-preview { line-height: 1.9; }
-[data-content-theme='pixyll'] .markdown-preview h1,
-[data-content-theme='pixyll'] .markdown-preview h2 {
-  text-align: center;
-  border-top: 0;
-  margin-top: 2.5em;
-}
+/* ---- 2. themeNight → Linear（深空灰 + 去饱和薰衣草） ---- */
+/* Material Design 深色表面：基准 #141517（温暖 off-black），抬升层 #1c1d20/#242528 */
+/* 文字遵循 87%/60%/38% 透明度阶梯，强调色降饱和到 #7c85d6 以避免视觉震颤 */
+html[data-content-theme='night'] {
+  --c-void: rgba(232, 233, 235, 0.95);
+  --c-canvas: #141517;
+  --c-fog: #2a2b2f;
+  --c-chalk: #1c1d20;
+  --c-graphite: rgba(232, 233, 235, 0.78);
+  --c-ash: rgba(232, 233, 235, 0.5);
+  --c-hair: rgba(255, 255, 255, 0.06);
+  --c-hover: rgba(124, 133, 214, 0.1);
+  --c-selection: rgba(124, 133, 214, 0.2);
 
-/* Whitey —— 强化巨标题 + 硬边分隔线 */
-[data-content-theme='whitey'] {
-  --preview-bg: var(--c-canvas);
-  --preview-text: var(--c-void);
-  --preview-font: var(--font-sans);
+  --preview-bg: #141517;
+  --preview-text: rgba(232, 233, 235, 0.82);
+  --preview-font: -apple-system, 'SF Pro Display', 'Inter', sans-serif;
+  --preview-font-size: 16px;
+  --preview-line-height: 1.7;
+  --preview-max-width: clamp(640px, 61.8vw, 1200px);
 }
-[data-content-theme='whitey'] .markdown-preview h1 {
-  font-size: 64px;
-  letter-spacing: -2px;
+html[data-content-theme='night'] .markdown-preview h1,
+html[data-content-theme='night'] .markdown-preview h2,
+html[data-content-theme='night'] .markdown-preview h3,
+html[data-content-theme='night'] .markdown-preview h4 {
+  color: rgba(232, 233, 235, 0.92);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+html[data-content-theme='night'] .markdown-preview h1 {
+  font-size: 48px;
   font-weight: 700;
-  text-transform: lowercase;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
 }
-[data-content-theme='whitey'] .markdown-preview h2 {
-  border-top: 4px solid var(--c-void);
-  padding-top: 0.5em;
-  margin-top: 2em;
+html[data-content-theme='night'] .markdown-preview h2 {
+  font-size: 26px;
+  border-top: 1px solid #2a2b2f;
+  padding-top: 20px;
+  margin-top: 52px;
 }
-[data-content-theme='whitey'] .markdown-preview pre.code-block {
-  border: 2px solid var(--c-void);
+html[data-content-theme='night'] .markdown-preview h5 { color: rgba(232, 233, 235, 0.55); }
+html[data-content-theme='night'] .markdown-preview h6 { color: rgba(232, 233, 235, 0.4); }
+html[data-content-theme='night'] .markdown-preview p { color: rgba(232, 233, 235, 0.8); }
+html[data-content-theme='night'] .markdown-preview a {
+  color: #9ea6e0;
+  text-decoration-color: rgba(158, 166, 224, 0.4);
+}
+html[data-content-theme='night'] .markdown-preview a:hover {
+  color: #b4bae6;
+  background: rgba(124, 133, 214, 0.1);
+}
+html[data-content-theme='night'] .markdown-preview strong { color: rgba(232, 233, 235, 0.95); }
+html[data-content-theme='night'] .markdown-preview blockquote {
+  background: #1c1d20;
+  border-left: 3px solid #7c85d6;
+  color: rgba(232, 233, 235, 0.7);
+  border-radius: 0 6px 6px 0;
+  font-style: normal;
+}
+html[data-content-theme='night'] .markdown-preview code {
+  background: #242528;
+  border: 1px solid #2a2b2f;
+  color: rgba(232, 233, 235, 0.9);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.88em;
+}
+html[data-content-theme='night'] .markdown-preview pre.code-block {
+  background: #1c1d20;
+  border: 1px solid #2a2b2f;
+  border-radius: 8px;
+  box-shadow: none;
+}
+html[data-content-theme='night'] .markdown-preview .code-header {
+  background: #242528;
+  border-color: #2a2b2f;
+  color: rgba(232, 233, 235, 0.55);
+}
+html[data-content-theme='night'] .markdown-preview pre.code-block > code { color: rgba(232, 233, 235, 0.82); }
+html[data-content-theme='night'] .markdown-preview table { border-color: #2a2b2f; }
+html[data-content-theme='night'] .markdown-preview thead th {
+  color: rgba(232, 233, 235, 0.92);
+  border-bottom-color: #35363a;
+}
+html[data-content-theme='night'] .markdown-preview tbody td {
+  color: rgba(232, 233, 235, 0.8);
+  border-bottom-color: #2a2b2f;
+}
+html[data-content-theme='night'] .markdown-preview hr {
+  background: #2a2b2f;
+  mask-image: none;
+  -webkit-mask-image: none;
+  height: 1px;
+  max-width: 100%;
+}
+
+/* ---- 3. themeGithub → Notion（浅底 + 紫色强调） ---- */
+html[data-content-theme='github'] {
+  --c-void: #1c1f23;
+  --c-canvas: #ffffff;
+  --c-fog: #e6e0f5;
+  --c-chalk: #f8f5e8;
+  --c-graphite: #4a4a4a;
+  --c-ash: #8a8a8a;
+  --c-hair: rgba(86, 69, 212, 0.06);
+  --c-hover: rgba(86, 69, 212, 0.06);
+  --c-selection: rgba(86, 69, 212, 0.14);
+
+  --preview-bg: #ffffff;
+  --preview-text: #1c1f23;
+  --preview-font: 'Inter', -apple-system, sans-serif;
+  --preview-font-size: 16px;
+  --preview-line-height: 1.6;
+  --preview-max-width: clamp(640px, 61.8vw, 1200px);
+}
+html[data-content-theme='github'] .markdown-preview h1 {
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  border: 0;
+  padding: 24px 28px;
+  margin: 0 0 32px;
+  background: #0a1530;
+  color: #ffffff;
+  border-radius: 12px;
+  text-align: center;
+}
+html[data-content-theme='github'] .markdown-preview h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0a1530;
+  border: 0;
+  padding: 0;
+  margin: 48px 0 16px;
+}
+html[data-content-theme='github'] .markdown-preview h3 { color: #1a2a52; font-size: 18px; }
+html[data-content-theme='github'] .markdown-preview a {
+  color: #5645d4;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(86, 69, 212, 0.3);
+}
+html[data-content-theme='github'] .markdown-preview a:hover {
+  background: transparent;
+  border-bottom-color: #5645d4;
+}
+html[data-content-theme='github'] .markdown-preview strong { color: #1c1f23; font-weight: 600; }
+html[data-content-theme='github'] .markdown-preview blockquote {
+  background: #f8f5e8;
+  border-left: 3px solid #523410;
+  color: #523410;
+  font-style: normal;
+  padding: 12px 20px;
+  border-radius: 0 6px 6px 0;
+}
+html[data-content-theme='github'] .markdown-preview code {
+  background: #e6e0f5;
+  border: 0;
+  color: #5645d4;
+  padding: 2px 6px;
+  font-size: 0.88em;
+  font-family: 'JetBrains Mono', monospace;
+}
+html[data-content-theme='github'] .markdown-preview pre.code-block {
+  background: #fbfaf5;
+  border: 1px solid #e6e0f5;
+  border-radius: 8px;
+  box-shadow: none;
+}
+html[data-content-theme='github'] .markdown-preview .code-header {
+  background: #e6e0f5;
+  border-color: #d6b6f6;
+  color: #391c57;
+}
+html[data-content-theme='github'] .markdown-preview pre.code-block > code { color: #1c1f23; }
+html[data-content-theme='github'] .markdown-preview thead th {
+  background: #0a1530;
+  color: #ffffff;
+  border-bottom: 0;
+}
+html[data-content-theme='github'] .markdown-preview tbody td { border-bottom-color: #e6e0f5; }
+html[data-content-theme='github'] .markdown-preview hr {
+  background: #e6e0f5;
+  mask-image: none;
+  -webkit-mask-image: none;
+  height: 2px;
+  max-width: 100%;
+  border-radius: 2px;
+}
+html[data-content-theme='github'] .markdown-preview mark {
+  background: #f5d75e;
+  color: #523410;
+  padding: 0 4px;
+}
+
+/* ---- 4. themePixyll → Medium（衬线长文） ---- */
+html[data-content-theme='pixyll'] {
+  --c-void: #242424;
+  --c-canvas: #ffffff;
+  --c-fog: #e5e5e5;
+  --c-chalk: #f7f7f7;
+  --c-graphite: #555555;
+  --c-ash: #8a8a8a;
+  --c-hair: rgba(0, 0, 0, 0.06);
+  --c-hover: rgba(0, 0, 0, 0.03);
+  --c-selection: rgba(0, 0, 0, 0.08);
+
+  --preview-bg: #ffffff;
+  --preview-text: #242424;
+  --preview-font: 'Charter', Georgia, 'Source Serif Pro', serif;
+  --preview-font-size: 20px;
+  --preview-line-height: 1.8;
+  --preview-max-width: 68ch;
+}
+html[data-content-theme='pixyll'] .markdown-preview {
+  letter-spacing: -0.003em;
+}
+html[data-content-theme='pixyll'] .markdown-preview h1 {
+  font-family: 'Charter', Georgia, serif;
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.022em;
+  color: #242424;
+  text-align: left;
+  border: 0;
+  margin: 0 0 16px;
+}
+html[data-content-theme='pixyll'] .markdown-preview h2 {
+  font-family: 'Charter', Georgia, serif;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.012em;
+  color: #242424;
+  text-align: left;
+  border: 0;
+  padding: 0;
+  margin: 56px 0 16px;
+}
+html[data-content-theme='pixyll'] .markdown-preview h3 {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 40px 0 12px;
+}
+html[data-content-theme='pixyll'] .markdown-preview p {
+  color: #242424;
+  margin-bottom: 28px;
+}
+html[data-content-theme='pixyll'] .markdown-preview a {
+  color: #242424;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  text-decoration-color: #757575;
+}
+html[data-content-theme='pixyll'] .markdown-preview a:hover {
+  background: transparent;
+  text-decoration-color: #242424;
+}
+html[data-content-theme='pixyll'] .markdown-preview strong { font-weight: 700; color: #242424; }
+html[data-content-theme='pixyll'] .markdown-preview em { font-style: italic; }
+html[data-content-theme='pixyll'] .markdown-preview blockquote {
+  border: 0;
+  border-left: 3px solid #242424;
+  background: transparent;
+  color: #292929;
+  font-family: 'Charter', Georgia, serif;
+  font-style: italic;
+  font-size: 1.1em;
+  padding: 4px 0 4px 24px;
+  margin: 32px 0;
   border-radius: 0;
 }
+html[data-content-theme='pixyll'] .markdown-preview code {
+  background: #f2f2f2;
+  border: 0;
+  color: #242424;
+  font-size: 0.82em;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 2px 4px;
+}
+html[data-content-theme='pixyll'] .markdown-preview pre.code-block {
+  background: #f7f7f7;
+  border: 0;
+  border-radius: 4px;
+  box-shadow: none;
+}
+html[data-content-theme='pixyll'] .markdown-preview .code-header {
+  background: #eeeeee;
+  border: 0;
+  color: #757575;
+}
+html[data-content-theme='pixyll'] .markdown-preview pre.code-block > code {
+  color: #242424;
+  font-size: 14px;
+  line-height: 1.6;
+}
+html[data-content-theme='pixyll'] .markdown-preview thead th {
+  color: #242424;
+  border-bottom-color: #242424;
+}
+html[data-content-theme='pixyll'] .markdown-preview tbody td { border-bottom-color: #e5e5e5; }
+html[data-content-theme='pixyll'] .markdown-preview hr {
+  mask-image: none;
+  -webkit-mask-image: none;
+  background: transparent;
+  height: auto;
+  border: 0;
+  text-align: center;
+  margin: 56px auto;
+  max-width: 100%;
+  position: relative;
+}
+html[data-content-theme='pixyll'] .markdown-preview hr::before {
+  content: '· · ·';
+  font-size: 28px;
+  letter-spacing: 8px;
+  color: #242424;
+}
 
+/* ---- 5. themeWhitey → Vercel（shadow-as-border 极白） ---- */
+html[data-content-theme='whitey'] {
+  --c-void: #171717;
+  --c-canvas: #ffffff;
+  --c-fog: #ebebeb;
+  --c-chalk: #fafafa;
+  --c-graphite: #4d4d4d;
+  --c-ash: #808080;
+  --c-hair: rgba(0, 0, 0, 0.06);
+  --c-hover: rgba(0, 0, 0, 0.04);
+  --c-selection: rgba(0, 0, 0, 0.08);
 
-
-
+  --preview-bg: #ffffff;
+  --preview-text: #171717;
+  --preview-font: 'Geist', 'Inter', -apple-system, sans-serif;
+  --preview-font-size: 16px;
+  --preview-line-height: 1.55;
+  --preview-max-width: clamp(640px, 61.8vw, 1200px);
+}
+html[data-content-theme='whitey'] .markdown-preview h1,
+html[data-content-theme='whitey'] .markdown-preview h2,
+html[data-content-theme='whitey'] .markdown-preview h3 {
+  color: #171717;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+html[data-content-theme='whitey'] .markdown-preview h1 {
+  font-size: 56px;
+  line-height: 1.05;
+}
+html[data-content-theme='whitey'] .markdown-preview h2 {
+  font-size: 28px;
+  border: 0;
+  padding-top: 0;
+  margin-top: 56px;
+}
+html[data-content-theme='whitey'] .markdown-preview h3 {
+  font-size: 20px;
+  margin-top: 32px;
+}
+html[data-content-theme='whitey'] .markdown-preview p { color: #4d4d4d; }
+html[data-content-theme='whitey'] .markdown-preview a {
+  color: #0072f5;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+html[data-content-theme='whitey'] .markdown-preview a:hover {
+  background: transparent;
+  text-decoration-thickness: 2px;
+}
+html[data-content-theme='whitey'] .markdown-preview strong { color: #171717; font-weight: 600; }
+html[data-content-theme='whitey'] .markdown-preview blockquote {
+  background: #fafafa;
+  border: 0;
+  border-left: 2px solid #ebebeb;
+  color: #4d4d4d;
+  font-style: normal;
+  padding: 12px 20px;
+  border-radius: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+html[data-content-theme='whitey'] .markdown-preview code {
+  background: #fafafa;
+  border: 0;
+  color: #171717;
+  font-family: 'Geist Mono', 'JetBrains Mono', monospace;
+  font-size: 0.88em;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+html[data-content-theme='whitey'] .markdown-preview pre.code-block {
+  background: #fafafa;
+  border: 0;
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.08),
+    0 2px 4px rgba(0, 0, 0, 0.02);
+}
+html[data-content-theme='whitey'] .markdown-preview .code-header {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #ebebeb;
+  color: #666666;
+  font-family: 'Geist Mono', 'JetBrains Mono', monospace;
+}
+html[data-content-theme='whitey'] .markdown-preview pre.code-block > code {
+  color: #171717;
+  font-family: 'Geist Mono', 'JetBrains Mono', monospace;
+}
+html[data-content-theme='whitey'] .markdown-preview table {
+  border: 0;
+  box-shadow: 0 0 0 1px #ebebeb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+html[data-content-theme='whitey'] .markdown-preview thead th {
+  background: #fafafa;
+  color: #171717;
+  border-bottom: 1px solid #ebebeb;
+}
+html[data-content-theme='whitey'] .markdown-preview tbody td { border-bottom-color: #ebebeb; }
+html[data-content-theme='whitey'] .markdown-preview hr {
+  mask-image: none;
+  -webkit-mask-image: none;
+  background: #ebebeb;
+  height: 1px;
+  max-width: 100%;
+  margin: 48px 0;
+}
+html[data-content-theme='whitey'] .markdown-preview kbd {
+  background: #fafafa;
+  border: 0;
+  color: #171717;
+  box-shadow: 0 0 0 1px #ebebeb, 0 1px 2px rgba(0, 0, 0, 0.04);
+  font-family: 'Geist Mono', 'JetBrains Mono', monospace;
+}

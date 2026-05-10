@@ -114,8 +114,8 @@ export async function executeMenuAction(
         return handleZoom('in');
       case 'zoomOut':
         return handleZoom('out');
-      case 'alwaysOnTop':
-        return await handleAlwaysOnTop(context);
+      case 'themeClassic':
+        return context.settingsStore.setContentTheme('classic');
       case 'themeGithub':
         return context.settingsStore.setContentTheme('github');
       case 'themeWhitey':

@@ -103,15 +103,18 @@ async function readFolderChildren(folderPath: string, depth: number): Promise<Fi
     });
 
   const nodes = await Promise.all(
-    visibleEntries.map(async (entry): Promise<FileNode> => {
+    visibleEntries.map(async (entry): Promise<FileNode | null> => {
       const fullPath = joinPath(folderPath, entry.name);
 
       if (entry.isDirectory) {
+        const children = await readFolderChildren(fullPath, depth + 1);
+        // 只保留包含文件的目录（递归后 children 非空）
+        if (children.length === 0) return null;
         return {
           path: fullPath,
           name: entry.name,
           kind: 'directory',
-          children: await readFolderChildren(fullPath, depth + 1),
+          children,
         };
       }
 
@@ -119,7 +122,7 @@ async function readFolderChildren(folderPath: string, depth: number): Promise<Fi
     }),
   );
 
-  return nodes;
+  return nodes.filter((n): n is FileNode => n !== null);
 }
 
 export async function loadFolderTree(folderPath: string): Promise<FileNode[]> {

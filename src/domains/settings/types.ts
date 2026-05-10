@@ -1,10 +1,11 @@
 export type AppearanceMode = 'light' | 'dark' | 'auto';
 
-export type ContentTheme = 
-  | 'github' 
-  | 'whitey' 
-  | 'newsprint' 
-  | 'pixyll' 
+export type ContentTheme =
+  | 'classic'
+  | 'github'
+  | 'whitey'
+  | 'newsprint'
+  | 'pixyll'
   | 'night';
 
 export interface SettingsState {
@@ -24,7 +25,7 @@ export interface SettingsState {
 
 export const DEFAULT_SETTINGS: SettingsState = {
   theme: 'auto',
-  contentTheme: 'github',
+  contentTheme: 'classic',
   fontSize: 16,
   editorFontFamily: 'Cascadia Code, Consolas, monospace',
   autoSaveInterval: 2000,

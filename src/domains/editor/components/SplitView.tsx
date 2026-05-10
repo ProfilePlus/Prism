@@ -14,7 +14,7 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
   function SplitView({ content, viewMode, onChange, onCursorChange }, ref) {
     const previewContainerRef = useRef<HTMLDivElement>(null);
     const editorRef = useRef<EditorPaneHandle>(null);
-    const isProgrammaticScrollRef = useRef(false);
+    const lastSyncAtRef = useRef(0);
     const [searchVisible, setSearchVisible] = useState(false);
 
     useImperativeHandle(ref, () => ({
@@ -36,6 +36,7 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
         }
       },
       setScrollRatio: (ratio) => editorRef.current?.setScrollRatio(ratio),
+      scrollToLine: (line) => editorRef.current?.scrollToLine(line),
       execSearch: (action, params) => editorRef.current?.execSearch?.(action, params),
     }));
 
@@ -72,29 +73,98 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
       }
     };
 
-    const syncPreview = (ratio: number) => {
+    // 预览的锚点 → 编辑器行号：按源码行号索引
+    const collectPreviewAnchors = () => {
+      const preview = previewContainerRef.current;
+      if (!preview) return [];
+      const nodes = preview.querySelectorAll<HTMLElement>('[data-line]');
+      const anchors: Array<{ line: number; top: number }> = [];
+      const previewTop = preview.getBoundingClientRect().top;
+      nodes.forEach((el) => {
+        const raw = el.getAttribute('data-line');
+        const line = raw ? Number(raw) : NaN;
+        if (!Number.isFinite(line)) return;
+        const top = el.getBoundingClientRect().top - previewTop + preview.scrollTop;
+        anchors.push({ line, top });
+      });
+      anchors.sort((a, b) => a.line - b.line);
+      return anchors;
+    };
+
+    // 反向：从预览 scrollTop → 源码行号
+    const previewScrollToLine = (scrollTop: number, anchors: Array<{ line: number; top: number }>): number => {
+      if (anchors.length === 0) return 1;
+      if (scrollTop <= anchors[0].top) return anchors[0].line;
+      for (let i = 0; i < anchors.length - 1; i++) {
+        const a = anchors[i];
+        const b = anchors[i + 1];
+        if (scrollTop >= a.top && scrollTop <= b.top) {
+          const ratio = b.top === a.top ? 0 : (scrollTop - a.top) / (b.top - a.top);
+          return a.line + (b.line - a.line) * ratio;
+        }
+      }
+      return anchors[anchors.length - 1].line;
+    };
+
+    // 正向：源码行号 → 预览 scrollTop
+    const lineToPreviewScrollTop = (line: number, anchors: Array<{ line: number; top: number }>): number | null => {
+      if (anchors.length === 0) return null;
+      if (line <= anchors[0].line) return anchors[0].top;
+      for (let i = 0; i < anchors.length - 1; i++) {
+        const a = anchors[i];
+        const b = anchors[i + 1];
+        if (line >= a.line && line <= b.line) {
+          const ratio = b.line === a.line ? 0 : (line - a.line) / (b.line - a.line);
+          return a.top + (b.top - a.top) * ratio;
+        }
+      }
+      return anchors[anchors.length - 1].top;
+    };
+
+    const previewAnimRef = useRef<{ raf: number | null; target: number }>({ raf: null, target: 0 });
+
+    const smoothScrollPreview = (target: number) => {
       const preview = previewContainerRef.current;
       if (!preview) return;
-      const maxScroll = preview.scrollHeight - preview.clientHeight;
-      const targetScroll = ratio * maxScroll;
+      previewAnimRef.current.target = target;
+      if (previewAnimRef.current.raf !== null) return;
+      const step = () => {
+        const preview = previewContainerRef.current;
+        if (!preview) { previewAnimRef.current.raf = null; return; }
+        const goal = previewAnimRef.current.target;
+        const current = preview.scrollTop;
+        const delta = goal - current;
+        lastSyncAtRef.current = Date.now();
+        if (Math.abs(delta) < 0.5) {
+          preview.scrollTop = goal;
+          previewAnimRef.current.raf = null;
+          return;
+        }
+        preview.scrollTop = current + delta * 0.22;
+        previewAnimRef.current.raf = requestAnimationFrame(step);
+      };
+      previewAnimRef.current.raf = requestAnimationFrame(step);
+    };
+
+    const syncPreviewByLine = (line: number) => {
+      const preview = previewContainerRef.current;
+      if (!preview) return;
+      const anchors = collectPreviewAnchors();
+      const targetScroll = lineToPreviewScrollTop(line, anchors);
+      if (targetScroll === null) return;
       if (Math.abs(preview.scrollTop - targetScroll) > 1) {
-        isProgrammaticScrollRef.current = true;
-        preview.scrollTop = targetScroll;
+        smoothScrollPreview(targetScroll);
       }
     };
 
     const handlePreviewScroll = () => {
-      if (isProgrammaticScrollRef.current) {
-        isProgrammaticScrollRef.current = false;
-        return;
-      }
+      // 编辑器驱动预览期间，忽略预览的回传
+      if (Date.now() - lastSyncAtRef.current < 160) return;
       const preview = previewContainerRef.current;
       if (!preview) return;
-      const maxScroll = preview.scrollHeight - preview.clientHeight;
-      const ratio = maxScroll > 0 ? preview.scrollTop / maxScroll : 0;
-      if (editorRef.current) {
-        editorRef.current.setScrollRatio(ratio);
-      }
+      const anchors = collectPreviewAnchors();
+      const line = previewScrollToLine(preview.scrollTop, anchors);
+      editorRef.current?.scrollToLine?.(Math.round(line));
     };
 
     // 核心渲染逻辑：根据 viewMode 返回不同的主体内容
@@ -146,7 +216,7 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
                 content={content}
                 onChange={onChange}
                 onCursorChange={onCursorChange}
-                onScrollRatioChange={syncPreview}
+                onTopLineChange={syncPreviewByLine}
               />
             </div>
           </div>

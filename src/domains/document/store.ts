@@ -22,7 +22,7 @@ export const useDocumentStore = create<DocumentStore>((set) => ({
         content,
         isDirty: false,
         lastSavedAt: Date.now(),
-        viewMode: 'split',
+        viewMode: 'edit',
       },
     });
   },
@@ -39,7 +39,7 @@ export const useDocumentStore = create<DocumentStore>((set) => ({
         content: '',
         isDirty: false,
         lastSavedAt: Date.now(),
-        viewMode: 'split',
+        viewMode: 'edit',
       },
     });
   },

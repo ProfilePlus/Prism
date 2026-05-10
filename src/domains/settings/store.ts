@@ -48,17 +48,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   setContentTheme: (contentTheme) => {
     set({ contentTheme });
-    
-    // 设置 data-theme 属性，主要影响内容预览区
     document.documentElement.setAttribute('data-content-theme', contentTheme);
-    
-    // 如果设置了 Night 主题，自动切换 UI 到深色模式，反之切换到浅色模式
-    if (contentTheme === 'night') {
-      get().setTheme('dark');
-    } else {
-      get().setTheme('light');
-    }
-    
     get().saveSettings();
   },
 

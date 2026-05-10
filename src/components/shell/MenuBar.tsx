@@ -27,6 +27,7 @@ export function MenuBar({ onAction }: MenuBarProps) {
       newData['主题'] = newData['主题'].map(item => {
         if (item.type === 'separator') return item;
         const themeMap: Record<string, string> = {
+          themeClassic: 'classic',
           themeGithub: 'github',
           themeWhitey: 'whitey',
           themeNewsprint: 'newsprint',
