@@ -4,104 +4,72 @@
   align-items: center;
   gap: 0;
   padding: 3px;
-  background: var(--layer-2);
-  border: 1px solid var(--stroke-control);
-  border-radius: var(--radius-md);
-  box-shadow:
-    0 8px 16px rgba(0, 0, 0, 0.12),
-    0 2px 4px rgba(0, 0, 0, 0.08);
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
-  z-index: 2000; /* 确保在搜索栏之上 */
+  background: var(--c-canvas);
+  border: 1px solid var(--c-fog);
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow-float);
+  z-index: 2000;
   pointer-events: auto;
-  animation: toolbarEnter 0.2s var(--ease-out);
+  animation: toolbarEnter 180ms var(--ease-out);
   transform: translate(-50%, -100%);
-  margin-top: -12px;
+  margin-top: -10px;
 }
 
 @keyframes toolbarEnter {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -85%) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, -100%) scale(1);
-  }
+  from { opacity: 0; transform: translate(-50%, -80%) scale(0.96); }
+  to { opacity: 1; transform: translate(-50%, -100%) scale(1); }
 }
 
 .group {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 1px;
+  padding: 0 2px;
 }
 
 .button {
   width: 28px;
   height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   border: none;
   background: transparent;
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-pill);
   cursor: pointer;
-  color: var(--text-secondary);
-  transition: all var(--duration-fast) var(--ease-out);
-  font-family: var(--font-ui);
-  font-size: 14px;
+  color: var(--c-void);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
   position: relative;
+  transition: background 120ms var(--ease-out), color 120ms var(--ease-out), transform 120ms var(--ease-out);
 }
 
-.button:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
+.button:hover { background: var(--c-chalk); }
+.button:active { transform: scale(0.92); }
 
-.button:active {
-  background: var(--bg-active);
-  transform: scale(0.9);
+.button.active {
+  background: var(--c-void);
+  color: var(--c-canvas);
 }
 
 .divider {
   width: 1px;
-  height: 18px;
-  background: var(--stroke-divider);
-  margin: 0 6px;
+  height: 14px;
+  background: var(--c-fog);
+  margin: 0 2px;
 }
 
-/* 针对文字型按钮的特殊处理 */
-.button[name="bold"] { font-weight: 800; font-family: 'Inter', sans-serif; }
-.button[name="italic"] { font-style: italic; font-family: 'Inter', sans-serif; }
-.button[name="underline"] { text-decoration: underline; text-underline-offset: 2px; font-family: 'Inter', sans-serif; }
-
-/* 图标型按钮映射 */
-.button[name="strikethrough"]::before,
-.button[name="highlight"]::before,
-.button[name="code"]::before,
-.button[name="link"]::before,
-.button[name="quote"]::before {
-  font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets';
+.button[name='bold'] { font-weight: 700; }
+.button[name='italic'] { font-style: italic; }
+.button[name='underline'] { text-decoration: underline; text-underline-offset: 2px; }
+.button[name='strikethrough'] { text-decoration: line-through; }
+.button[name='highlight']::before {
+  content: 'H';
+  font-weight: 700;
+  background: linear-gradient(transparent 55%, rgba(255, 224, 102, 0.7) 55%);
+  padding: 0 2px;
 }
-
-.button[name="strikethrough"]::before { content: "\EDE0"; font-size: 15px; }
-.button[name="highlight"]::before { content: "\E7E6"; font-size: 14px; }
-.button[name="code"]::before { content: "\E943"; font-size: 14px; }
-.button[name="link"]::before { content: "\E71B"; font-size: 14px; }
-.button[name="quote"]::before { content: "\E9B1"; font-size: 14px; }
-
-/* 操作反馈动画 */
-.button.active {
-  background: var(--accent-tint) !important;
-  color: var(--accent) !important;
-  animation: buttonPulse 0.3s ease;
-}
-
-@keyframes buttonPulse {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.15);
-  }
-}
+.button[name='code'] { font-family: var(--font-mono); }
+.button[name='code']::before { content: '<>'; font-size: 12px; }
+.button[name='link']::before { content: '↗'; font-size: 15px; }
+.button[name='quote']::before { content: '\201C'; font-size: 18px; line-height: 1; }

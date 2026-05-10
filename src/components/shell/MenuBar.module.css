@@ -1,12 +1,13 @@
 .menubar {
   display: flex;
   align-items: center;
-  height: 36px;
-  padding: 0 10px;
+  height: 40px;
+  padding: 0 8px 0 12px;
+  gap: 2px;
   user-select: none;
   position: relative;
-  border-bottom: 1px solid var(--stroke-surface);
-  background: transparent;
+  border-bottom: 1px solid var(--c-fog);
+  background: var(--c-canvas);
 }
 
 .menuItemWrapper {
@@ -14,27 +15,65 @@
 }
 
 .menuItem {
-  padding: 6px 14px;
+  padding: 5px 10px;
   font-size: 13px;
   font-weight: 500;
-  border-radius: var(--radius-sm);
+  color: var(--c-void);
+  background: transparent;
+  border: none;
+  border-radius: var(--r-link);
   cursor: pointer;
-  color: var(--text-primary);
-  transition: all var(--duration-fast) var(--ease-out);
-  margin: 0 4px;
+  transition: background var(--duration-fast) var(--ease-out);
 }
 
-.menuItem:hover {
-  background: var(--bg-hover); /* 更符合原生行为的轻微悬浮底色 */
-}
-
-.menuItem:active {
-  transform: scale(0.96);
-  background: var(--bg-active);
-}
-
+.menuItem:hover,
 .menuItem.active {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-  font-weight: 500;
+  background: var(--c-chalk);
 }
+
+.spacer { flex: 1; }
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 10px;
+}
+
+.pillGhost {
+  padding: 6px 13px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--c-void);
+  background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+:global(body.dark) .pillGhost { border-color: rgba(255, 255, 255, 0.18); }
+
+.pillGhost:hover { background: var(--c-chalk); }
+
+.pillFilled {
+  padding: 7px 15px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--c-canvas);
+  background: var(--c-void);
+  border: 1px solid var(--c-void);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  box-shadow: var(--shadow-faint);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.pillFilled:hover { opacity: 0.85; }
+.pillFilled:disabled { opacity: 0.35; cursor: not-allowed; }

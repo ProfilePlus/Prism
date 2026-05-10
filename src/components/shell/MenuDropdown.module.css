@@ -2,75 +2,62 @@
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  min-width: 260px;
-  padding: 4px;
-  border-radius: var(--radius-md);
-  background: var(--layer-2);
-  border: 1px solid var(--stroke-control);
-  box-shadow: var(--elevation-flyout);
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  min-width: 280px;
+  padding: 6px;
+  border-radius: var(--r-card);
+  background: var(--c-canvas);
+  border: 1px solid var(--c-fog);
+  box-shadow: var(--shadow-flyout);
   z-index: 1000;
-  animation: menuSlideIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: ddIn 140ms var(--ease-out);
 }
 
-@keyframes menuSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-8px) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+@keyframes ddIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
+  gap: 10px;
+  padding: 7px 10px;
   font-size: 13px;
-  font-weight: 400;
-  border-radius: var(--radius-sm);
+  color: var(--c-void);
+  border-radius: var(--r-link);
   cursor: pointer;
-  gap: 24px;
-  color: var(--text-primary);
-  transition: all var(--duration-fast) var(--ease-out);
+  user-select: none;
 }
 
-.item:hover {
-  background: var(--bg-hover); /* 替换为标准底色，不使用主题蓝 */
-}
-
-.item:active {
-  transform: scale(0.98);
-  background: var(--bg-active);
-}
-
-.check {
-  width: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: -4px;
-}
-
-.checkIcon {
-  font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets';
-  font-size: 10px;
-  color: var(--accent);
+.item:hover,
+.item.hover {
+  background: var(--c-chalk);
 }
 
 .item.disabled {
-  opacity: 0.5;
+  color: var(--c-ash);
   cursor: not-allowed;
-  color: var(--text-tertiary);
 }
 
-.item.disabled:hover {
-  background: transparent !important;
-  transform: none;
+.item.disabled:hover { background: transparent; }
+
+.item.danger { color: #c0392b; }
+.item.danger:hover { background: rgba(192, 57, 43, 0.08); }
+
+:global(body.dark) .item.danger { color: #ff6b5e; }
+
+.check {
+  width: 14px;
+  display: inline-grid;
+  place-items: center;
+  color: var(--c-void);
+  flex-shrink: 0;
+}
+
+.checkIcon {
+  width: 12px;
+  height: 12px;
+  display: block;
 }
 
 .label {
@@ -85,23 +72,22 @@
 }
 
 .shortcut {
-  color: var(--text-tertiary);
-  font-size: 11px;
   font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--c-graphite);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  font-weight: 500;
   letter-spacing: 0.2px;
 }
 
 .arrow {
-  color: var(--text-tertiary);
+  color: var(--c-ash);
   font-size: 10px;
-  margin-left: 8px;
+  margin-left: 4px;
 }
 
 .separator {
   height: 1px;
-  background: var(--stroke-divider);
-  margin: 4px 8px;
+  background: var(--c-fog);
+  margin: 4px 6px;
 }

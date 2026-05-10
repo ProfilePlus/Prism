@@ -1,22 +1,67 @@
 .titlebar {
-  height: 36px; /* 从 32px 调高，增加透气感 */
+  height: 36px;
   display: flex;
   align-items: center;
   padding-left: 16px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: var(--c-void);
   user-select: none;
-  border-bottom: 1px solid var(--stroke-surface);
+  border-bottom: 1px solid var(--c-fog);
+  background: var(--c-canvas);
   -webkit-app-region: drag;
   app-region: drag;
 }
 
-.title {
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   flex: 1;
+  min-width: 0;
   pointer-events: none;
-  letter-spacing: 0.2px;
 }
+
+.logo {
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--c-void);
+  color: var(--c-canvas);
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0;
+}
+
+.docName { color: var(--c-void); }
+
+.dirtyDot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--c-void);
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+
+.sep {
+  color: var(--c-ash);
+  margin: 0 8px;
+}
+
+.app { color: var(--c-graphite); }
 
 .controls {
   display: flex;
@@ -26,36 +71,33 @@
 }
 
 .btn {
-  width: 46px;
+  width: 44px;
   height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   border: none;
   background: transparent;
-  color: var(--text-secondary); /* 默认为次要文本颜色，不那么刺眼 */
+  color: var(--c-graphite);
   cursor: pointer;
-  font-size: 10px;
-  font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets', sans-serif;
-  transition: background 120ms cubic-bezier(0.16, 1, 0.3, 1), color 120ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
 
 .btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  background: var(--c-chalk);
+  color: var(--c-void);
 }
 
-.btn:active {
-  background: var(--bg-active);
+.btn svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 1.3;
+  fill: none;
+  stroke: currentColor;
 }
 
 .btn.close:hover {
-  background: #C42B1C;
+  background: #e81123;
   color: #fff;
-}
-
-.btn.close:active {
-  background: #A42417; /* 点击时稍微加深红色 */
 }

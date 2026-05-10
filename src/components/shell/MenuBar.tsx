@@ -13,10 +13,11 @@ interface MenuBarProps {
 export function MenuBar({ onAction }: MenuBarProps) {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  
+
   const contentTheme = useSettingsStore((s) => s.contentTheme);
   const { sidebarVisible, statusBarVisible, focusMode, typewriterMode, isFullscreen, isAlwaysOnTop } = useWorkspaceStore();
   const viewMode = useDocumentStore((s) => s.currentDocument?.viewMode);
+  const isDirty = useDocumentStore((s) => s.currentDocument?.isDirty ?? false);
 
   const processedMenuData = useMemo(() => {
     const newData = { ...menuData };
@@ -81,7 +82,7 @@ export function MenuBar({ onAction }: MenuBarProps) {
   };
 
   return (
-    <div className={styles.menubar} ref={menuRef}>
+    <div className={`${styles.menubar} app-menubar`} ref={menuRef}>
       {Object.keys(processedMenuData).map((menuName) => (
         <div key={menuName} className={styles.menuItemWrapper}>
           <div
@@ -99,6 +100,17 @@ export function MenuBar({ onAction }: MenuBarProps) {
           )}
         </div>
       ))}
+      <div className={styles.spacer} />
+      <div className={styles.actions}>
+        <button
+          className={styles.pillFilled}
+          onClick={() => onAction('save')}
+          disabled={!isDirty}
+          title="保存 (Ctrl+S)"
+        >
+          保存
+        </button>
+      </div>
     </div>
   );
 }

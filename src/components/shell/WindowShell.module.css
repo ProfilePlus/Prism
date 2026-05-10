@@ -1,20 +1,8 @@
 .windowShell {
-  border-radius: 0;
-  overflow: hidden;
-  border: none;
-  box-shadow: none;
-  background:
-    radial-gradient(1200px 600px at 15% 0%, rgba(0, 103, 192, 0.05), transparent 60%),
-    radial-gradient(900px 500px at 100% 100%, rgba(138, 43, 226, 0.04), transparent 55%),
-    var(--bg-app);
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-}
-
-body.dark .windowShell {
-  background:
-    radial-gradient(1200px 600px at 15% 0%, rgba(96, 205, 255, 0.06), transparent 60%),
-    radial-gradient(900px 500px at 100% 100%, rgba(138, 43, 226, 0.06), transparent 55%),
-    var(--bg-app);
+  background: var(--c-canvas);
+  border-radius: 0;
+  overflow: hidden;
 }

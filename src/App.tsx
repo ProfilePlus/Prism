@@ -19,6 +19,8 @@ import { executeFileAction, FileActionInput } from './lib/fileActions';
 import { ContextMenu } from './components/shell/ContextMenu';
 import { ShortcutPanel } from './components/shell/ShortcutPanel';
 import { CommandPalette } from './components/shell/CommandPalette';
+import { AboutModal } from './components/shell/AboutModal';
+import { SettingsModal } from './components/shell/SettingsModal';
 import { ALL_COMMANDS } from './lib/commands';
 
 function basename(path: string): string {
@@ -43,6 +45,8 @@ function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [shortcutPanelVisible, setShortcutPanelVisible] = useState(false);
   const [commandPaletteVisible, setCommandPaletteVisible] = useState(false);
+  const [aboutVisible, setAboutVisible] = useState(false);
+  const [settingsVisible, setSettingsVisible] = useState(false);
 
   useBootstrap();
   useAutoSave(2000);
@@ -90,6 +94,14 @@ function App() {
     loadSettings();
   }, [loadSettings]);
 
+  useEffect(() => {
+    document.body.classList.toggle('focus-mode', workspace.focusMode);
+  }, [workspace.focusMode]);
+
+  useEffect(() => {
+    document.body.classList.toggle('typewriter-mode', workspace.typewriterMode);
+  }, [workspace.typewriterMode]);
+
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
     if (toastTimerRef.current) {
@@ -117,6 +129,10 @@ function App() {
   }, [handleFileAction]);
 
   const handleMenuAction = useCallback(async (action: string) => {
+    if (action === 'about') { setAboutVisible(true); return; }
+    if (action === 'preferences') { setSettingsVisible(true); return; }
+    if (action === 'showShortcuts') { setShortcutPanelVisible(true); return; }
+    if (action === 'showCmd' || action === 'commandPalette') { setCommandPaletteVisible(true); return; }
     await executeMenuAction(action, {
       documentStore: useDocumentStore.getState(),
       settingsStore: useSettingsStore.getState(),
@@ -222,17 +238,17 @@ function App() {
     setGlobalContextMenu({ x: e.clientX, y: e.clientY, items });
   };
 
-  const titleText = currentDocument
-    ? `Prism · ${currentDocument.name}${currentDocument.isDirty ? ' •' : ''}`
-    : 'Prism';
+  const titleDocName = currentDocument?.name ?? '未命名';
+  const titleDirty = currentDocument?.isDirty ?? false;
 
   return (
     <WindowShell>
-      {!workspace.focusMode && <TitleBar title={titleText} />}
-      {!workspace.focusMode && <MenuBar onAction={handleMenuAction} />}
+      <TitleBar docName={titleDocName} isDirty={titleDirty} />
+      <MenuBar onAction={handleMenuAction} />
       <div className="app-main" style={{ flex: 1, display: 'flex', minHeight: 0, minWidth: 0 }}>
-        {workspace.sidebarVisible && !workspace.focusMode && (
-          <div 
+        {workspace.sidebarVisible && (
+          <div
+            className="app-sidebar"
             onMouseEnter={() => setIsSidebarHovered(true)}
             onMouseLeave={() => setIsSidebarHovered(false)}
             style={{ display: 'flex', flexDirection: 'column' }}
@@ -248,30 +264,32 @@ function App() {
             />
           </div>
         )}
-        <DocumentView 
-          key={currentDocument?.path || 'new-doc'} 
-          ref={editorRef} 
-          onCursorChange={setCursor} 
+        <DocumentView
+          key={currentDocument?.path || 'new-doc'}
+          ref={editorRef}
+          onCursorChange={setCursor}
         />
       </div>
 
-      {currentDocument && !workspace.focusMode && workspace.statusBarVisible && (
-        <StatusBar
-          viewMode={currentDocument.viewMode}
-          wordCount={currentDocument.content.split(/\s+/).filter(Boolean).length}
-          cursor={cursor}
-          sidebarVisible={workspace.sidebarVisible}
-          isSidebarHovered={isSidebarHovered}
-          onMouseEnter={() => setIsSidebarHovered(true)}
-          onMouseLeave={() => setIsSidebarHovered(false)}
-          onViewModeChange={setViewMode}
-          onExportHtml={() => currentDocument && exportToHtml(currentDocument.content, currentDocument.name)}
-          onToggleFocusMode={() => workspace.toggleFocusMode()}
-          onToggleSidebar={() => workspace.toggleSidebar()}
-          onFolderContextMenu={handleFolderContextMenu}
-          onNewFile={() => handleFileAction('newFile')}
-          onToggleFileTreeMode={() => handleFileAction(workspace.fileTreeMode === 'tree' ? 'viewList' : 'viewTree')}
-        />
+      {currentDocument && workspace.statusBarVisible && (
+        <div className="app-statusbar">
+          <StatusBar
+            viewMode={currentDocument.viewMode}
+            wordCount={currentDocument.content.split(/\s+/).filter(Boolean).length}
+            cursor={cursor}
+            sidebarVisible={workspace.sidebarVisible}
+            isSidebarHovered={isSidebarHovered}
+            onMouseEnter={() => setIsSidebarHovered(true)}
+            onMouseLeave={() => setIsSidebarHovered(false)}
+            onViewModeChange={setViewMode}
+            onExportHtml={() => currentDocument && exportToHtml(currentDocument.content, currentDocument.name)}
+            onToggleFocusMode={() => workspace.toggleFocusMode()}
+            onToggleSidebar={() => workspace.toggleSidebar()}
+            onFolderContextMenu={handleFolderContextMenu}
+            onNewFile={() => handleFileAction('newFile')}
+            onToggleFileTreeMode={() => handleFileAction(workspace.fileTreeMode === 'tree' ? 'viewList' : 'viewTree')}
+          />
+        </div>
       )}
 
       {globalContextMenu && (
@@ -285,27 +303,7 @@ function App() {
       )}
 
       {toastMessage && (
-        <div
-          role="status"
-          className="prism-toast"
-          style={{
-            position: 'fixed',
-            left: '50%',
-            bottom: workspace.statusBarVisible && !workspace.focusMode ? '44px' : '18px',
-            transform: 'translateX(-50%)',
-            zIndex: 20000,
-            maxWidth: 'min(520px, calc(100vw - 40px))',
-            padding: '9px 14px',
-            borderRadius: '8px',
-            border: '1px solid var(--stroke-surface)',
-            background: 'var(--bg-surface-solid)',
-            color: 'var(--text-primary)',
-            boxShadow: 'var(--elevation-flyout)',
-            fontSize: '12px',
-            lineHeight: 1.5,
-            pointerEvents: 'none',
-          }}
-        >
+        <div role="status" className="prism-toast">
           {toastMessage}
         </div>
       )}
@@ -319,15 +317,11 @@ function App() {
         visible={commandPaletteVisible}
         commands={ALL_COMMANDS}
         onClose={() => setCommandPaletteVisible(false)}
-        onExecute={(commandId) => {
-          executeMenuAction(commandId, {
-            documentStore: useDocumentStore.getState(),
-            workspaceStore: useWorkspaceStore.getState(),
-            settingsStore: useSettingsStore.getState(),
-            showToast,
-          });
-        }}
+        onExecute={(commandId) => handleMenuAction(commandId)}
       />
+
+      <AboutModal visible={aboutVisible} onClose={() => setAboutVisible(false)} />
+      <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
     </WindowShell>
   );
 }

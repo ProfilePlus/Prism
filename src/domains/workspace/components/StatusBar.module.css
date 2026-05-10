@@ -1,0 +1,200 @@
+.statusbar {
+  display: flex;
+  align-items: stretch;
+  border-top: 1px solid var(--c-fog);
+  font-size: 11px;
+  color: var(--c-graphite);
+  user-select: none;
+  position: relative;
+  height: 28px;
+  background: var(--c-canvas);
+}
+
+/* 侧栏 zone：仅在侧栏可见时显示，hover 淡入 */
+.sidebarZone {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0 6px 0 8px;
+  box-shadow: 1px 0 0 var(--c-fog);
+  opacity: 0;
+  transition: opacity 220ms var(--ease-out);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.sidebarZone.visible {
+  opacity: 1;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  position: relative;
+  min-width: 0;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-pill);
+  color: var(--c-graphite);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+
+.btn:hover {
+  background: var(--c-chalk);
+  color: var(--c-void);
+}
+
+.btn.active {
+  color: var(--c-void);
+  background: var(--c-chalk);
+}
+
+.btn svg {
+  width: 13px;
+  height: 13px;
+  stroke-width: 1.5;
+  fill: none;
+  stroke: currentColor;
+}
+
+.iconBtn {
+  width: 22px;
+  padding: 0;
+  justify-content: center;
+}
+
+.folder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  color: var(--c-graphite);
+  font-size: 11px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: transparent;
+  border: none;
+}
+
+.folder:hover {
+  background: var(--c-chalk);
+  color: var(--c-void);
+}
+
+.sep {
+  width: 1px;
+  height: 10px;
+  background: var(--c-fog);
+  margin: 0 6px;
+}
+
+/* 模式切换药丸组 */
+.modeGroup {
+  display: inline-flex;
+  align-items: center;
+  background: var(--c-chalk);
+  border-radius: var(--r-pill);
+  padding: 2px;
+}
+
+.modeBtn {
+  width: 26px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: var(--c-graphite);
+  cursor: pointer;
+  border-radius: var(--r-pill);
+  display: grid;
+  place-items: center;
+  transition: background 140ms var(--ease-out), color 140ms var(--ease-out), box-shadow 140ms var(--ease-out);
+}
+
+.modeBtn:hover { color: var(--c-void); }
+
+.modeBtn.active {
+  background: var(--c-canvas);
+  color: var(--c-void);
+  box-shadow: var(--shadow-faint);
+}
+
+.modeBtn svg {
+  width: 11px;
+  height: 11px;
+  stroke-width: 1.5;
+  fill: none;
+  stroke: currentColor;
+}
+
+/* 保存状态 */
+.saveStatus {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 0 6px;
+  pointer-events: auto;
+}
+.saveStatus.saved { color: var(--c-ash); }
+.saveStatus.saving { color: var(--c-graphite); }
+.saveStatus.unsaved { color: var(--c-void); }
+.saveStatus.unsaved::before { content: '●'; margin-right: 4px; }
+
+.statVal {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--c-graphite);
+  font-variant-numeric: tabular-nums;
+}
+
+.statLbl {
+  font-size: 10px;
+  color: var(--c-ash);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}

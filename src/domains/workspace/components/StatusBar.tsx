@@ -1,24 +1,68 @@
-import { useMemo, useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import styles from './StatusBar.module.css';
 import { useWorkspaceStore } from '../../workspace/store';
 import { useDocumentStore } from '../../document/store';
 
-// --- 精密图标库 (SVG) ---
-const IconAdd = () => <svg className="outline-icon" width="15" height="15" viewBox="0 0 24 24" strokeWidth="1.2" shapeRendering="crispEdges"><path d="M12 4v16M4 12h16" /></svg>;
-const IconMore = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5.5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="18.5" r="1.3"/></svg>;
-const IconViewToggle = () => (
-    <svg className="outline-icon" width="15" height="15" viewBox="0 0 24 24" strokeWidth="1.2" shapeRendering="crispEdges">
-        <rect x="4" y="4" width="16" height="16" rx="0.5" />
-        <line x1="4" y1="9.3" x2="20" y2="9.3" />
-        <line x1="4" y1="14.7" x2="20" y2="14.7" />
-    </svg>
+const IconSource = () => (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor">
+    <path d="M6 4L2 8l4 4M10 4l4 4-4 4" />
+  </svg>
 );
-const IconCollapse = () => <svg className="outline-icon" width="12" height="12" viewBox="0 0 24 24" strokeWidth="1.5"><path d="M15 18l-6-6 6-6" /></svg>;
-const IconExpand = () => <svg className="outline-icon" width="12" height="12" viewBox="0 0 24 24" strokeWidth="1.5"><path d="M9 18l6-6-6-6" /></svg>;
-const IconSource = () => <span style={{fontFamily:'Consolas, monospace', fontSize:'12px', fontWeight:'bold', letterSpacing: '-0.5px'}}>&lt;/&gt;</span>;
-const IconSplit = () => <svg className="outline-icon" width="14" height="14" viewBox="0 0 24 24" strokeWidth="1.5"><path d="M4 4h16v16H4z M12 4v16" /></svg>;
-const IconPreview = () => <svg className="outline-icon" width="14" height="14" viewBox="0 0 24 24" strokeWidth="1.5"><path d="M5 3h14v18H5z M9 8h6 M9 12h6 M9 16h4" /></svg>;
-const IconFocus = () => <svg className="outline-icon" width="14" height="14" viewBox="0 0 24 24" strokeWidth="1.5"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/></svg>;
-const IconExport = () => <svg className="outline-icon" width="14" height="14" viewBox="0 0 24 24" strokeWidth="1.5"><path d="M12 15V3m0 0L8.5 6.5M12 3l3.5 3.5M4 12v7a2 2 0 002 2h12a2 2 0 002-2v-7"/></svg>;
+const IconSplit = () => (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor">
+    <rect x="2" y="2" width="12" height="12" rx="1" />
+    <path d="M8 2v12" />
+  </svg>
+);
+const IconPreview = () => (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor">
+    <rect x="2" y="2" width="12" height="12" rx="1" />
+    <path d="M5 6h6M5 9h6M5 12h4" />
+  </svg>
+);
+const IconFocus = () => (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor">
+    <circle cx="8" cy="8" r="6" />
+    <circle cx="8" cy="8" r="2" fill="currentColor" />
+  </svg>
+);
+const IconExport = () => (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor">
+    <path d="M8 10V2M8 2L5 5M8 2l3 3M3 10v3a1 1 0 001 1h8a1 1 0 001-1v-3" />
+  </svg>
+);
+const IconCollapse = () => (
+  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <path d="M7.5 3l-3 3 3 3" />
+  </svg>
+);
+const IconExpand = () => (
+  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <path d="M4.5 3l3 3-3 3" />
+  </svg>
+);
+const IconPlus = () => (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor">
+    <path d="M8 3v10M3 8h10" />
+  </svg>
+);
+const IconTree = () => (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor">
+    <path d="M3 4h2M3 8h2M3 12h2M7 4h6M7 8h6M7 12h4" />
+  </svg>
+);
+const IconList = () => (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor">
+    <path d="M3 4h10M3 8h10M3 12h10" />
+  </svg>
+);
+const IconMore = () => (
+  <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor">
+    <circle cx="3" cy="6" r="1" />
+    <circle cx="6" cy="6" r="1" />
+    <circle cx="9" cy="6" r="1" />
+  </svg>
+);
 
 interface StatusBarProps {
   viewMode: 'edit' | 'split' | 'preview';
@@ -55,6 +99,7 @@ export function StatusBar({
 }: StatusBarProps) {
   const rootPath = useWorkspaceStore((s) => s.rootPath);
   const fileTreeMode = useWorkspaceStore((s) => s.fileTreeMode);
+  const focusMode = useWorkspaceStore((s) => s.focusMode);
   const currentDocument = useDocumentStore((s) => s.currentDocument);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
 
@@ -63,23 +108,14 @@ export function StatusBar({
     return rootPath.split(/[\\/]/).pop() || rootPath;
   }, [rootPath]);
 
-  // 监听文档保存状态
   useEffect(() => {
-    if (!currentDocument) {
-      setSaveStatus('saved');
-      return;
-    }
-
+    if (!currentDocument) { setSaveStatus('saved'); return; }
     if (currentDocument.isDirty) {
       setSaveStatus('unsaved');
-      // 模拟保存中状态（实际应该从 auto-save hook 获取）
-      const timer = setTimeout(() => {
-        setSaveStatus('saving');
-      }, 1500);
+      const timer = setTimeout(() => setSaveStatus('saving'), 1500);
       return () => clearTimeout(timer);
-    } else {
-      setSaveStatus('saved');
     }
+    setSaveStatus('saved');
   }, [currentDocument?.isDirty, currentDocument?.lastSavedAt]);
 
   const modes = [
@@ -89,186 +125,89 @@ export function StatusBar({
   ] as const;
 
   return (
-    <div className="typora-status-bar-outer">
-      {/* 1. 侧边栏地基：增加了悬停监听，防止图标消失 */}
+    <div className={styles.statusbar}>
       {sidebarVisible && (
-        <div 
-          className="foundation-sidebar-part"
+        <div
+          className={`${styles.sidebarZone} ${isSidebarHovered ? styles.visible + ' is-visible' : ''}`}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
         >
-          <div className={`reveal-anim-wrap ${isSidebarHovered ? 'is-visible' : ''}`}>
-            <button className="base-icon-btn" title="新建文件" onClick={onNewFile}><IconAdd /></button>
-            <div 
-              className="folder-name-label" 
-              onContextMenu={onFolderContextMenu}
-              onClick={onFolderContextMenu}
-              title="工作区操作"
-            >
-              <span className="name">{rootName}</span>
-              <span className="more-icon" style={{marginLeft: '6px', display: 'flex'}}><IconMore /></span>
-            </div>
-            <button
-              className={`base-icon-btn ${fileTreeMode === 'list' ? 'is-active' : ''}`}
-              title={fileTreeMode === 'tree' ? '切换到文档列表' : '切换到文档树'}
-              onClick={onToggleFileTreeMode}
-            >
-                <IconViewToggle />
-            </button>
-          </div>
+          <button className={`${styles.btn} ${styles.iconBtn}`} title="新建文件" onClick={onNewFile}>
+            <IconPlus />
+          </button>
+          <button
+            className={`${styles.btn} ${styles.iconBtn} ${fileTreeMode === 'list' ? styles.active + ' is-active' : ''}`}
+            title={fileTreeMode === 'tree' ? '切换到文档列表' : '切换到文档树'}
+            onClick={onToggleFileTreeMode}
+          >
+            {fileTreeMode === 'tree' ? <IconTree /> : <IconList />}
+          </button>
+          <button
+            className={styles.folder}
+            onContextMenu={onFolderContextMenu}
+            onClick={onFolderContextMenu}
+            title="工作区操作"
+          >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{rootName}</span>
+            <IconMore />
+          </button>
         </div>
       )}
 
-      {/* 2. 编辑器地基 */}
-      <div className="foundation-editor-part">
-        <div className="left-controls">
-          <button 
-            className={`slider-handle ${!sidebarVisible ? 'is-collapsed' : ''}`}
+      <div className={styles.main}>
+        <div className={styles.left}>
+          <button
+            className={`${styles.btn} ${styles.iconBtn}`}
             onClick={onToggleSidebar}
-            title={sidebarVisible ? "收起侧边栏" : "展开侧边栏"}
+            title={sidebarVisible ? '收起侧边栏' : '展开侧边栏'}
           >
             {sidebarVisible ? <IconCollapse /> : <IconExpand />}
           </button>
-
-          <div className="vertical-sep" />
-
-          <div className="mode-switcher-set">
-            {modes.map(mode => (
-              <button 
-                key={mode.key}
-                className={`mode-btn-styled ${viewMode === mode.key ? 'is-active' : ''}`}
-                onClick={() => onViewModeChange?.(mode.key as any)}
-                title={mode.label}
+          <div className={styles.sep} />
+          <div className={styles.modeGroup}>
+            {modes.map((m) => (
+              <button
+                key={m.key}
+                className={`${styles.modeBtn} ${viewMode === m.key ? styles.active + ' is-active' : ''}`}
+                onClick={() => onViewModeChange?.(m.key)}
+                title={m.label}
               >
-                {mode.icon}
+                {m.icon}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="center-stats-display">
-          {/* 保存状态 */}
-          <span className={`save-status ${saveStatus}`}>
+        <div className={styles.center}>
+          <span className={`${styles.saveStatus} ${styles[saveStatus]}`}>
             {saveStatus === 'saved' && '已保存'}
-            {saveStatus === 'saving' && '保存中...'}
+            {saveStatus === 'saving' && '保存中…'}
             {saveStatus === 'unsaved' && '未保存'}
           </span>
-          <div className="vertical-sep" style={{ opacity: 0.3, margin: '0 8px' }} />
-          <span className="val">{wordCount}</span>
-          <span className="lbl">词</span>
-          <div className="vertical-sep" style={{ opacity: 0.3, margin: '0 8px' }} />
-          <span className="lbl">LN</span>
-          <span className="val">{cursor.line}</span>
-          <div className="vertical-sep" style={{ opacity: 0.3, margin: '0 8px' }} />
-          <span className="lbl">COL</span>
-          <span className="val">{cursor.column}</span>
+          <div className={styles.sep} />
+          <span className={styles.statVal}>{wordCount}</span>
+          <span className={styles.statLbl}>词</span>
+          <div className={styles.sep} />
+          <span className={styles.statLbl}>LN</span>
+          <span className={styles.statVal}>{cursor.line}</span>
+          <div className={styles.sep} />
+          <span className={styles.statLbl}>COL</span>
+          <span className={styles.statVal}>{cursor.column}</span>
         </div>
 
-        <div className="right-controls">
-          <button className="mode-btn-styled" onClick={onToggleFocusMode} title="专注模式 (F8)">
+        <div className={styles.right}>
+          <button
+            className={`${styles.btn} ${styles.iconBtn} ${focusMode ? styles.active : ''}`}
+            onClick={onToggleFocusMode}
+            title="专注模式 (F8)"
+          >
             <IconFocus />
           </button>
-          <button className="mode-btn-styled" onClick={onExportHtml} title="导出 HTML">
+          <button className={`${styles.btn} ${styles.iconBtn}`} onClick={onExportHtml} title="导出 HTML">
             <IconExport />
           </button>
         </div>
       </div>
-
-      <style>{`
-        .typora-status-bar-outer {
-          height: 28px;
-          display: flex;
-          background: var(--bg-sidebar);
-          color: var(--text-secondary);
-          user-select: none;
-          font-family: var(--font-ui);
-          font-size: 11px;
-        }
-
-        /* 侧边栏部分：无顶边框，确保垂直边框连贯 */
-        .foundation-sidebar-part {
-          width: clamp(240px, 26vw, 300px);
-          flex-shrink: 0;
-          height: 100%;
-          display: flex;
-          align-items: center;
-          padding: 0 6px;
-          border-right: 1px solid var(--theme-divider, var(--border-color));
-          background: transparent;
-          box-sizing: border-box;
-        }
-
-        .reveal-anim-wrap {
-          display: flex; align-items: center; width: 100%; height: 100%;
-          opacity: 0; transition: opacity 0.2s ease; pointer-events: none;
-        }
-        .reveal-anim-wrap.is-visible { opacity: 1; pointer-events: auto; }
-
-        .folder-name-label {
-          flex: 1; 
-          display: flex; align-items: center; justify-content: center;
-          height: calc(100% - 8px);
-          margin: 0 4px; padding: 2px 8px; 
-          border-radius: var(--radius-sm);
-          cursor: pointer;
-          transition: background 0.15s;
-        }
-        .folder-name-label:hover { background: var(--bg-hover); }
-        
-        .folder-name-label .name {
-          font-size: 11px; font-weight: 500; color: var(--text-secondary);
-          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-        }
-
-        /* 编辑器部分：应用顶边框 */
-        .foundation-editor-part {
-          flex: 1; height: 100%; display: flex; align-items: center; justify-content: space-between;
-          padding: 0 10px; position: relative; border-top: 1px solid var(--theme-divider, var(--border-color));
-        }
-
-        .base-icon-btn, .mode-btn-styled, .slider-handle {
-          background: transparent; border: none; cursor: pointer;
-          display: flex; align-items: center; justify-content: center;
-          transition: all 0.15s var(--ease-out); border-radius: var(--radius-sm);
-          color: var(--text-tertiary);
-        }
-
-        .base-icon-btn { width: 22px; height: 22px; }
-        .mode-btn-styled { width: 26px; height: 22px; }
-        .slider-handle { width: 22px; height: 22px; }
-
-        .base-icon-btn:hover, .mode-btn-styled:hover, .slider-handle:hover {
-          background: var(--bg-hover); color: var(--text-primary);
-        }
-
-        .mode-btn-styled.is-active { color: var(--accent); background: var(--accent-tint); }
-        .base-icon-btn.is-active { color: var(--accent); background: var(--accent-tint); }
-        .slider-handle.is-collapsed { color: var(--accent); }
-
-        .vertical-sep { width: 1px; height: 12px; background: var(--stroke-divider); margin: 0 4px; }
-
-        .center-stats-display {
-          position: absolute; left: 50%; transform: translateX(-50%);
-          display: flex; align-items: center; gap: 4px; pointer-events: none;
-        }
-        .val { font-family: var(--font-mono); font-size: 11px; font-weight: 500; color: var(--text-secondary); }
-        .lbl { font-size: 10px; color: var(--text-tertiary); font-weight: 600; letter-spacing: 0.3px; }
-
-        .save-status {
-          font-size: 11px;
-          color: var(--text-tertiary);
-          font-weight: 500;
-          transition: color 0.2s;
-          padding-right: 4px;
-        }
-        .save-status.saved { color: var(--text-tertiary); }
-        .save-status.saving { color: var(--accent); }
-        .save-status.unsaved { color: #f59e0b; }
-
-        .mode-switcher-set, .left-controls, .right-controls { display: flex; align-items: center; gap: 4px; }
-        
-        svg.outline-icon { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
-      `}</style>
     </div>
   );
 }

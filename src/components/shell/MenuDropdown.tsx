@@ -7,13 +7,18 @@ interface MenuDropdownProps {
   onClose: () => void;
 }
 
+const CheckIcon = () => (
+  <svg className={styles.checkIcon} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M2.5 6.5l2.5 2.5 5-6" />
+  </svg>
+);
+
 export function MenuDropdown({ items, onAction, onClose }: MenuDropdownProps) {
   const visibleItems = items.filter((item) => {
     if (item.type === 'separator') return true;
     return !item.hidden;
   });
 
-  // 清理连续的分隔线和首尾分隔线
   const cleanedItems = visibleItems.filter((item, idx, arr) => {
     if (item.type !== 'separator') return true;
     if (idx === 0 || idx === arr.length - 1) return false;
@@ -24,7 +29,6 @@ export function MenuDropdown({ items, onAction, onClose }: MenuDropdownProps) {
   const handleItemClick = (item: MenuItem) => {
     if (item.type === 'separator') return;
     if (item.disabled || item.submenu) return;
-
     if (item.action) {
       onAction(item.action);
       onClose();
@@ -42,9 +46,7 @@ export function MenuDropdown({ items, onAction, onClose }: MenuDropdownProps) {
           styles.item,
           item.disabled ? styles.disabled : '',
           item.submenu ? styles.submenu : '',
-        ]
-          .filter(Boolean)
-          .join(' ');
+        ].filter(Boolean).join(' ');
 
         return (
           <div
@@ -56,14 +58,14 @@ export function MenuDropdown({ items, onAction, onClose }: MenuDropdownProps) {
             onClick={() => handleItemClick(item)}
           >
             <div className={styles.check}>
-              {item.checked ? <span className={styles.checkIcon}></span> : null}
+              {item.checked ? <CheckIcon /> : null}
             </div>
             <span className={styles.label}>{item.label}</span>
             <span className={styles.meta}>
               {item.shortcut ? (
                 <span className={styles.shortcut}>{item.shortcut}</span>
               ) : null}
-              {item.submenu ? <span className={styles.arrow}>▸</span> : null}
+              {item.submenu ? <span className={styles.arrow}>›</span> : null}
             </span>
           </div>
         );
