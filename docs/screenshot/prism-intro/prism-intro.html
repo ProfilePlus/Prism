@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prism Intro Video</title>
+  <style>
+    :root {
+      --paper: #eee8dd;
+      --paper-soft: #f7f4ef;
+      --ink: #24211d;
+      --muted: #786f64;
+      --line: rgba(42, 38, 33, 0.14);
+      --green: #315f43;
+      --blue: #425b74;
+      --red: #8c3f35;
+      --shadow: 0 34px 90px rgba(40, 33, 25, 0.20);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "TsangerJinKai02 W04", "Kaiti SC", "STKaiti", "Songti SC", "PingFang SC", serif;
+    }
+
+    body {
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .stage {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background:
+        linear-gradient(90deg, rgba(49, 95, 67, 0.075) 0 1px, transparent 1px 100%),
+        linear-gradient(180deg, rgba(49, 95, 67, 0.05) 0 1px, transparent 1px 100%),
+        var(--paper);
+      background-size: 120px 120px, 120px 120px, auto;
+    }
+
+    .stage::before {
+      content: "";
+      position: absolute;
+      inset: 48px;
+      border: 1px solid rgba(42, 38, 33, 0.10);
+      pointer-events: none;
+    }
+
+    .stage::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(rgba(36, 33, 29, 0.08) 0.7px, transparent 0.7px);
+      background-size: 5px 5px;
+      opacity: 0.18;
+      mix-blend-mode: multiply;
+      pointer-events: none;
+    }
+
+    .shot {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 1440px;
+      height: 810px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #f9f8f4;
+      border: 1px solid rgba(42, 38, 33, 0.13);
+      box-shadow: var(--shadow);
+      transform-origin: center center;
+      will-change: transform, opacity, filter;
+    }
+
+    .shot img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .shot.small {
+      width: 680px;
+      height: 382px;
+      box-shadow: 0 24px 70px rgba(40, 33, 25, 0.18);
+    }
+
+    .copy {
+      position: absolute;
+      z-index: 20;
+      opacity: 0;
+      will-change: transform, opacity;
+    }
+
+    .brandMark {
+      left: 132px;
+      top: 154px;
+      width: 560px;
+    }
+
+    .brandName {
+      margin: 0;
+      font-family: "Newsreader", "Source Serif 4", Georgia, serif;
+      font-size: 118px;
+      font-weight: 520;
+      line-height: 0.9;
+      letter-spacing: 0;
+      color: var(--ink);
+    }
+
+    .brandLine {
+      width: 132px;
+      height: 3px;
+      margin: 36px 0 28px;
+      background: var(--green);
+      transform-origin: left center;
+    }
+
+    .brandSub {
+      margin: 0;
+      max-width: 520px;
+      font-size: 32px;
+      line-height: 1.55;
+      color: var(--muted);
+    }
+
+    .labelBlock {
+      left: 126px;
+      bottom: 118px;
+      width: 520px;
+    }
+
+    .eyebrow {
+      margin: 0 0 20px;
+      font-family: "JetBrains Mono", Menlo, monospace;
+      font-size: 15px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--green);
+    }
+
+    .sceneTitle {
+      margin: 0;
+      font-size: 54px;
+      font-weight: 600;
+      line-height: 1.16;
+      color: var(--ink);
+    }
+
+    .sceneText {
+      margin: 22px 0 0;
+      font-size: 25px;
+      line-height: 1.55;
+      color: var(--muted);
+    }
+
+    .chips {
+      position: absolute;
+      z-index: 24;
+      display: flex;
+      gap: 12px;
+      opacity: 0;
+      will-change: transform, opacity;
+    }
+
+    .chip {
+      min-width: 104px;
+      padding: 10px 16px 11px;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      background: rgba(247, 244, 239, 0.88);
+      box-shadow: 0 12px 34px rgba(40, 33, 25, 0.10);
+      font-size: 20px;
+      line-height: 1;
+      color: var(--ink);
+      text-align: center;
+      backdrop-filter: blur(16px);
+    }
+
+    .chip.green {
+      color: #254c35;
+      border-color: rgba(49, 95, 67, 0.28);
+    }
+
+    .chip.blue {
+      color: #334e67;
+      border-color: rgba(66, 91, 116, 0.26);
+    }
+
+    .chip.red {
+      color: #76372f;
+      border-color: rgba(140, 63, 53, 0.26);
+    }
+
+    .endFrame {
+      position: absolute;
+      inset: 0;
+      z-index: 40;
+      display: grid;
+      place-items: center;
+      opacity: 0;
+      will-change: opacity, transform;
+    }
+
+    .endPanel {
+      width: 1060px;
+      padding: 78px 88px 82px;
+      border-radius: 8px;
+      border: 1px solid rgba(42, 38, 33, 0.14);
+      background: rgba(247, 244, 239, 0.86);
+      box-shadow: 0 36px 96px rgba(40, 33, 25, 0.20);
+      backdrop-filter: blur(22px);
+      text-align: center;
+    }
+
+    .endPanel h2 {
+      margin: 0;
+      font-family: "Newsreader", "Source Serif 4", Georgia, serif;
+      font-size: 104px;
+      font-weight: 520;
+      line-height: 0.95;
+      letter-spacing: 0;
+    }
+
+    .endPanel p {
+      margin: 30px auto 0;
+      max-width: 790px;
+      font-size: 30px;
+      line-height: 1.55;
+      color: var(--muted);
+    }
+
+    .endMeta {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      margin-top: 38px;
+    }
+
+    .watermark {
+      position: absolute;
+      right: 34px;
+      bottom: 24px;
+      z-index: 80;
+      font-family: Menlo, "JetBrains Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      color: rgba(36, 33, 29, 0.42);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <main class="stage" id="stage">
+    <section class="copy brandMark" id="brand">
+      <h1 class="brandName">Prism</h1>
+      <div class="brandLine" id="brandLine"></div>
+      <p class="brandSub">A native-feeling Markdown editor for quiet writing, beautiful preview, and polished export.</p>
+    </section>
+
+    <section class="copy labelBlock" id="label">
+      <p class="eyebrow" id="eyebrow">Split View</p>
+      <h2 class="sceneTitle" id="sceneTitle">写作与预览保持同一节奏</h2>
+      <p class="sceneText" id="sceneText">左侧组织文档，中间专注编辑，右侧即时检查排版。</p>
+    </section>
+
+    <div class="shot" id="shotA"><img src="assets/split.png" alt=""></div>
+    <div class="shot" id="shotB"><img src="assets/edit.png" alt=""></div>
+    <div class="shot" id="shotC"><img src="assets/preview-typography.png" alt=""></div>
+    <div class="shot small" id="shotD"><img src="assets/preview-code.png" alt=""></div>
+    <div class="shot small" id="shotE"><img src="assets/preview-diagram.png" alt=""></div>
+    <div class="shot" id="shotF"><img src="assets/export.png" alt=""></div>
+
+    <div class="chips" id="chipsA">
+      <div class="chip green">Code</div>
+      <div class="chip blue">Mermaid</div>
+      <div class="chip red">KaTeX</div>
+      <div class="chip">Tables</div>
+    </div>
+
+    <div class="chips" id="chipsB">
+      <div class="chip green">HTML</div>
+      <div class="chip blue">PDF</div>
+      <div class="chip red">Word</div>
+      <div class="chip">PNG</div>
+    </div>
+
+    <section class="endFrame" id="endFrame">
+      <div class="endPanel">
+        <h2>Prism</h2>
+        <p>Markdown editor for people who care about words, typography, and export quality.</p>
+        <div class="endMeta">
+          <span class="chip green">macOS DMG</span>
+          <span class="chip blue">Windows</span>
+          <span class="chip red">Open Source</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="watermark">Created by Huashu-Design</div>
+  </main>
+
+  <script>
+    const DURATION = 20;
+    const state = {
+      startedAt: 0,
+      raf: 0,
+      ready: false,
+      nodes: {},
+    };
+
+    const textBeats = [
+      {
+        start: 2.65,
+        end: 6.7,
+        eyebrow: 'Split View',
+        title: '写作与预览保持同一节奏',
+        text: '左侧组织文档，中间专注编辑，右侧即时检查排版。',
+      },
+      {
+        start: 6.75,
+        end: 10.85,
+        eyebrow: 'Typography',
+        title: '中文长文也能安静好读',
+        text: '居中的预览、克制的间距、清楚的层级，让内容先于工具出现。',
+      },
+      {
+        start: 10.75,
+        end: 14.8,
+        eyebrow: 'Technical Writing',
+        title: '代码、公式、图表自然进入正文',
+        text: 'Markdown 不只是段落，还应该承载结构、逻辑和技术表达。',
+      },
+      {
+        start: 14.65,
+        end: 17.75,
+        eyebrow: 'Export',
+        title: '四种格式，一套排版气质',
+        text: 'HTML、PDF、Word、PNG：从写作到交付保持一致。',
+      },
+    ];
+
+    function q(id) {
+      return document.getElementById(id);
+    }
+
+    function clamp(value, min = 0, max = 1) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function easeOutCubic(x) {
+      return 1 - Math.pow(1 - clamp(x), 3);
+    }
+
+    function easeInOutCubic(x) {
+      x = clamp(x);
+      return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+    }
+
+    function pulse(t, start, end, fade = 0.7) {
+      return clamp((t - start) / fade) * clamp((end - t) / fade);
+    }
+
+    function lerp(a, b, x) {
+      return a + (b - a) * x;
+    }
+
+    function setShot(node, opacity, x, y, scale, extra = {}) {
+      node.style.opacity = opacity.toFixed(3);
+      node.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) scale(${scale})`;
+      node.style.filter = extra.blur ? `blur(${extra.blur}px)` : 'none';
+    }
+
+    function setCopy(node, opacity, x, y) {
+      node.style.opacity = opacity.toFixed(3);
+      node.style.transform = `translate(${x}px, ${y}px)`;
+    }
+
+    function applyTextBeat(t) {
+      const beat = textBeats.find((item) => t >= item.start - 0.2 && t < item.end + 0.2) ?? textBeats[0];
+      state.nodes.eyebrow.textContent = beat.eyebrow;
+      state.nodes.sceneTitle.textContent = beat.title;
+      state.nodes.sceneText.textContent = beat.text;
+
+      const opacity = pulse(t, beat.start, beat.end, 0.62);
+      const entrance = easeOutCubic((t - beat.start) / 0.9);
+      setCopy(state.nodes.label, opacity, lerp(-26, 0, entrance), lerp(20, 0, entrance));
+    }
+
+    function render(t) {
+      t = clamp(t, 0, DURATION);
+
+      const intro = pulse(t, 0.25, 3.25, 0.9);
+      setCopy(state.nodes.brand, intro, lerp(-34, 0, easeOutCubic(t / 1.25)), lerp(20, 0, easeOutCubic(t / 1.25)));
+      state.nodes.brandLine.style.transform = `scaleX(${easeOutCubic((t - 0.7) / 0.8)})`;
+
+      applyTextBeat(t);
+
+      const split = pulse(t, 0.4, 6.45, 0.95);
+      const splitMove = easeInOutCubic((t - 0.4) / 6.0);
+      setShot(state.nodes.shotA, split, lerp(210, 120, splitMove), lerp(10, -18, splitMove), lerp(0.86, 0.93, splitMove));
+
+      const edit = pulse(t, 3.95, 9.1, 0.85);
+      const editMove = easeInOutCubic((t - 4.0) / 4.5);
+      setShot(state.nodes.shotB, edit, lerp(260, 156, editMove), lerp(-8, -26, editMove), lerp(0.82, 0.95, editMove));
+
+      const preview = pulse(t, 7.1, 12.05, 0.85);
+      const previewMove = easeInOutCubic((t - 7.1) / 4.35);
+      setShot(state.nodes.shotC, preview, lerp(270, 122, previewMove), lerp(0, -20, previewMove), lerp(0.84, 0.96, previewMove));
+
+      const code = pulse(t, 10.25, 15.0, 0.72);
+      const codeMove = easeInOutCubic((t - 10.25) / 4.2);
+      setShot(state.nodes.shotD, code, lerp(-240, -300, codeMove), lerp(-72, -108, codeMove), lerp(0.98, 1.05, codeMove));
+      setShot(state.nodes.shotE, code, lerp(430, 392, codeMove), lerp(142, 98, codeMove), lerp(1.02, 1.09, codeMove));
+      state.nodes.chipsA.style.opacity = (pulse(t, 11.25, 14.7, 0.5)).toFixed(3);
+      state.nodes.chipsA.style.left = '654px';
+      state.nodes.chipsA.style.top = '812px';
+      state.nodes.chipsA.style.transform = `translateY(${lerp(18, 0, easeOutCubic((t - 11.25) / 0.75))}px)`;
+
+      const exp = pulse(t, 14.55, 18.1, 0.65);
+      const expMove = easeInOutCubic((t - 14.55) / 3.2);
+      setShot(state.nodes.shotF, exp, lerp(208, 108, expMove), lerp(-10, -12, expMove), lerp(0.82, 0.94, expMove));
+      state.nodes.chipsB.style.opacity = (pulse(t, 15.15, 17.75, 0.45)).toFixed(3);
+      state.nodes.chipsB.style.left = '656px';
+      state.nodes.chipsB.style.top = '828px';
+      state.nodes.chipsB.style.transform = `translateY(${lerp(16, 0, easeOutCubic((t - 15.15) / 0.6))}px)`;
+
+      const end = clamp((t - 17.2) / 1.15);
+      const endOpacity = easeOutCubic(end);
+      state.nodes.endFrame.style.opacity = endOpacity.toFixed(3);
+      state.nodes.endFrame.style.transform = `scale(${lerp(0.985, 1, endOpacity)})`;
+
+      if (t > 17.1) {
+        const bgFade = clamp((t - 17.1) / 0.9);
+        [state.nodes.shotA, state.nodes.shotC, state.nodes.shotF].forEach((node, index) => {
+          node.style.opacity = (0.16 * bgFade).toFixed(3);
+          node.style.filter = 'blur(2px)';
+          node.style.transform = `translate(calc(-50% + ${[-540, 0, 540][index]}px), calc(-50% + ${[-90, 80, -30][index]}px)) scale(0.58)`;
+        });
+      }
+    }
+
+    function tick(now) {
+      if (!state.startedAt) state.startedAt = now;
+      const raw = (now - state.startedAt) / 1000;
+      const t = window.__recording ? Math.min(raw, DURATION) : raw % DURATION;
+      render(t);
+      if (!window.__recording || raw < DURATION) {
+        state.raf = requestAnimationFrame(tick);
+      }
+    }
+
+    function waitForImages() {
+      const images = Array.from(document.images);
+      return Promise.all(images.map((img) => {
+        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+        return new Promise((resolve) => {
+          img.addEventListener('load', resolve, { once: true });
+          img.addEventListener('error', resolve, { once: true });
+        });
+      }));
+    }
+
+    function boot() {
+      state.nodes = {
+        brand: q('brand'),
+        brandLine: q('brandLine'),
+        label: q('label'),
+        eyebrow: q('eyebrow'),
+        sceneTitle: q('sceneTitle'),
+        sceneText: q('sceneText'),
+        shotA: q('shotA'),
+        shotB: q('shotB'),
+        shotC: q('shotC'),
+        shotD: q('shotD'),
+        shotE: q('shotE'),
+        shotF: q('shotF'),
+        chipsA: q('chipsA'),
+        chipsB: q('chipsB'),
+        endFrame: q('endFrame'),
+      };
+
+      window.__seek = (time) => {
+        state.startedAt = performance.now() - time * 1000;
+        render(time);
+      };
+
+      Promise.all([
+        document.fonts ? document.fonts.ready : Promise.resolve(),
+        waitForImages(),
+      ]).then(() => {
+        requestAnimationFrame(() => {
+          render(0);
+          window.__ready = true;
+          state.startedAt = 0;
+          state.raf = requestAnimationFrame(tick);
+        });
+      });
+    }
+
+    boot();
+  </script>
+</body>
+</html>

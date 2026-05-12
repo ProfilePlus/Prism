@@ -1,0 +1,46 @@
+name: Feature request
+description: Suggest an improvement for Prism.
+title: "[Feature] "
+labels: ["needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tell us what writing workflow you are trying to improve. Concrete examples help a lot.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is hard, slow, or unpleasant in the current workflow?
+      placeholder: "When I write ..., I need Prism to ..."
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What would a good version of this feature feel like?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Writing experience
+        - Preview typography
+        - Search / replace
+        - Export
+        - Themes
+        - File management
+        - Keyboard shortcuts
+        - Platform integration
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Links, screenshots, apps, or documents that show the desired behavior.
+

@@ -1,0 +1,73 @@
+name: Bug report
+description: Report something that is broken or behaves unexpectedly.
+title: "[Bug] "
+labels: ["needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Prism. Screenshots and small Markdown samples are especially useful.
+  - type: input
+    id: version
+    attributes:
+      label: Prism version
+      placeholder: "v0.1.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Windows
+        - Linux
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Editor
+        - Preview
+        - Split view
+        - Search / replace
+        - Export
+        - Theme
+        - File tree
+        - Build / install
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the bug and what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Switch to ...
+        3. Click ...
+        4. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: markdown
+    attributes:
+      label: Minimal Markdown sample
+      description: If the issue is about rendering, export, search, or formatting, paste a small Markdown sample.
+      render: markdown
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or screen recordings
+      description: Drag images or videos here if they help explain the issue.
+
