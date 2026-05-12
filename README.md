@@ -4,7 +4,11 @@
 
 **A quiet, native-feeling Markdown editor for writers who care about typography.**
 
-**为中文写作、预览排版和高质量导出而打磨的 Markdown 桌面编辑器。**
+<p>
+  <a href="README.md">English</a>
+  ·
+  <a href="README.zh-CN.md">简体中文</a>
+</p>
 
 <p>
   <a href="https://github.com/AlexPlum405/Prism/releases/latest">
@@ -25,7 +29,7 @@
   ·
   <a href="#screenshots">Screenshots</a>
   ·
-  <a href="#中文简介">中文简介</a>
+  <a href="#development">Development</a>
 </p>
 
 <a href="docs/screenshot/prism-intro/prism-intro-final.mp4">
@@ -40,23 +44,29 @@
 
 ## Why Prism
 
-Prism is a desktop Markdown editor built around one idea: writing tools should feel calm, precise, and out of the way.
+Most Markdown editors can render Markdown. Prism focuses on how writing feels.
 
-It combines a native Tauri shell, CodeMirror 6 editing, polished Markdown preview, Chinese-friendly typography, document search, multiple visual themes, and one-click export to HTML, PDF, Word, and PNG.
+Prism is a desktop Markdown editor built with Tauri, React, TypeScript, and CodeMirror 6. It is designed for calm long-form writing, polished preview typography, Chinese and mixed-language documents, and export workflows that preserve the visual quality of the page.
 
-Prism is still young, but it is already usable for real writing workflows: drafts, technical notes, product docs, README pages, and long-form Chinese writing.
+It is currently best suited for:
+
+- Long-form Chinese writing
+- Technical notes and product documents
+- README and documentation drafts
+- Markdown documents with code, tables, diagrams, and formulas
+- Exporting themed documents to HTML, PDF, Word, or PNG
 
 ## Highlights
 
 | What you get | Why it matters |
 | --- | --- |
-| **Edit / Split / Preview modes** | Switch between focused writing, live comparison, and clean reading. |
-| **Chinese-first typography** | Comfortable spacing, centered preview, writing themes, and code styling tuned for mixed Chinese and technical content. |
-| **CodeMirror 6 editor core** | Reliable text editing, selection, search, replace, and keyboard-driven workflows. |
-| **Markdown power features** | GitHub Flavored Markdown, syntax highlighting, Mermaid diagrams, KaTeX math, tables, task lists, blockquotes. |
-| **Beautiful content themes** | MiaoYan, Inkstone, Slate, Mono, and Nocturne Dark, each with its own visual tokens. |
-| **Product-grade export** | Export HTML, PDF, Word (`.docx`), and PNG with themed rendering and Prism-native save dialogs. |
-| **Desktop workspace** | Sidebar, file tree, outline, context menu, status bar, auto-save, and recent workflow affordances. |
+| Edit / Split / Preview modes | Switch between focused writing, live comparison, and clean reading. |
+| Chinese-first typography | Comfortable spacing, centered preview, and themes tuned for mixed Chinese and technical content. |
+| CodeMirror 6 editor core | Reliable editing, selection, search, replace, and keyboard-driven workflows. |
+| Markdown power features | GFM, syntax highlighting, Mermaid, KaTeX, tables, task lists, blockquotes, and more. |
+| Five content themes | MiaoYan, Inkstone, Slate, Mono, and Nocturne Dark, each with its own visual tokens. |
+| Product-grade export | Export HTML, PDF, Word (`.docx`), and PNG with themed rendering and Prism-native save dialogs. |
+| Desktop workspace | Sidebar, file tree, outline, context menu, status bar, and auto-save. |
 
 ## Download
 
@@ -95,7 +105,7 @@ macOS builds are currently unsigned. If macOS blocks the app on first launch, us
 
 <img src="docs/screenshot/prism-intro/assets/export.png" alt="Prism export menu with HTML, PDF, Word, PNG" width="920">
 
-## Feature Details
+## Features
 
 ### Editing
 
@@ -196,16 +206,6 @@ npm run build
 - Theme gallery and theme authoring docs
 - Spell checking
 - More keyboard-first writing workflows
-
-## 中文简介
-
-Prism 是一个基于 **Tauri 2 + React + TypeScript + CodeMirror 6** 的 Markdown 桌面编辑器。
-
-它更关注中文写作时真正会影响体验的细节：字号、行高、预览居中、代码块颜色、表格、Mermaid 图表、KaTeX 公式、搜索替换、主题一致性，以及最后交付时的 HTML / PDF / Word / PNG 导出。
-
-如果你需要一个适合写中文长文、技术笔记、产品文档和 README 的桌面 Markdown 编辑器，Prism 正在朝这个方向打磨。
-
-欢迎 star、试用、提 issue，也欢迎提供你喜欢的写作主题和排版参考。
 
 ## Contributing
 
