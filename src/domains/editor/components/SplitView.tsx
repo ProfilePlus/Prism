@@ -1,13 +1,26 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { EditorPane, EditorPaneHandle } from './EditorPane';
 import { PreviewPane } from './PreviewPane';
-import { SearchPanel, SearchParams } from './SearchPanel';
+import { buildSearchPattern, countMatches, SearchAction, SearchMode, SearchPanel, SearchParams } from './SearchPanel';
 
 interface SplitViewProps {
   content: string;
   viewMode: 'edit' | 'split' | 'preview';
   onChange: (content: string) => void;
   onCursorChange?: (cursor: { line: number; column: number }) => void;
+}
+
+const DEFAULT_SEARCH_PARAMS: SearchParams = {
+  query: '',
+  replaceWith: '',
+  matchCase: false,
+  regexp: false,
+  wholeWord: false,
+};
+
+function normalizeSelectionSeed(text: string) {
+  const seed = text.replace(/\u00a0/g, ' ');
+  return seed.trim().length > 0 ? seed : '';
 }
 
 // 借鉴 VSCode markdown preview scroll-sync 算法
@@ -146,14 +159,152 @@ function pageOffsetToLine(scrollTop: number, elements: CodeLineElement[], previe
   return previous.line;
 }
 
+function clearPreviewSearchMarks(preview: HTMLElement) {
+  const marks = Array.from(preview.querySelectorAll<HTMLElement>('.preview-search-match'));
+  for (const mark of marks) {
+    const parent = mark.parentNode;
+    if (!parent) continue;
+    parent.replaceChild(document.createTextNode(mark.textContent ?? ''), mark);
+    parent.normalize();
+  }
+}
+
+function isSearchablePreviewTextNode(node: Node) {
+  const parent = node.parentElement;
+  if (!parent) return false;
+  if (!node.textContent) return false;
+  return !parent.closest('.preview-search-match, script, style, noscript, textarea, input, select, button, svg');
+}
+
+function applyPreviewSearch(
+  preview: HTMLElement | null,
+  params: SearchParams,
+  currentMatch: number,
+) {
+  if (!preview) return { count: 0, current: 0 };
+
+  clearPreviewSearchMarks(preview);
+
+  const write = preview.querySelector<HTMLElement>('#write');
+  if (!write || !params.query) return { count: 0, current: 0 };
+
+  const pattern = buildSearchPattern(params.query, params.matchCase, params.regexp, params.wholeWord);
+  if (!pattern || pattern === 'invalid') return { count: 0, current: 0 };
+
+  const textNodes: Text[] = [];
+  const walker = document.createTreeWalker(write, NodeFilter.SHOW_TEXT, {
+    acceptNode: (node) => (
+      isSearchablePreviewTextNode(node)
+        ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_REJECT
+    ),
+  });
+
+  while (walker.nextNode()) {
+    textNodes.push(walker.currentNode as Text);
+  }
+
+  const occurrences: Array<{ node: Text; from: number; to: number }> = [];
+  for (const node of textNodes) {
+    const text = node.data;
+    pattern.lastIndex = 0;
+
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(text)) !== null) {
+      if (match[0].length === 0) {
+        pattern.lastIndex += 1;
+        continue;
+      }
+
+      occurrences.push({
+        node,
+        from: match.index,
+        to: match.index + match[0].length,
+      });
+    }
+  }
+
+  const count = occurrences.length;
+  if (count === 0) return { count: 0, current: 0 };
+
+  const normalizedCurrent = Math.min(Math.max(currentMatch || 1, 1), count);
+  const occurrencesByNode = new Map<Text, Array<{ from: number; to: number; index: number }>>();
+
+  occurrences.forEach((occurrence, index) => {
+    const entries = occurrencesByNode.get(occurrence.node) ?? [];
+    entries.push({ ...occurrence, index: index + 1 });
+    occurrencesByNode.set(occurrence.node, entries);
+  });
+
+  let currentElement: HTMLElement | null = null;
+  for (const [node, entries] of occurrencesByNode) {
+    const fragment = document.createDocumentFragment();
+    let cursor = 0;
+
+    for (const entry of entries) {
+      if (entry.from > cursor) {
+        fragment.appendChild(document.createTextNode(node.data.slice(cursor, entry.from)));
+      }
+
+      const mark = document.createElement('span');
+      mark.className = entry.index === normalizedCurrent
+        ? 'preview-search-match preview-search-match--current'
+        : 'preview-search-match';
+      mark.textContent = node.data.slice(entry.from, entry.to);
+      fragment.appendChild(mark);
+
+      if (entry.index === normalizedCurrent) {
+        currentElement = mark;
+      }
+
+      cursor = entry.to;
+    }
+
+    if (cursor < node.data.length) {
+      fragment.appendChild(document.createTextNode(node.data.slice(cursor)));
+    }
+
+    node.replaceWith(fragment);
+  }
+
+  currentElement?.scrollIntoView({ block: 'center', inline: 'nearest' });
+
+  return { count, current: normalizedCurrent };
+}
+
 export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
   function SplitView({ content, viewMode, onChange, onCursorChange }, ref) {
     const previewContainerRef = useRef<HTMLDivElement>(null);
     const editorRef = useRef<EditorPaneHandle>(null);
     const [searchVisible, setSearchVisible] = useState(false);
+    const [searchMode, setSearchMode] = useState<SearchMode>('find');
+    const [searchParams, setSearchParams] = useState<SearchParams>(DEFAULT_SEARCH_PARAMS);
+    const [searchMatchCount, setSearchMatchCount] = useState(0);
+    const [searchCurrentMatch, setSearchCurrentMatch] = useState(0);
+    const [searchActivationKey, setSearchActivationKey] = useState(0);
+    const searchParamsRef = useRef(searchParams);
+    const searchCurrentMatchRef = useRef(searchCurrentMatch);
+    const contentRef = useRef(content);
+    const viewModeRef = useRef(viewMode);
     // 同步方向锁：防止反馈循环
     const syncingRef = useRef<'editor' | 'preview' | null>(null);
     const syncingTimerRef = useRef<number | null>(null);
+
+    useEffect(() => {
+      searchParamsRef.current = searchParams;
+    }, [searchParams]);
+
+    useEffect(() => {
+      searchCurrentMatchRef.current = searchCurrentMatch;
+    }, [searchCurrentMatch]);
+
+    useEffect(() => {
+      contentRef.current = content;
+    }, [content]);
+
+    useEffect(() => {
+      viewModeRef.current = viewMode;
+    }, [viewMode]);
 
     useImperativeHandle(ref, () => ({
       jumpToLine: (line) => {
@@ -173,35 +324,165 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
       setScrollRatio: (ratio) => editorRef.current?.setScrollRatio(ratio),
       scrollToLine: (line) => editorRef.current?.scrollToLine(line),
       execSearch: (action, params) => editorRef.current?.execSearch?.(action, params),
+      restoreSearch: (params, currentMatch) => editorRef.current?.restoreSearch?.(params, currentMatch),
+      getSelectedText: () => editorRef.current?.getSelectedText?.() ?? '',
     }));
+
+    const getPreviewSelectedText = useCallback(() => {
+      const selection = window.getSelection();
+      const preview = previewContainerRef.current?.querySelector<HTMLElement>('#write');
+      if (!selection || selection.isCollapsed || !preview || !selection.anchorNode) return '';
+      if (!preview.contains(selection.anchorNode)) return '';
+      return normalizeSelectionSeed(selection.toString());
+    }, []);
+
+    const getSearchSeed = useCallback(() => {
+      if (viewModeRef.current !== 'preview') {
+        const editorSeed = normalizeSelectionSeed(editorRef.current?.getSelectedText?.() ?? '');
+        if (editorSeed) return editorSeed;
+      }
+
+      return getPreviewSelectedText();
+    }, [getPreviewSelectedText]);
+
+    const activateSearch = useCallback((mode: SearchMode) => {
+      const seed = getSearchSeed();
+      setSearchMode(mode);
+      setSearchVisible(true);
+      setSearchActivationKey((key) => key + 1);
+
+      if (!seed) return;
+
+      const params = {
+        ...searchParamsRef.current,
+        query: seed,
+      };
+      const localMatchState = countMatches(
+        contentRef.current,
+        params.query,
+        params.matchCase,
+        params.regexp,
+        params.wholeWord,
+      );
+      const count = localMatchState.invalid ? 0 : localMatchState.count;
+      const nextCurrent = count > 0 ? 1 : 0;
+
+      setSearchParams(params);
+      setSearchMatchCount(count);
+      setSearchCurrentMatch(nextCurrent);
+      searchParamsRef.current = params;
+      searchCurrentMatchRef.current = nextCurrent;
+
+      if (viewModeRef.current !== 'preview') {
+        editorRef.current?.execSearch?.('input', params);
+      }
+
+      if (viewModeRef.current !== 'edit') {
+        applyPreviewSearch(previewContainerRef.current, params, nextCurrent);
+      }
+    }, [getSearchSeed]);
 
     useEffect(() => {
       const handleGlobalKeyDown = (e: KeyboardEvent) => {
-        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        const key = e.key.toLowerCase();
+        if ((e.ctrlKey || e.metaKey) && key === 'f') {
           e.preventDefault();
           e.stopPropagation();
-          setSearchVisible(true);
+          activateSearch('find');
+        }
+        if ((e.ctrlKey || e.metaKey) && key === 'h') {
+          e.preventDefault();
+          e.stopPropagation();
+          activateSearch('replace');
         }
       };
-      const handlePrismSearch = () => setSearchVisible(true);
+      const handlePrismSearch = (event: Event) => {
+        const detail = (event as CustomEvent<{ action?: string }>).detail;
+        activateSearch(detail?.action === 'replace' ? 'replace' : 'find');
+      };
       window.addEventListener('keydown', handleGlobalKeyDown, true);
       window.addEventListener('prism-search', handlePrismSearch);
       return () => {
         window.removeEventListener('keydown', handleGlobalKeyDown, true);
         window.removeEventListener('prism-search', handlePrismSearch);
       };
-    }, []);
+    }, [activateSearch]);
 
-    const handleSearch = (action: 'next' | 'prev' | 'all' | 'replace' | 'replaceAll', params: SearchParams) => {
-      if (viewMode === 'preview') {
-        if (action === 'next' || action === 'prev') {
-          const backwards = action === 'prev';
-          (window as any).find(params.query, params.matchCase, backwards, true, params.wholeWord, false, false);
-        }
-      } else {
+    const handleSearch = (action: SearchAction, params: SearchParams) => {
+      const localMatchState = countMatches(content, params.query, params.matchCase, params.regexp, params.wholeWord);
+      const count = localMatchState.invalid ? 0 : localMatchState.count;
+      const previousCurrent = searchCurrentMatchRef.current;
+      let nextCurrent = previousCurrent;
+
+      if (!params.query || count === 0) {
+        nextCurrent = 0;
+      } else if (action === 'input') {
+        nextCurrent = 1;
+      } else if (action === 'next') {
+        nextCurrent = previousCurrent >= count ? 1 : previousCurrent + 1;
+      } else if (action === 'prev') {
+        nextCurrent = previousCurrent <= 1 ? count : previousCurrent - 1;
+      } else if (action === 'replace') {
+        nextCurrent = previousCurrent >= count ? 1 : Math.max(previousCurrent, 1);
+      } else if (action === 'replaceAll') {
+        nextCurrent = 0;
+      } else if (previousCurrent <= 0 || previousCurrent > count) {
+        nextCurrent = 1;
+      }
+
+      setSearchParams(params);
+      setSearchMatchCount(count);
+      setSearchCurrentMatch(nextCurrent);
+      searchParamsRef.current = params;
+      searchCurrentMatchRef.current = nextCurrent;
+
+      if (viewMode !== 'preview') {
         editorRef.current?.execSearch?.(action, params);
       }
+
+      if (viewMode !== 'edit') {
+        applyPreviewSearch(previewContainerRef.current, params, nextCurrent);
+      }
     };
+
+    useEffect(() => {
+      const params = searchParamsRef.current;
+      if (!params.query) {
+        setSearchMatchCount(0);
+        setSearchCurrentMatch(0);
+        searchCurrentMatchRef.current = 0;
+        return;
+      }
+
+      const localMatchState = countMatches(content, params.query, params.matchCase, params.regexp, params.wholeWord);
+      const count = localMatchState.invalid ? 0 : localMatchState.count;
+      const nextCurrent = count === 0
+        ? 0
+        : Math.min(Math.max(searchCurrentMatchRef.current || 1, 1), count);
+
+      setSearchMatchCount(count);
+      setSearchCurrentMatch(nextCurrent);
+      searchCurrentMatchRef.current = nextCurrent;
+    }, [content]);
+
+    useEffect(() => {
+      if (!searchVisible || !searchParams.query) return;
+
+      const frame = requestAnimationFrame(() => {
+        const params = searchParamsRef.current;
+        const current = searchCurrentMatchRef.current;
+
+        if (viewMode !== 'preview') {
+          editorRef.current?.restoreSearch?.(params, current);
+        }
+
+        if (viewMode !== 'edit') {
+          applyPreviewSearch(previewContainerRef.current, params, current);
+        }
+      });
+
+      return () => cancelAnimationFrame(frame);
+    }, [viewMode, content, searchVisible, searchParams.query]);
 
     // 设置同步锁，100ms 后自动释放
     const markSyncing = (direction: 'editor' | 'preview') => {
@@ -293,8 +574,16 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
         <SearchPanel
           visible={searchVisible}
           viewMode={viewMode}
+          content={content}
+          mode={searchMode}
+          initialQuery={searchParams.query}
+          initialReplaceWith={searchParams.replaceWith}
+          matchCount={searchMatchCount}
+          currentMatch={searchCurrentMatch}
+          activationKey={searchActivationKey}
           onClose={() => setSearchVisible(false)}
           onSearch={handleSearch}
+          onModeChange={setSearchMode}
         />
       </div>
     );

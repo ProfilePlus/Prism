@@ -1,13 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 
+export type SearchMode = 'find' | 'replace';
+export type SearchAction = 'input' | 'next' | 'prev' | 'all' | 'replace' | 'replaceAll';
+
 export interface SearchPanelProps {
   visible: boolean;
   viewMode: 'edit' | 'split' | 'preview';
+  content: string;
   onClose: () => void;
-  onSearch: (action: 'next' | 'prev' | 'all' | 'replace' | 'replaceAll', params: SearchParams) => void;
+  onSearch: (action: SearchAction, params: SearchParams) => void;
   initialQuery?: string;
+  initialReplaceWith?: string;
   matchCount?: number;
   currentMatch?: number;
+  mode?: SearchMode;
+  activationKey?: number;
+  onModeChange?: (mode: SearchMode) => void;
 }
 
 export interface SearchParams {
@@ -18,58 +26,128 @@ export interface SearchParams {
   wholeWord: boolean;
 }
 
-export function SearchPanel({ visible, viewMode, onClose, onSearch, initialQuery = '', matchCount = 0, currentMatch = 0 }: SearchPanelProps) {
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export function buildSearchPattern(query: string, matchCase: boolean, regexp: boolean, wholeWord: boolean) {
+  if (!query) return null;
+
+  const source = regexp ? query : escapeRegExp(query);
+  const wrappedSource = wholeWord ? `\\b(?:${source})\\b` : source;
+  const flags = matchCase ? 'g' : 'gi';
+
+  try {
+    return new RegExp(wrappedSource, flags);
+  } catch {
+    return 'invalid' as const;
+  }
+}
+
+export function countMatches(content: string, query: string, matchCase: boolean, regexp: boolean, wholeWord: boolean) {
+  const pattern = buildSearchPattern(query, matchCase, regexp, wholeWord);
+  if (!pattern) return { count: 0, invalid: false };
+  if (pattern === 'invalid') return { count: 0, invalid: true };
+
+  const matches = content.match(pattern);
+  return { count: matches?.length ?? 0, invalid: false };
+}
+
+export function SearchPanel({
+  visible,
+  viewMode,
+  content,
+  onClose,
+  onSearch,
+  initialQuery = '',
+  initialReplaceWith = '',
+  matchCount,
+  currentMatch,
+  mode = 'find',
+  activationKey = 0,
+  onModeChange,
+}: SearchPanelProps) {
   const [query, setQuery] = useState(initialQuery);
-  const [replaceWith, setReplaceWith] = useState('');
-  const [matchCase, setMatchCase] = useState(false);
-  const [regexp, setRegexp] = useState(false);
-  const [wholeWord, setWholeWord] = useState(false);
-  const [isReplaceVisible, setIsReplaceVisible] = useState(false);
-  const [isOptionsOpen, setIsOptionsOpen] = useState(false);
+  const [replaceWith, setReplaceWith] = useState(initialReplaceWith);
+  const matchCase = false;
+  const regexp = false;
+  const wholeWord = false;
+  const [localCurrentMatch, setLocalCurrentMatch] = useState(0);
   
   const queryInputRef = useRef<HTMLInputElement>(null);
-  const optionsRef = useRef<HTMLDivElement>(null);
+  const replaceWithRef = useRef(initialReplaceWith);
+
+  const localMatchState = countMatches(content, query, matchCase, regexp, wholeWord);
+  const resolvedMatchCount = matchCount ?? localMatchState.count;
+  const resolvedCurrentMatch = currentMatch ?? localCurrentMatch;
+  const canReplace = viewMode !== 'preview';
+  const panelMode: SearchMode = canReplace && mode === 'replace' ? 'replace' : 'find';
+  const params = (nextQuery = query, nextReplaceWith = replaceWithRef.current): SearchParams => ({
+    query: nextQuery,
+    replaceWith: nextReplaceWith,
+    matchCase,
+    regexp,
+    wholeWord,
+  });
 
   useEffect(() => {
     if (visible && queryInputRef.current) {
       queryInputRef.current.focus();
       queryInputRef.current.select();
     }
-  }, [visible]);
+  }, [activationKey, visible]);
 
   useEffect(() => {
-    if (initialQuery && visible) {
+    if (visible) {
       setQuery(initialQuery);
     }
   }, [initialQuery, visible]);
 
-  // Click outside to close options dropdown
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (optionsRef.current && !optionsRef.current.contains(event.target as Node)) {
-        setIsOptionsOpen(false);
-      }
-    };
-    if (isOptionsOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+    if (visible) {
+      replaceWithRef.current = initialReplaceWith;
+      setReplaceWith(initialReplaceWith);
     }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOptionsOpen]);
+  }, [initialReplaceWith, visible]);
+
+  useEffect(() => {
+    setLocalCurrentMatch(query ? 1 : 0);
+  }, [query]);
 
   if (!visible) return null;
 
-  const handleAction = (action: 'next' | 'prev' | 'all' | 'replace' | 'replaceAll') => {
-    onSearch(action, { query, replaceWith, matchCase, regexp, wholeWord });
+  const handleQueryChange = (nextQuery: string) => {
+    setQuery(nextQuery);
+    setLocalCurrentMatch(nextQuery ? 1 : 0);
+    onSearch('input', params(nextQuery));
+  };
+
+  const handleAction = (action: SearchAction) => {
+    if ((action === 'next' || action === 'prev') && resolvedMatchCount > 0) {
+      setLocalCurrentMatch((current) => {
+        const normalized = current > 0 ? current : (action === 'prev' ? 1 : 0);
+        if (action === 'prev') {
+          return normalized <= 1 ? resolvedMatchCount : normalized - 1;
+        }
+        return normalized >= resolvedMatchCount ? 1 : normalized + 1;
+      });
+    }
+    onSearch(action, params());
+  };
+
+  const handleReplaceChange = (nextReplaceWith: string) => {
+    replaceWithRef.current = nextReplaceWith;
+    setReplaceWith(nextReplaceWith);
+  };
+
+  const toggleReplaceMode = () => {
+    onModeChange?.(panelMode === 'replace' ? 'find' : 'replace');
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       e.preventDefault();
-      if (isOptionsOpen) {
-        setIsOptionsOpen(false);
-      } else {
-        onClose();
-      }
+      onClose();
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (e.shiftKey) {
@@ -80,136 +158,105 @@ export function SearchPanel({ visible, viewMode, onClose, onSearch, initialQuery
     }
   };
 
-  const canReplace = viewMode !== 'preview';
+  const resultText = query
+    ? localMatchState.invalid
+      ? '0/0'
+      : resolvedMatchCount === 0
+        ? '0/0'
+        : `${resolvedCurrentMatch || 1}/${resolvedMatchCount}`
+    : '';
 
   return (
-    <div className="notepad-search-panel">
-      <div className="notepad-search-container">
-        {/* Top Row: Expander + Find Input + Controls */}
-        <div className="notepad-search-row">
-          <button 
-            type="button" 
-            className={`notepad-search-btn expander ${isReplaceVisible ? 'is-expanded' : ''}`}
-            onClick={() => canReplace && setIsReplaceVisible(!isReplaceVisible)}
-            style={{ visibility: canReplace ? 'visible' : 'hidden' }}
-          ></button>
-
-          <div className="notepad-search-input-wrapper">
-            <input
-              ref={queryInputRef}
-              type="text"
-              placeholder="查找"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={onKeyDown}
-              className="notepad-search-input"
-            />
-            {query && (
-              <span className="notepad-search-result-count">
-                {matchCount === 0 ? '未找到匹配项' : `${currentMatch}/${matchCount}`}
-              </span>
-            )}
-            <span className="notepad-search-icon-inside"></span>
-          </div>
-
-          <div className="notepad-search-separator"></div>
-
-          <div className="notepad-search-controls">
-            <button 
-                name="next" 
-                type="button" 
-                className="notepad-search-btn icon-btn"
-                title="查找下一个" 
-                onClick={() => handleAction('next')}
-            ></button>
-            <button 
-                name="prev" 
-                type="button" 
-                className="notepad-search-btn icon-btn"
-                title="查找上一个" 
-                onClick={() => handleAction('prev')}
-            ></button>
-            
-            <div className="notepad-search-options-container" ref={optionsRef}>
-              <button 
-                type="button" 
-                className={`notepad-search-btn icon-btn options-toggle ${isOptionsOpen ? 'is-active' : ''}`}
-                title="更多选项"
-                onClick={() => setIsOptionsOpen(!isOptionsOpen)}
-              ></button>
-              
-              {isOptionsOpen && (
-                <div className="notepad-search-options-menu">
-                  <label className="notepad-menu-item">
-                    <input type="checkbox" checked={matchCase} onChange={(e) => setMatchCase(e.target.checked)} />
-                    <span className="notepad-menu-check"></span>
-                    区分大小写
-                  </label>
-                  <label className="notepad-menu-item">
-                    <input type="checkbox" checked={true} readOnly />
-                    <span className="notepad-menu-check"></span>
-                    回绕
-                  </label>
-                  <div className="notepad-menu-separator"></div>
-                  <label className={`notepad-menu-item ${!canReplace ? 'is-disabled' : ''}`}>
-                    <input 
-                      type="checkbox" 
-                      checked={regexp} 
-                      disabled={!canReplace}
-                      onChange={(e) => setRegexp(e.target.checked)} 
-                    />
-                    <span className="notepad-menu-check"></span>
-                    正则表达式
-                  </label>
-                  <label className={`notepad-menu-item ${!canReplace ? 'is-disabled' : ''}`}>
-                    <input 
-                      type="checkbox" 
-                      checked={wholeWord} 
-                      disabled={!canReplace}
-                      onChange={(e) => setWholeWord(e.target.checked)} 
-                    />
-                    <span className="notepad-menu-check"></span>
-                    全词匹配
-                  </label>
-                </div>
-              )}
-            </div>
-
-            <button 
-              name="close" 
-              type="button" 
-              className="notepad-search-btn icon-btn close-btn"
-              aria-label="关闭" 
-              onClick={onClose}
-            ></button>
-          </div>
+    <div className={`compat-search-panel ${canReplace ? 'has-replace-toggle' : ''} ${panelMode === 'replace' ? 'is-replace' : ''}`}>
+      <div className="compat-search-row compat-search-row--find">
+        {canReplace && (
+          <button
+            type="button"
+            className={`compat-search-button compat-search-button--mode ${panelMode === 'replace' ? 'is-active' : ''}`}
+            title={panelMode === 'replace' ? '隐藏替换' : '显示替换'}
+            aria-label={panelMode === 'replace' ? '隐藏替换' : '显示替换'}
+            aria-pressed={panelMode === 'replace'}
+            onClick={toggleReplaceMode}
+          />
+        )}
+        <div className="compat-search-field-wrap compat-search-field-wrap--find">
+          <input
+            ref={queryInputRef}
+            type="text"
+            placeholder="查找"
+            aria-label="查找"
+            value={query}
+            onChange={(e) => handleQueryChange(e.target.value)}
+            onKeyDown={onKeyDown}
+            className="compat-search-field"
+          />
         </div>
 
-        {/* Bottom Row: Replace Input + Action Buttons */}
-        {canReplace && isReplaceVisible && (
-          <div className="notepad-search-row expanded-row">
-            <div className="notepad-search-input-wrapper">
-              <input
-                type="text"
-                placeholder="替换"
-                value={replaceWith}
-                onChange={(e) => setReplaceWith(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAction('replace');
-                  }
-                }}
-                className="notepad-search-input"
-              />
-            </div>
-            <div className="notepad-search-actions">
-              <button className="notepad-text-btn" type="button" onClick={() => handleAction('replace')}>替换</button>
-              <button className="notepad-text-btn" type="button" onClick={() => handleAction('replaceAll')}>全部替换</button>
-            </div>
-          </div>
-        )}
+        <div className={`compat-search-match ${query && resolvedMatchCount === 0 ? 'is-empty' : ''}`}>
+          {resultText}
+        </div>
+
+        <button
+          type="button"
+          className="compat-search-button compat-search-button--previous"
+          title="上一个"
+          aria-label="上一个"
+          disabled={!resolvedMatchCount}
+          onClick={() => handleAction('prev')}
+        />
+        <button
+          type="button"
+          className="compat-search-button compat-search-button--next"
+          title="下一个"
+          aria-label="下一个"
+          disabled={!resolvedMatchCount}
+          onClick={() => handleAction('next')}
+        />
+        <button
+          type="button"
+          className="compat-search-button compat-search-button--close"
+          title="完成"
+          aria-label="完成"
+          onClick={onClose}
+        />
       </div>
+
+      {canReplace && (
+        <div className="compat-search-row compat-search-row--replace" aria-hidden={panelMode !== 'replace'}>
+          <div className="compat-search-field-wrap compat-search-field-wrap--replace">
+            <input
+              type="text"
+              placeholder="替换"
+              aria-label="替换"
+              value={replaceWith}
+              onChange={(e) => handleReplaceChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAction('replace');
+                }
+              }}
+              className="compat-search-field"
+            />
+          </div>
+          <button
+            type="button"
+            className="compat-search-button compat-search-button--replace"
+            title="替换"
+            aria-label="替换"
+            disabled={!resolvedMatchCount}
+            onClick={() => handleAction('replace')}
+          />
+          <button
+            type="button"
+            className="compat-search-button compat-search-button--replace-all"
+            title="全部替换"
+            aria-label="全部替换"
+            disabled={!resolvedMatchCount}
+            onClick={() => handleAction('replaceAll')}
+          />
+        </div>
+      )}
     </div>
   );
 }

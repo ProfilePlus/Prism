@@ -205,6 +205,7 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
+  zoom: var(--app-zoom);
 }
 
 .app { display: flex; flex-direction: column; height: 100%; }
@@ -1003,9 +1004,113 @@ html[data-content-theme='nocturne'] .cm-editor .hljs-strong {
   font-weight: 700 !important;
 }
 
-/* CodeMirror 搜索高亮（跟原型语言） */
-.cm-searchMatch { background-color: rgba(255, 224, 102, 0.5); border-radius: 2px; }
-.cm-searchMatch-selected { background-color: var(--c-void) !important; color: var(--c-canvas) !important; }
+/* CodeMirror 搜索高亮：弱化其他命中，强化当前命中。 */
+.cm-editor {
+  --editor-search-match-bg: color-mix(in srgb, var(--accent, #1c5d33) 14%, transparent);
+  --editor-search-current-bg: var(--c-void, #1c5d33);
+  --editor-search-current-ring: color-mix(in srgb, var(--c-void, #1c5d33) 46%, transparent);
+  --editor-search-current-text: var(--c-canvas, #ffffff);
+  --editor-selection-bg: var(--editor-search-current-bg);
+  --editor-selection-ring: var(--editor-search-current-ring);
+  --editor-selection-text: var(--editor-search-current-text);
+}
+
+html[data-content-theme='miaoyan'] .cm-editor {
+  --editor-search-match-bg: color-mix(in srgb, var(--miaoyan-accent) 15%, transparent);
+  --editor-search-current-bg: var(--miaoyan-accent);
+  --editor-search-current-ring: color-mix(in srgb, var(--miaoyan-accent) 58%, transparent);
+  --editor-search-current-text: #ffffff;
+}
+
+html:is([data-content-theme='inkstone'], [data-content-theme='slate'], [data-content-theme='mono']) .cm-editor {
+  --editor-search-match-bg: color-mix(in srgb, var(--theme-accent) 15%, transparent);
+  --editor-search-current-bg: var(--theme-accent);
+  --editor-search-current-ring: color-mix(in srgb, var(--theme-accent) 58%, transparent);
+  --editor-search-current-text: var(--theme-main-bg);
+}
+
+html[data-content-theme='nocturne'] .cm-editor {
+  --editor-search-match-bg: color-mix(in srgb, var(--nocturne-accent) 22%, transparent);
+  --editor-search-current-bg: var(--nocturne-accent);
+  --editor-search-current-ring: color-mix(in srgb, var(--nocturne-accent) 64%, transparent);
+  --editor-search-current-text: var(--nocturne-main-bg);
+}
+
+.cm-editor .cm-searchMatch {
+  background-color: var(--editor-search-match-bg) !important;
+  border-radius: 2px;
+}
+
+.cm-editor .cm-searchMatch-selected {
+  background-color: var(--editor-search-current-bg) !important;
+  box-shadow: 0 0 0 1px var(--editor-search-current-ring);
+  color: var(--editor-search-current-text) !important;
+}
+
+.cm-editor .cm-editor-selection-mark {
+  background-color: var(--editor-selection-bg) !important;
+  box-shadow: 0 0 0 1px var(--editor-selection-ring);
+  border-radius: 2px;
+  color: var(--editor-selection-text) !important;
+}
+
+.cm-editor .cm-editor-selection-mark * {
+  color: inherit !important;
+}
+
+.cm-editor .cm-selectionMatch,
+.cm-editor .cm-selectionMatch-main {
+  background-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.cm-panel.cm-search {
+  display: none !important;
+}
+
+.cm-compat-hidden-search-panel {
+  display: none !important;
+}
+
+.preview-compat {
+  --preview-search-match-bg: color-mix(in srgb, var(--accent, #1c5d33) 14%, transparent);
+  --preview-search-current-bg: var(--c-void, #1c5d33);
+  --preview-search-current-ring: color-mix(in srgb, var(--c-void, #1c5d33) 46%, transparent);
+  --preview-search-current-text: var(--c-canvas, #ffffff);
+}
+
+html[data-content-theme='miaoyan'] .preview-compat {
+  --preview-search-match-bg: color-mix(in srgb, var(--miaoyan-accent) 15%, transparent);
+  --preview-search-current-bg: var(--miaoyan-accent);
+  --preview-search-current-ring: color-mix(in srgb, var(--miaoyan-accent) 58%, transparent);
+  --preview-search-current-text: #ffffff;
+}
+
+html:is([data-content-theme='inkstone'], [data-content-theme='slate'], [data-content-theme='mono']) .preview-compat {
+  --preview-search-match-bg: color-mix(in srgb, var(--theme-accent) 15%, transparent);
+  --preview-search-current-bg: var(--theme-accent);
+  --preview-search-current-ring: color-mix(in srgb, var(--theme-accent) 58%, transparent);
+  --preview-search-current-text: var(--theme-main-bg);
+}
+
+html[data-content-theme='nocturne'] .preview-compat {
+  --preview-search-match-bg: color-mix(in srgb, var(--nocturne-accent) 22%, transparent);
+  --preview-search-current-bg: var(--nocturne-accent);
+  --preview-search-current-ring: color-mix(in srgb, var(--nocturne-accent) 64%, transparent);
+  --preview-search-current-text: var(--nocturne-main-bg);
+}
+
+.preview-search-match {
+  background-color: var(--preview-search-match-bg) !important;
+  border-radius: 2px;
+}
+
+.preview-search-match--current {
+  background-color: var(--preview-search-current-bg) !important;
+  box-shadow: 0 0 0 1px var(--preview-search-current-ring);
+  color: var(--preview-search-current-text) !important;
+}
 
 /* ============================================================
    浮层：CommandPalette / ShortcutPanel / About / Settings / Toast
@@ -1298,6 +1403,8 @@ body.dark .modal-overlay { background: rgba(0, 0, 0, 0.6); }
   position: fixed;
   z-index: 4000;
   min-width: 220px;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
   background: var(--c-canvas);
   border: 1px solid var(--c-fog);
   border-radius: var(--r-card);
@@ -1395,6 +1502,11 @@ html[data-content-theme='inkstone'] {
   --inkstone-panel-secondary: rgba(70, 111, 87, 0.08);
   --inkstone-font: 'TsangerJinKai02-W04', 'TsangerJinKai02 W04', 'Kaiti SC', 'STKaiti', 'Songti SC', serif;
   --inkstone-code-font: SFMono-Regular, Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  --inkstone-search-bg: color-mix(in srgb, var(--inkstone-main-bg) 92%, #000);
+  --inkstone-search-field-bg: var(--inkstone-main-bg);
+  --inkstone-search-field-border: color-mix(in srgb, var(--inkstone-border) 80%, #000);
+  --inkstone-search-shadow: 0 9px 22px rgba(72, 58, 35, 0.16), 0 1px 3px rgba(72, 58, 35, 0.12);
+  --inkstone-search-font: var(--inkstone-font);
 
   --theme-main-bg: var(--inkstone-main-bg);
   --theme-pane-bg: var(--inkstone-pane-bg);
@@ -1415,6 +1527,11 @@ html[data-content-theme='inkstone'] {
   --theme-panel-secondary: var(--inkstone-panel-secondary);
   --theme-font: var(--inkstone-font);
   --theme-code-font: var(--inkstone-code-font);
+  --theme-search-bg: var(--inkstone-search-bg);
+  --theme-search-field-bg: var(--inkstone-search-field-bg);
+  --theme-search-field-border: var(--inkstone-search-field-border);
+  --theme-search-shadow: var(--inkstone-search-shadow);
+  --theme-search-font: var(--inkstone-search-font);
 
   --c-void: #24231f;
   --c-canvas: #fcfbf7;
@@ -1900,6 +2017,11 @@ html[data-content-theme='slate'] {
   --slate-panel-secondary: rgba(88, 122, 133, 0.08);
   --slate-font: 'IBM Plex Sans', 'PingFang SC', 'Hiragino Sans GB', -apple-system, BlinkMacSystemFont, sans-serif;
   --slate-code-font: SFMono-Regular, Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  --slate-search-bg: color-mix(in srgb, var(--slate-main-bg) 92%, #000);
+  --slate-search-field-bg: var(--slate-main-bg);
+  --slate-search-field-border: color-mix(in srgb, var(--slate-border) 82%, #000);
+  --slate-search-shadow: 0 9px 22px rgba(35, 49, 53, 0.15), 0 1px 3px rgba(35, 49, 53, 0.11);
+  --slate-search-font: var(--slate-font);
 
   --theme-main-bg: var(--slate-main-bg);
   --theme-pane-bg: var(--slate-pane-bg);
@@ -1920,6 +2042,11 @@ html[data-content-theme='slate'] {
   --theme-panel-secondary: var(--slate-panel-secondary);
   --theme-font: var(--slate-font);
   --theme-code-font: var(--slate-code-font);
+  --theme-search-bg: var(--slate-search-bg);
+  --theme-search-field-bg: var(--slate-search-field-bg);
+  --theme-search-field-border: var(--slate-search-field-border);
+  --theme-search-shadow: var(--slate-search-shadow);
+  --theme-search-font: var(--slate-search-font);
 
   --c-void: #222829;
   --c-canvas: #f7f8f8;
@@ -2405,6 +2532,11 @@ html[data-content-theme='mono'] {
   --mono-panel-secondary: rgba(59, 111, 72, 0.08);
   --mono-font: 'JetBrains Mono', SFMono-Regular, Menlo, 'PingFang SC', monospace;
   --mono-code-font: 'JetBrains Mono', SFMono-Regular, Menlo, monospace;
+  --mono-search-bg: color-mix(in srgb, var(--mono-main-bg) 92%, #000);
+  --mono-search-field-bg: var(--mono-main-bg);
+  --mono-search-field-border: color-mix(in srgb, var(--mono-border) 82%, #000);
+  --mono-search-shadow: 0 9px 22px rgba(24, 26, 24, 0.15), 0 1px 3px rgba(24, 26, 24, 0.1);
+  --mono-search-font: var(--mono-font);
 
   --theme-main-bg: var(--mono-main-bg);
   --theme-pane-bg: var(--mono-pane-bg);
@@ -2425,6 +2557,11 @@ html[data-content-theme='mono'] {
   --theme-panel-secondary: var(--mono-panel-secondary);
   --theme-font: var(--mono-font);
   --theme-code-font: var(--mono-code-font);
+  --theme-search-bg: var(--mono-search-bg);
+  --theme-search-field-bg: var(--mono-search-field-bg);
+  --theme-search-field-border: var(--mono-search-field-border);
+  --theme-search-shadow: var(--mono-search-shadow);
+  --theme-search-font: var(--mono-search-font);
 
   --c-void: #171817;
   --c-canvas: #fbfbfa;
@@ -2910,6 +3047,11 @@ html[data-content-theme='nocturne'] {
   --nocturne-panel-secondary: rgba(134, 168, 120, 0.10);
   --nocturne-font: 'Newsreader', 'Source Serif 4', 'Songti SC', 'STSong', 'Iowan Old Style', Georgia, serif;
   --nocturne-code-font: SFMono-Regular, Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  --nocturne-search-bg: color-mix(in srgb, var(--nocturne-main-bg) 82%, #000);
+  --nocturne-search-field-bg: color-mix(in srgb, var(--nocturne-main-bg) 88%, #fff);
+  --nocturne-search-field-border: color-mix(in srgb, var(--nocturne-border) 76%, #fff);
+  --nocturne-search-shadow: 0 12px 28px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.38);
+  --nocturne-search-font: var(--nocturne-font);
 
   --theme-main-bg: var(--nocturne-main-bg);
   --theme-pane-bg: var(--nocturne-pane-bg);
@@ -2930,6 +3072,11 @@ html[data-content-theme='nocturne'] {
   --theme-panel-secondary: var(--nocturne-panel-secondary);
   --theme-font: var(--nocturne-font);
   --theme-code-font: var(--nocturne-code-font);
+  --theme-search-bg: var(--nocturne-search-bg);
+  --theme-search-field-bg: var(--nocturne-search-field-bg);
+  --theme-search-field-border: var(--nocturne-search-field-border);
+  --theme-search-shadow: var(--nocturne-search-shadow);
+  --theme-search-font: var(--nocturne-search-font);
 
   --c-void: #e5e1d7;
   --c-canvas: #171a18;
@@ -3564,6 +3711,11 @@ html[data-content-theme='miaoyan'] {
   --miaoyan-toolbar-icon: #282828;
   --miaoyan-toast-bg: rgba(26, 26, 26, 0.95);
   --miaoyan-panel-secondary: rgba(0, 0, 0, 0.035);
+  --miaoyan-search-bg: #eeeeee;
+  --miaoyan-search-field-bg: #ffffff;
+  --miaoyan-search-field-border: #cfcfcf;
+  --miaoyan-search-shadow: 0 9px 22px rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.12);
+  --miaoyan-search-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', sans-serif;
   --miaoyan-font: 'TsangerJinKai02-W04', 'TsangerJinKai02 W04', 'TsangerJinKai02', 'PingFangSC-Regular', -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   --miaoyan-code-font: 'Menlo', SFMono-Regular, Consolas, 'Liberation Mono', 'Courier New', monospace;
 
@@ -3791,72 +3943,141 @@ html[data-content-theme='miaoyan'] .file-tree-rename-input {
   box-shadow: none !important;
 }
 
-html[data-content-theme='miaoyan'] .notepad-search-panel {
+html[data-content-theme='miaoyan'] .compat-search-panel {
+  --compat-search-bg: var(--miaoyan-search-bg);
+  --compat-search-text: var(--miaoyan-text);
+  --compat-search-secondary: var(--miaoyan-secondary-text);
+  --compat-search-empty: var(--miaoyan-link);
+  --compat-search-field-bg: var(--miaoyan-search-field-bg);
+  --compat-search-field-border: var(--miaoyan-search-field-border);
+  --compat-search-focus: var(--miaoyan-accent);
+  --compat-search-button: var(--miaoyan-toolbar-icon);
+  --compat-search-button-hover-bg: var(--miaoyan-panel-secondary);
+  --compat-search-shadow: var(--miaoyan-search-shadow);
+  --compat-search-font: var(--miaoyan-search-font);
+}
+
+html:is([data-content-theme='inkstone'], [data-content-theme='slate'], [data-content-theme='mono'], [data-content-theme='nocturne']) .compat-search-panel {
+  --compat-search-bg: var(--theme-search-bg);
+  --compat-search-text: var(--theme-text);
+  --compat-search-secondary: var(--theme-secondary-text);
+  --compat-search-empty: var(--theme-link);
+  --compat-search-field-bg: var(--theme-search-field-bg);
+  --compat-search-field-border: var(--theme-search-field-border);
+  --compat-search-focus: var(--theme-accent);
+  --compat-search-button: var(--theme-toolbar-icon);
+  --compat-search-button-hover-bg: var(--theme-panel-secondary);
+  --compat-search-shadow: var(--theme-search-shadow);
+  --compat-search-font: var(--theme-search-font);
+}
+
+.compat-search-panel {
   position: absolute;
-  top: 13px;
+  top: 0;
   right: 24px;
   z-index: 2600;
-  font-family: var(--miaoyan-font);
-  letter-spacing: 0.6px;
+  width: min(360px, calc(100% - 48px));
+  height: 40px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 8px 0 0 8px;
+  background: var(--compat-search-bg);
+  box-shadow: var(--compat-search-shadow);
+  color: var(--compat-search-text);
+  font-family: var(--compat-search-font);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  transition: height 120ms ease;
 }
 
-html[data-content-theme='miaoyan'] .notepad-search-container {
-  min-width: 420px;
-  padding: 6px;
-  border: 1px solid var(--miaoyan-divider);
-  border-radius: 8px;
-  background: var(--miaoyan-main-bg);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+.compat-search-panel.is-replace {
+  height: 76px;
 }
 
-html[data-content-theme='miaoyan'] .notepad-search-row {
+.compat-search-row {
+  position: relative;
+  width: 100%;
+}
+
+.compat-search-row--find {
+  height: 40px;
+}
+
+.compat-search-row--replace {
+  display: none;
+  position: absolute;
+  top: 39px;
+  left: 0;
+  right: 0;
+  height: 28px;
+}
+
+.compat-search-panel.is-replace .compat-search-row--replace {
+  display: block;
+}
+
+.compat-search-field-wrap {
+  position: absolute;
+  left: 8px;
+  width: 180px;
+  height: 22px;
+}
+
+.compat-search-panel.has-replace-toggle .compat-search-field-wrap {
+  left: 36px;
+}
+
+.compat-search-field-wrap--find {
+  top: 8px;
+}
+
+.compat-search-panel.is-replace .compat-search-field-wrap--find {
+  top: 11px;
+}
+
+.compat-search-field-wrap--replace {
+  top: 0;
+}
+
+.compat-search-field {
+  width: 180px;
+  height: 22px;
+  box-sizing: border-box;
+  padding: 0 7px;
+  border: 1px solid var(--compat-search-field-border);
+  border-radius: 5px;
+  outline: none;
+  background: var(--compat-search-field-bg);
+  color: var(--compat-search-text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 20px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -1px 0 rgba(0, 0, 0, 0.03);
+}
+
+.compat-search-field:focus {
+  border-color: color-mix(in srgb, var(--compat-search-focus) 62%, var(--compat-search-field-border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--compat-search-focus) 18%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.compat-search-field::placeholder {
+  color: var(--compat-search-secondary);
+  opacity: 0.72;
+}
+
+.compat-search-match {
+  position: absolute;
+  top: 8px;
+  left: 194px;
+  width: 50px;
+  height: 22px;
   display: flex;
   align-items: center;
-  gap: 6px;
-}
-
-html[data-content-theme='miaoyan'] .notepad-search-row.expanded-row {
-  margin-top: 6px;
-  padding-left: 26px;
-}
-
-html[data-content-theme='miaoyan'] .notepad-search-input-wrapper {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-}
-
-html[data-content-theme='miaoyan'] .notepad-search-input {
-  width: 100%;
-  height: 30px;
-  padding: 0 64px 0 12px;
-  border: 1px solid var(--miaoyan-divider);
-  border-radius: 15px;
-  outline: none;
-  background: var(--miaoyan-main-bg);
-  color: var(--miaoyan-text);
-  font-family: var(--miaoyan-font);
-  font-size: 14px;
-  font-weight: 400;
-  letter-spacing: 0.6px;
-}
-
-html[data-content-theme='miaoyan'] .notepad-search-input:focus {
-  border-color: rgba(28, 93, 51, 0.7);
-  box-shadow: none;
-}
-
-html[data-content-theme='miaoyan'] .notepad-search-input::placeholder {
-  color: var(--miaoyan-tertiary-text);
-}
-
-html[data-content-theme='miaoyan'] .notepad-search-result-count {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  max-width: 96px;
-  transform: translateY(-50%);
-  color: var(--miaoyan-secondary-text);
+  justify-content: center;
+  color: var(--compat-search-text);
   font-size: 11px;
   line-height: 1;
   white-space: nowrap;
@@ -3865,115 +4086,89 @@ html[data-content-theme='miaoyan'] .notepad-search-result-count {
   pointer-events: none;
 }
 
-html[data-content-theme='miaoyan'] .notepad-search-btn {
-  width: 20px;
-  height: 20px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--miaoyan-toolbar-icon);
-  cursor: pointer;
-  display: inline-grid;
-  place-items: center;
-  position: relative;
+.compat-search-panel.has-replace-toggle .compat-search-match {
+  left: 222px;
+  width: 40px;
 }
 
-html[data-content-theme='miaoyan'] .notepad-search-btn:hover,
-html[data-content-theme='miaoyan'] .notepad-search-btn.is-active {
-  background: var(--miaoyan-panel-secondary);
+.compat-search-panel.is-replace .compat-search-match {
+  top: 11px;
 }
 
-html[data-content-theme='miaoyan'] .notepad-search-btn.expander::before {
-  content: '›';
-  font-size: 16px;
-  line-height: 1;
-  transform: rotate(0deg);
-  transition: transform 120ms ease;
+.compat-search-match:empty {
+  color: transparent;
 }
 
-html[data-content-theme='miaoyan'] .notepad-search-btn.expander.is-expanded::before {
-  transform: rotate(90deg);
+.compat-search-match.is-empty {
+  color: var(--compat-search-empty);
 }
 
-html[data-content-theme='miaoyan'] .notepad-search-btn[name='next']::before { content: '↓'; font-size: 13px; }
-html[data-content-theme='miaoyan'] .notepad-search-btn[name='prev']::before { content: '↑'; font-size: 13px; }
-html[data-content-theme='miaoyan'] .notepad-search-btn.options-toggle::before { content: '⋯'; font-size: 16px; line-height: 0; }
-html[data-content-theme='miaoyan'] .notepad-search-btn.close-btn::before { content: '×'; font-size: 16px; line-height: 1; }
-
-html[data-content-theme='miaoyan'] .notepad-search-separator {
-  width: 1px;
-  height: 14px;
-  background: var(--miaoyan-divider);
-}
-
-html[data-content-theme='miaoyan'] .notepad-search-controls,
-html[data-content-theme='miaoyan'] .notepad-search-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-html[data-content-theme='miaoyan'] .notepad-text-btn {
-  height: 24px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--miaoyan-text);
-  font-family: var(--miaoyan-font);
-  font-size: 14px;
-  font-weight: 400;
-  letter-spacing: 0.6px;
-}
-
-html[data-content-theme='miaoyan'] .notepad-text-btn:hover {
-  background: var(--miaoyan-panel-secondary);
-}
-
-html[data-content-theme='miaoyan'] .notepad-search-options-container {
-  position: relative;
-}
-
-html[data-content-theme='miaoyan'] .notepad-search-options-menu {
+.compat-search-button {
   position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  min-width: 180px;
-  padding: 5px;
-  border: 1px solid var(--miaoyan-divider);
-  border-radius: 8px;
-  background: var(--miaoyan-main-bg);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+  top: 8px;
+  width: 28px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--compat-search-button);
+  display: grid;
+  place-items: center;
+  cursor: default;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+  line-height: 1;
 }
 
-html[data-content-theme='miaoyan'] .notepad-menu-item {
-  min-height: 26px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  color: var(--miaoyan-text);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  cursor: pointer;
+.compat-search-panel.is-replace .compat-search-row--find .compat-search-button {
+  top: 11px;
 }
 
-html[data-content-theme='miaoyan'] .notepad-menu-item:hover {
-  background: var(--miaoyan-selection);
+.compat-search-button:hover:not(:disabled) {
+  background: var(--compat-search-button-hover-bg);
+  color: var(--compat-search-text);
 }
 
-html[data-content-theme='miaoyan'] .notepad-menu-item.is-disabled {
-  color: var(--miaoyan-tertiary-text);
+.compat-search-button:disabled {
+  opacity: 0.38;
 }
 
-html[data-content-theme='miaoyan'] .notepad-menu-item input {
-  accent-color: var(--miaoyan-accent);
+.compat-search-button--mode { left: 8px; }
+.compat-search-panel.has-replace-toggle .compat-search-button--previous { left: 264px; }
+.compat-search-panel.has-replace-toggle .compat-search-button--next { left: 294px; }
+.compat-search-button--previous { left: 250px; }
+.compat-search-button--next { left: 280px; }
+.compat-search-button--close { right: 8px; }
+.compat-search-button--replace {
+  top: 0;
+  left: 250px;
 }
+.compat-search-button--replace-all {
+  top: 0;
+  left: 280px;
+}
+.compat-search-panel.has-replace-toggle .compat-search-button--replace { left: 264px; }
+.compat-search-panel.has-replace-toggle .compat-search-button--replace-all { left: 294px; }
 
-html[data-content-theme='miaoyan'] .notepad-menu-separator {
-  height: 1px;
-  margin: 4px 8px;
-  background: var(--miaoyan-divider);
+.compat-search-button--previous::before,
+.compat-search-button--next::before,
+.compat-search-button--mode::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border: solid currentColor;
+  border-width: 0 1.5px 1.5px 0;
+}
+.compat-search-button--mode::before { transform: translateX(-1px) rotate(-45deg); }
+.compat-search-button--mode.is-active::before { transform: translateY(-2px) rotate(45deg); }
+.compat-search-button--previous::before { transform: translateY(2px) rotate(225deg); }
+.compat-search-button--next::before { transform: translateY(-2px) rotate(45deg); }
+.compat-search-button--close::before { content: '×'; font-size: 17px; font-weight: 300; transform: translateY(-1px); }
+.compat-search-button--replace::before { content: '↵'; font-size: 14px; transform: translateY(-1px); }
+.compat-search-button--replace-all::before { content: '⇥'; font-size: 14px; transform: translateY(-1px); }
+
+html[data-content-theme='nocturne'] .compat-search-field {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 -1px 0 rgba(0, 0, 0, 0.18);
 }
 
 html[data-content-theme='miaoyan'] .cmdk-overlay,

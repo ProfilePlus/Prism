@@ -16,6 +16,7 @@ export const ALL_COMMANDS: Command[] = [
   { id: 'copy', label: '复制', category: '编辑', shortcut: 'Ctrl+C', keywords: ['copy'] },
   { id: 'paste', label: '粘贴', category: '编辑', shortcut: 'Ctrl+V', keywords: ['paste'] },
   { id: 'showSearch', label: '查找', category: '编辑', shortcut: 'Ctrl+F', keywords: ['find', 'search'] },
+  { id: 'showReplace', label: '替换', category: '编辑', shortcut: 'Ctrl+H', keywords: ['replace', 'find'] },
 
   // 格式
   { id: 'bold', label: '加粗', category: '格式', shortcut: 'Ctrl+B', keywords: ['bold'] },
@@ -46,10 +47,13 @@ export const ALL_COMMANDS: Command[] = [
   { id: 'focusMode', label: '专注模式', category: '视图', shortcut: 'F8', keywords: ['focus'] },
   { id: 'typewriterMode', label: '打字机模式', category: '视图', keywords: ['typewriter'] },
   { id: 'statusBar', label: '切换状态栏', category: '视图', keywords: ['status'] },
+  { id: 'actualSize', label: '实际大小', category: '视图', shortcut: 'Ctrl+Shift+9', keywords: ['zoom', 'reset'] },
+  { id: 'zoomIn', label: '放大', category: '视图', shortcut: 'Ctrl+Shift+=', keywords: ['zoom', 'in'] },
+  { id: 'zoomOut', label: '缩小', category: '视图', shortcut: 'Ctrl+Shift+-', keywords: ['zoom', 'out'] },
 
   // 窗口
   { id: 'alwaysOnTop', label: '窗口置顶', category: '窗口', keywords: ['top', 'pin'] },
-  { id: 'devTools', label: '开发者工具', category: '窗口', shortcut: 'F12', keywords: ['dev', 'debug'] },
+  { id: 'devTools', label: '开发者工具', category: '窗口', shortcut: 'Shift+F12', keywords: ['dev', 'debug'] },
 
   // 帮助
   { id: 'about', label: '关于 Prism', category: '帮助', keywords: ['about', 'info'] },

@@ -2,6 +2,8 @@ import { MenuActionContext } from './menuActions.types';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile, stat } from '@tauri-apps/plugin-fs';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { getCurrentWebview } from '@tauri-apps/api/webview';
+import { invoke } from '@tauri-apps/api/core';
 import { loadFolderTree } from '../domains/workspace/lib/loadFolderTree';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { openPrismWindow } from './openWindow';
@@ -45,6 +47,9 @@ export async function executeMenuAction(
       case 'showSearch':
         window.dispatchEvent(new CustomEvent('prism-search', { detail: { action: 'open' } }));
         return;
+      case 'showReplace':
+        window.dispatchEvent(new CustomEvent('prism-search', { detail: { action: 'replace' } }));
+        return;
       case 'focusMode':
         return handleFocusMode(context);
       case 'alwaysOnTop':
@@ -54,7 +59,7 @@ export async function executeMenuAction(
       case 'statusBar':
         return context.workspaceStore.toggleStatusBar();
       case 'devTools':
-        return await handleDevTools();
+        return await handleDevTools(context);
 
       // ═══ 编辑操作 ═══
       case 'undo':
@@ -109,11 +114,11 @@ export async function executeMenuAction(
       case 'fullscreen':
         return await handleFullscreen(context);
       case 'actualSize':
-        return handleZoom('reset');
+        return await handleZoom('reset', context);
       case 'zoomIn':
-        return handleZoom('in');
+        return await handleZoom('in', context);
       case 'zoomOut':
-        return handleZoom('out');
+        return await handleZoom('out', context);
       case 'themeMiaoyan':
         return context.settingsStore.setContentTheme('miaoyan');
       case 'themeInkstone':
@@ -359,10 +364,13 @@ function handleFocusMode(context: MenuActionContext): void {
   context.workspaceStore.toggleFocusMode();
 }
 
-async function handleDevTools(): Promise<void> {
-  // 在 Tauri v2 中，可以使用 getCurrentWindow().close() 等，但调试窗口通常是核心功能
-  // 暂时通过 console 信息提示
-  console.log('[DevTools] Press Shift+F12 or Ctrl+Shift+I (if enabled in tauri.conf.json) to open Inspector');
+async function handleDevTools(context: MenuActionContext): Promise<void> {
+  try {
+    await invoke('plugin:webview|internal_toggle_devtools');
+  } catch (error) {
+    console.error('[DevTools] toggle failed', error);
+    context.showToast?.('开发者工具暂不可用');
+  }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -440,21 +448,27 @@ async function handleAlwaysOnTop(context: MenuActionContext): Promise<void> {
 const ZOOM_STEP = 0.1;
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 3.0;
+let currentZoom = 1;
 
-function handleZoom(direction: 'in' | 'out' | 'reset'): void {
-  const el = document.documentElement;
-  if (direction === 'reset') {
-    el.style.setProperty('--app-zoom', '1');
-    return;
+async function handleZoom(direction: 'in' | 'out' | 'reset', context: MenuActionContext): Promise<void> {
+  const next =
+    direction === 'reset'
+      ? 1
+      : direction === 'in'
+        ? Math.min(currentZoom + ZOOM_STEP, ZOOM_MAX)
+        : Math.max(currentZoom - ZOOM_STEP, ZOOM_MIN);
+
+  currentZoom = Math.round(next * 100) / 100;
+
+  try {
+    await getCurrentWebview().setZoom(currentZoom);
+    document.documentElement.style.setProperty('--app-zoom', '1');
+  } catch (error) {
+    document.documentElement.style.setProperty('--app-zoom', String(currentZoom));
+    console.warn('[Zoom] webview zoom unavailable, falling back to CSS zoom', error);
   }
 
-  const current = parseFloat(getComputedStyle(el).getPropertyValue('--app-zoom') || '1');
-  const next =
-    direction === 'in'
-      ? Math.min(current + ZOOM_STEP, ZOOM_MAX)
-      : Math.max(current - ZOOM_STEP, ZOOM_MIN);
-
-  el.style.setProperty('--app-zoom', String(Math.round(next * 100) / 100));
+  context.showToast?.(`缩放 ${Math.round(currentZoom * 100)}%`);
 }
 
 // ══════════════════════════════════════════════════════════

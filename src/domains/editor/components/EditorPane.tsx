@@ -37,6 +37,18 @@ const lineFlashField = StateField.define<DecorationSet>({
   provide: f => EditorView.decorations.from(f)
 });
 
+const editorSelectionDecoration = Decoration.mark({ class: 'cm-editor-selection-mark' });
+
+function buildEditorSelectionDecorations(view: EditorView): DecorationSet {
+  const builder = new RangeSetBuilder<Decoration>();
+  for (const range of view.state.selection.ranges) {
+    if (!range.empty) {
+      builder.add(range.from, range.to, editorSelectionDecoration);
+    }
+  }
+  return builder.finish();
+}
+
 import { markdown } from '@codemirror/lang-markdown';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands';
@@ -44,14 +56,13 @@ import { indentOnInput, bracketMatching, foldGutter, foldKeymap, syntaxTree } fr
 import { ViewPlugin } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
-import { highlightSelectionMatches } from '@codemirror/search';
-import { SearchQuery, setSearchQuery, findNext, findPrevious, replaceNext, replaceAll, selectMatches } from '@codemirror/search';
+import { SearchQuery, setSearchQuery, findNext, findPrevious, replaceNext, replaceAll, search, selectMatches, openSearchPanel, searchPanelOpen } from '@codemirror/search';
 import hljs from 'highlight.js';
 import { useSettingsStore } from '../../settings/store';
 import type { ContentTheme } from '../../settings/types';
 import { useWorkspaceStore } from '../../workspace/store';
 import { FloatingToolbar } from './FloatingToolbar';
-import { SearchParams } from './SearchPanel';
+import type { SearchAction, SearchParams } from './SearchPanel';
 
 const editorLineNumbersCompartment = new Compartment();
 const editorDarkThemeCompartment = new Compartment();
@@ -100,11 +111,26 @@ function getContentThemeExtension(contentTheme: ContentTheme) {
   return contentThemeFacet.of(contentTheme);
 }
 
+function createHiddenSearchPanel() {
+  const dom = document.createElement('div');
+  dom.className = 'cm-search cm-compat-hidden-search-panel';
+  dom.setAttribute('aria-hidden', 'true');
+  return { dom, top: true };
+}
+
+function ensureSearchHighlighterEnabled(view: EditorView) {
+  if (!searchPanelOpen(view.state)) {
+    openSearchPanel(view);
+  }
+}
+
 export interface EditorPaneHandle {
   jumpToLine: (line: number) => void;
   setScrollRatio: (ratio: number) => void;
   scrollToLine: (line: number) => void;
-  execSearch?: (action: 'next' | 'prev' | 'all' | 'replace' | 'replaceAll', params: SearchParams) => void;
+  execSearch?: (action: SearchAction, params: SearchParams) => void;
+  restoreSearch?: (params: SearchParams, currentMatch: number) => void;
+  getSelectedText?: () => string;
 }
 
 interface EditorPaneProps {
@@ -392,6 +418,21 @@ const compatibilityMarkdownPlugin = ViewPlugin.fromClass(
   { decorations: (v) => v.decorations },
 );
 
+const editorSelectionPlugin = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) {
+      this.decorations = buildEditorSelectionDecorations(view);
+    }
+    update(update: ViewUpdate) {
+      if (update.docChanged || update.selectionSet) {
+        this.decorations = buildEditorSelectionDecorations(update.view);
+      }
+    }
+  },
+  { decorations: (v) => v.decorations },
+);
+
 function getCursorPosition(view: EditorView) {
   const pos = view.state.selection.main.head;
   const line = view.state.doc.lineAt(pos);
@@ -508,6 +549,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         const view = viewRef.current;
         if (!view) return;
 
+        ensureSearchHighlighterEnabled(view);
+
         view.dispatch({
           effects: setSearchQuery.of(new SearchQuery({
             search: params.query,
@@ -519,14 +562,56 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         });
 
         switch (action) {
+          case 'input':
+            if (params.query) {
+              view.dispatch({ selection: { anchor: 0 } });
+              findNext(view);
+            }
+            break;
           case 'next': findNext(view); break;
           case 'prev': findPrevious(view); break;
           case 'all': selectMatches(view); break;
-          case 'replace': replaceNext(view); break;
+          case 'replace': {
+            const beforeDoc = view.state.doc.toString();
+            const handled = replaceNext(view);
+            if (handled && params.query && view.state.doc.toString() !== beforeDoc) {
+              findNext(view);
+            }
+            break;
+          }
           case 'replaceAll': replaceAll(view); break;
         }
-        view.focus();
-      }
+      },
+      restoreSearch: (params, currentMatch) => {
+        const view = viewRef.current;
+        if (!view) return;
+
+        ensureSearchHighlighterEnabled(view);
+
+        view.dispatch({
+          selection: { anchor: 0 },
+          effects: setSearchQuery.of(new SearchQuery({
+            search: params.query,
+            caseSensitive: params.matchCase,
+            regexp: params.regexp,
+            wholeWord: params.wholeWord,
+            replace: params.replaceWith
+          }))
+        });
+
+        if (!params.query || currentMatch <= 0) return;
+
+        for (let index = 0; index < currentMatch; index += 1) {
+          findNext(view);
+        }
+      },
+      getSelectedText: () => {
+        const view = viewRef.current;
+        if (!view) return '';
+        const selection = view.state.selection.main;
+        if (selection.from === selection.to) return '';
+        return view.state.doc.sliceString(selection.from, selection.to);
+      },
     }));
 
     const handleFormat = useCallback(
@@ -795,6 +880,13 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
                 window.dispatchEvent(new CustomEvent('prism-search', { detail: { action: 'open' } }));
                 return true;
               }
+            },
+            {
+              key: 'Mod-h',
+              run: () => {
+                window.dispatchEvent(new CustomEvent('prism-search', { detail: { action: 'replace' } }));
+                return true;
+              }
             }
           ])),
           lineFlashField,
@@ -803,16 +895,20 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           history(),
           drawSelection(),
           dropCursor(),
+          search({
+            createPanel: createHiddenSearchPanel,
+            scrollToMatch: (range) => EditorView.scrollIntoView(range, { y: 'center' }),
+          }),
           EditorState.allowMultipleSelections.of(true),
           indentOnInput(),
           editorContentThemeCompartment.of(getContentThemeExtension(contentTheme)),
           compatibilityMarkdownPlugin,
+          editorSelectionPlugin,
           bracketMatching(),
           closeBrackets(),
           rectangularSelection(),
           crosshairCursor(),
           highlightActiveLine(),
-          highlightSelectionMatches(),
           foldGutter(),
           keymap.of([
             ...closeBracketsKeymap,
@@ -834,8 +930,14 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             '.cm-activeLine': { backgroundColor: 'var(--c-chalk, var(--bg-hover))' },
             '.cm-cursor': { borderLeftColor: 'var(--accent)', borderLeftWidth: '2px' },
             '&.cm-focused': { outline: 'none' },
-            '.cm-selectionBackground': { backgroundColor: 'var(--accent-tint-strong) !important' },
-            '&.cm-focused .cm-selectionBackground': { backgroundColor: 'var(--accent-tint-strong) !important' }
+            '.cm-selectionBackground': {
+              backgroundColor: 'var(--editor-selection-bg, var(--accent-tint-strong)) !important',
+              boxShadow: '0 0 0 1px var(--editor-selection-ring, transparent)',
+              borderRadius: '2px',
+            },
+            '&.cm-focused .cm-selectionBackground': {
+              backgroundColor: 'var(--editor-selection-bg, var(--accent-tint-strong)) !important',
+            }
           }),
           EditorState.phrases.of({
             "Find": "查找内容", "Replace": "替换为", "next": "下一个", "previous": "上一个", "all": "全部",

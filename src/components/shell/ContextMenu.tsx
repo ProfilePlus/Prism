@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 export interface ContextMenuItem {
   label?: string;
@@ -21,6 +21,22 @@ interface ContextMenuProps {
 
 export function ContextMenu({ x, y, items, onAction, onClose }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ left: x, top: y });
+
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    if (!menu) return;
+
+    const margin = 8;
+    const rect = menu.getBoundingClientRect();
+    const maxLeft = Math.max(margin, window.innerWidth - rect.width - margin);
+    const maxTop = Math.max(margin, window.innerHeight - rect.height - margin);
+
+    setPosition({
+      left: Math.min(Math.max(x, margin), maxLeft),
+      top: Math.min(Math.max(y, margin), maxTop),
+    });
+  }, [x, y, items]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -32,14 +48,11 @@ export function ContextMenu({ x, y, items, onAction, onClose }: ContextMenuProps
     return () => window.removeEventListener('mousedown', handleClickOutside);
   }, [onClose]);
 
-  const adjustedX = Math.min(x, window.innerWidth - 240);
-  const adjustedY = Math.min(y, window.innerHeight - items.length * 32 - 20);
-
   return (
     <div
       ref={menuRef}
       className="custom-context-menu"
-      style={{ left: `${adjustedX}px`, top: `${adjustedY}px` }}
+      style={{ left: `${position.left}px`, top: `${position.top}px` }}
       onMouseDown={(e) => e.stopPropagation()}
     >
       {items.map((item, idx) => {

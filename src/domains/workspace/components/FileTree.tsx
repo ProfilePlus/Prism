@@ -167,6 +167,28 @@ export function FileTree({ nodes, activePath, onFileClick }: FileTreeProps) {
 
     const items: ContextMenuItem[] = [];
 
+    if (!node) {
+      return [
+        { label: '在新窗口中打开', action: 'openNewWindow' },
+        { type: 'separator' },
+        { label: '新建文件', action: 'newFile' },
+        { label: '新建文件夹', action: 'newFolder' },
+        { type: 'separator' },
+        { label: '搜索', action: 'searchInFolder' },
+        { type: 'separator' },
+        { label: '文档列表', action: 'viewList', checked: fileTreeMode === 'list' },
+        { label: '文档树', action: 'viewTree', checked: fileTreeMode === 'tree' },
+        { type: 'separator' },
+        { label: '按名称排序', action: 'sortByName', checked: fileSortMode === 'name' },
+        { label: '按修改时间排序', action: 'sortByModified', checked: fileSortMode === 'modified' },
+        { label: '按创建时间排序', action: 'sortByCreated', checked: fileSortMode === 'created' },
+        { label: '按大小排序', action: 'sortBySize', checked: fileSortMode === 'size' },
+        { type: 'separator' },
+        { label: '复制文件路径', action: 'copyRootPath' },
+        { label: '打开文件位置', action: 'openRootLocation' },
+      ];
+    }
+
     if (node && !nodeIsDirectory) {
       items.push(
         { label: '打开', action: `openFile:${node.path}` },
@@ -201,33 +223,17 @@ export function FileTree({ nodes, activePath, onFileClick }: FileTreeProps) {
       { type: 'separator' },
     );
 
-    if (node) {
-      items.push({ label: '重命名', action: `rename:${node.path}` });
-      if (!nodeIsDirectory) {
-        items.push({ label: '创建副本', action: `duplicate:${node.path}` });
-      }
-      items.push(
-        { label: '删除', action: `delete:${node.path}`, danger: true },
-        { type: 'separator' },
-        { label: '属性', action: `properties:${node.path}` },
-        { label: '复制文件路径', action: `copyPath:${node.path}` },
-        { label: '打开文件位置', action: `openLocation:${node.path}` },
-      );
-    } else {
-      items.push(
-        { label: '在新窗口中打开', action: 'openNewWindow' },
-        { type: 'separator' },
-        { label: '新建文件', action: 'newFile' },
-        { label: '新建文件夹', action: 'newFolder' },
-        { label: '搜索', action: 'searchInFolder' },
-        { type: 'separator' },
-        { label: '文档列表', action: 'viewList', checked: fileTreeMode === 'list' },
-        { label: '文档树', action: 'viewTree', checked: fileTreeMode === 'tree' },
-        { type: 'separator' },
-        { label: '复制文件路径', action: 'copyRootPath' },
-        { label: '打开文件位置', action: 'openRootLocation' },
-      );
+    items.push({ label: '重命名', action: `rename:${node.path}` });
+    if (!nodeIsDirectory) {
+      items.push({ label: '创建副本', action: `duplicate:${node.path}` });
     }
+    items.push(
+      { label: '删除', action: `delete:${node.path}`, danger: true },
+      { type: 'separator' },
+      { label: '属性', action: `properties:${node.path}` },
+      { label: '复制文件路径', action: `copyPath:${node.path}` },
+      { label: '打开文件位置', action: `openLocation:${node.path}` },
+    );
 
     return items;
   };

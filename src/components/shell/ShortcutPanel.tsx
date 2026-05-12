@@ -43,6 +43,10 @@ const SHORTCUTS: ShortcutItem[] = [
       { keys: 'F8', description: '专注模式' },
       { keys: 'F9', description: '打字机模式' },
       { keys: 'F11', description: '全屏' },
+      { keys: 'Ctrl+Shift+9', description: '实际大小' },
+      { keys: 'Ctrl+Shift+=', description: '放大' },
+      { keys: 'Ctrl+Shift+-', description: '缩小' },
+      { keys: 'Shift+F12', description: '开发者工具' },
     ],
   },
   {
