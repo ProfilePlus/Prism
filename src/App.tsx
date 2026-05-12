@@ -7,10 +7,12 @@ import { DocumentView } from './domains/document/components/DocumentView';
 import { StatusBar } from './domains/workspace/components/StatusBar';
 import { Sidebar } from './domains/workspace/components/Sidebar';
 import { useBootstrap } from './hooks/useBootstrap';
-import { writeTextFile } from '@tauri-apps/plugin-fs';
-import { save } from '@tauri-apps/plugin-dialog';
+import { exists as fsExists } from '@tauri-apps/plugin-fs';
+import { open } from '@tauri-apps/plugin-dialog';
+import { homeDir } from '@tauri-apps/api/path';
 import { EditorPaneHandle } from './domains/editor/components/EditorPane';
-import { exportToHtml } from './lib/exportToHtml';
+import type { ExportFormat } from './lib/exportDocument';
+import { getExportFormatLabel } from './lib/exportDocument';
 import { WindowShell } from './components/shell/WindowShell';
 import { TitleBar } from './components/shell/TitleBar';
 import { MenuBar } from './components/shell/MenuBar';
@@ -28,11 +30,77 @@ function basename(path: string): string {
   return parts[parts.length - 1] || path;
 }
 
+function dirname(path: string): string {
+  const parts = path.split(/[\\/]/);
+  parts.pop();
+  return parts.join(path.includes('\\') ? '\\' : '/');
+}
+
+function joinPath(dir: string, name: string): string {
+  const separator = dir.includes('\\') ? '\\' : '/';
+  return `${dir.replace(/[\\/]$/, '')}${separator}${name}`;
+}
+
+const exportExtensionByFormat: Record<ExportFormat, string> = {
+  html: 'html',
+  pdf: 'pdf',
+  docx: 'docx',
+  png: 'png',
+};
+
+function stripMarkdownExtension(filename: string) {
+  return filename.replace(/\.(md|markdown|txt)$/i, '') || 'Untitled';
+}
+
+function ensureExportExtension(filename: string, format: ExportFormat) {
+  const extension = exportExtensionByFormat[format];
+  const trimmed = filename.trim();
+  if (!trimmed) return `Untitled.${extension}`;
+  return trimmed.toLowerCase().endsWith(`.${extension}`) ? trimmed : `${trimmed}.${extension}`;
+}
+
+function ensureMarkdownExtension(filename: string) {
+  const trimmed = filename.trim();
+  if (!trimmed) return 'Untitled.md';
+  return /\.(md|markdown)$/i.test(trimmed) ? trimmed : `${trimmed}.md`;
+}
+
+function defaultExportFilename(filename: string, format: ExportFormat) {
+  return ensureExportExtension(stripMarkdownExtension(filename), format);
+}
+
+type SaveDialogKind = 'export' | 'markdown';
+
+interface SaveDialogState {
+  kind: SaveDialogKind;
+  format?: ExportFormat;
+  directory: string;
+  filename: string;
+  error: string | null;
+  pendingOverwritePath: string | null;
+  resolve: (path: string | null) => void;
+}
+
+function getSaveDialogTitle(dialog: SaveDialogState) {
+  if (dialog.kind === 'export' && dialog.format) {
+    return `导出 ${getExportFormatLabel(dialog.format)}`;
+  }
+  return '保存 Markdown';
+}
+
+function getSaveDialogPrimaryLabel(dialog: SaveDialogState) {
+  return dialog.kind === 'export' ? '导出' : '保存';
+}
+
+function getSaveDialogOverwriteText(dialog: SaveDialogState) {
+  return dialog.kind === 'export'
+    ? '继续导出会覆盖当前位置的同名文件。'
+    : '继续保存会覆盖当前位置的同名文件。';
+}
+
 function App() {
   const currentDocument = useDocumentStore((s) => s.currentDocument);
-  const openDocument = useDocumentStore((s) => s.openDocument);
   const setViewMode = useDocumentStore((s) => s.setViewMode);
-  const markSaved = useDocumentStore((s) => s.markSaved);
   
   const { loadSettings } = useSettingsStore();
   const workspace = useWorkspaceStore();
@@ -43,6 +111,8 @@ function App() {
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [globalContextMenu, setGlobalContextMenu] = useState<{ x: number, y: number, items: any[] } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [exportProgress, setExportProgress] = useState<string | null>(null);
+  const [saveDialog, setSaveDialog] = useState<SaveDialogState | null>(null);
   const [shortcutPanelVisible, setShortcutPanelVisible] = useState(false);
   const [commandPaletteVisible, setCommandPaletteVisible] = useState(false);
   const [aboutVisible, setAboutVisible] = useState(false);
@@ -116,6 +186,15 @@ function App() {
     }
   }, []);
 
+  useEffect(() => {
+    const handleExportProgress = (event: Event) => {
+      const detail = (event as CustomEvent<{ visible?: boolean; message?: string }>).detail;
+      setExportProgress(detail?.visible ? detail.message ?? '正在导出' : null);
+    };
+    window.addEventListener('prism-export-progress', handleExportProgress);
+    return () => window.removeEventListener('prism-export-progress', handleExportProgress);
+  }, []);
+
   const handleFileAction = useCallback(async (input: FileActionInput) => {
     await executeFileAction(input, {
       documentStore: useDocumentStore.getState(),
@@ -128,6 +207,117 @@ function App() {
     await handleFileAction({ action: 'openFile', path });
   }, [handleFileAction]);
 
+  const requestExportPath = useCallback(async (input: {
+    format: ExportFormat;
+    filename: string;
+    documentPath?: string;
+  }) => {
+    const initialDirectory = input.documentPath
+      ? dirname(input.documentPath)
+      : workspace.rootPath || await homeDir();
+
+    return new Promise<string | null>((resolve) => {
+      setSaveDialog({
+        kind: 'export',
+        format: input.format,
+        directory: initialDirectory,
+        filename: defaultExportFilename(input.filename, input.format),
+        error: null,
+        pendingOverwritePath: null,
+        resolve,
+      });
+    });
+  }, [workspace.rootPath]);
+
+  const requestMarkdownSavePath = useCallback(async (input: {
+    filename: string;
+    documentPath?: string;
+  }) => {
+    const initialDirectory = input.documentPath
+      ? dirname(input.documentPath)
+      : workspace.rootPath || await homeDir();
+
+    return new Promise<string | null>((resolve) => {
+      setSaveDialog({
+        kind: 'markdown',
+        directory: initialDirectory,
+        filename: ensureMarkdownExtension(input.filename),
+        error: null,
+        pendingOverwritePath: null,
+        resolve,
+      });
+    });
+  }, [workspace.rootPath]);
+
+  const closeSaveDialog = useCallback((path: string | null = null) => {
+    setSaveDialog((dialog) => {
+      dialog?.resolve(path);
+      return null;
+    });
+  }, []);
+
+  const chooseSaveDirectory = useCallback(async () => {
+    if (!saveDialog) return;
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      defaultPath: saveDialog.directory,
+    });
+    if (!selected || Array.isArray(selected)) return;
+    setSaveDialog((dialog) => dialog ? {
+      ...dialog,
+      directory: selected,
+      error: null,
+      pendingOverwritePath: null,
+    } : null);
+  }, [saveDialog]);
+
+  const confirmSaveDialog = useCallback(async (allowOverwrite = false) => {
+    if (!saveDialog) return;
+    let filename: string;
+    if (saveDialog.kind === 'export') {
+      const format = saveDialog.format;
+      if (!format) {
+        setSaveDialog((dialog) => dialog ? {
+          ...dialog,
+          error: '导出格式缺失',
+          pendingOverwritePath: null,
+        } : null);
+        return;
+      }
+      filename = ensureExportExtension(saveDialog.filename, format);
+    } else {
+      filename = ensureMarkdownExtension(saveDialog.filename);
+    }
+    if (/[\\/]/.test(filename)) {
+      setSaveDialog((dialog) => dialog ? {
+        ...dialog,
+        error: '文件名不能包含路径分隔符',
+        pendingOverwritePath: null,
+      } : null);
+      return;
+    }
+
+    const targetPath = joinPath(saveDialog.directory, filename);
+    if (!allowOverwrite) {
+      try {
+        if (await fsExists(targetPath)) {
+          setSaveDialog((dialog) => dialog ? {
+            ...dialog,
+            filename,
+            error: null,
+            pendingOverwritePath: targetPath,
+          } : null);
+          return;
+        }
+      } catch {
+        // If existence check fails, let the actual write surface the error.
+      }
+    }
+
+    closeSaveDialog(targetPath);
+  }, [closeSaveDialog, saveDialog]);
+
   const handleMenuAction = useCallback(async (action: string) => {
     if (action === 'about') { setAboutVisible(true); return; }
     if (action === 'preferences') { setSettingsVisible(true); return; }
@@ -138,8 +328,10 @@ function App() {
       settingsStore: useSettingsStore.getState(),
       workspaceStore: useWorkspaceStore.getState(),
       showToast,
+      requestExportPath,
+      requestSavePath: requestMarkdownSavePath,
     });
-  }, [showToast]);
+  }, [requestExportPath, requestMarkdownSavePath, showToast]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -163,25 +355,7 @@ function App() {
     if (ctrl && !shift && !alt && code === 'KeyS') {
       e.preventDefault();
       if (!currentDocument || !currentDocument.isDirty) return;
-      try {
-        let targetPath = currentDocument.path;
-        if (!targetPath) {
-          const chosen = await save({
-            filters: [{ name: 'Markdown', extensions: ['md'] }],
-            defaultPath: currentDocument.name,
-          });
-          if (!chosen) return;
-          targetPath = chosen;
-        }
-        await writeTextFile(targetPath, currentDocument.content);
-        if (!currentDocument.path) {
-          openDocument(targetPath, basename(targetPath), currentDocument.content);
-        }
-        markSaved();
-      } catch (err) {
-        console.error('[App] Manual save failed:', err);
-        showToast(`保存失败: ${err instanceof Error ? err.message : String(err)}`);
-      }
+      await handleMenuAction('save');
       return;
     }
 
@@ -210,7 +384,7 @@ function App() {
       e.preventDefault();
       handleMenuAction(action);
     }
-  }, [currentDocument, markSaved, openDocument, workspace, handleMenuAction, showToast]);
+  }, [currentDocument, workspace, handleMenuAction]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -282,7 +456,7 @@ function App() {
             onMouseEnter={() => setIsSidebarHovered(true)}
             onMouseLeave={() => setIsSidebarHovered(false)}
             onViewModeChange={setViewMode}
-            onExportHtml={() => currentDocument && exportToHtml(currentDocument.content, currentDocument.name)}
+            onExportHtml={() => handleMenuAction('exportHtml')}
             onToggleFocusMode={() => workspace.toggleFocusMode()}
             onToggleSidebar={() => workspace.toggleSidebar()}
             onFolderContextMenu={handleFolderContextMenu}
@@ -302,9 +476,84 @@ function App() {
         />
       )}
 
+      {saveDialog && (
+        <>
+          <div className="modal-overlay" onClick={() => closeSaveDialog(null)} />
+          <div className="modal prism-export-save-modal" role="dialog" aria-label={getSaveDialogTitle(saveDialog)}>
+            <div className="modal-header">
+              <div className="modal-title">{getSaveDialogTitle(saveDialog)}</div>
+              <button className="modal-close" onClick={() => closeSaveDialog(null)} aria-label="关闭">×</button>
+            </div>
+            <div className="modal-body prism-export-save-body">
+              <label className="prism-export-save-field">
+                <span>文件名</span>
+                <input
+                  autoFocus
+                  value={saveDialog.filename}
+                  onChange={(event) => setSaveDialog((dialog) => dialog ? {
+                    ...dialog,
+                    filename: event.target.value,
+                    error: null,
+                    pendingOverwritePath: null,
+                  } : null)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      confirmSaveDialog(false);
+                    }
+                  }}
+                />
+              </label>
+
+              <div className="prism-export-save-field">
+                <span>位置</span>
+                <div className="prism-export-save-location">
+                  <div title={saveDialog.directory}>{saveDialog.directory}</div>
+                  <button type="button" onClick={chooseSaveDirectory}>更改</button>
+                </div>
+              </div>
+
+              {saveDialog.error && (
+                <div className="prism-export-save-error">{saveDialog.error}</div>
+              )}
+
+              {saveDialog.pendingOverwritePath && (
+                <div className="prism-export-overwrite">
+                  <div className="prism-export-overwrite-title">
+                    “{basename(saveDialog.pendingOverwritePath)}” 已存在
+                  </div>
+                  <div className="prism-export-overwrite-text">
+                    {getSaveDialogOverwriteText(saveDialog)}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="prism-export-save-footer">
+              <button type="button" onClick={() => closeSaveDialog(null)}>取消</button>
+              {saveDialog.pendingOverwritePath ? (
+                <button type="button" className="danger" onClick={() => confirmSaveDialog(true)}>
+                  替换并{getSaveDialogPrimaryLabel(saveDialog)}
+                </button>
+              ) : (
+                <button type="button" className="primary" onClick={() => confirmSaveDialog(false)}>
+                  {getSaveDialogPrimaryLabel(saveDialog)}
+                </button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
       {toastMessage && (
         <div role="status" className="prism-toast">
           {toastMessage}
+        </div>
+      )}
+
+      {exportProgress && (
+        <div role="status" className="prism-export-progress">
+          <span className="prism-export-spinner" aria-hidden="true" />
+          <span>{exportProgress}</span>
         </div>
       )}
 

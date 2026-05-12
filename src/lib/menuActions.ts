@@ -1,5 +1,5 @@
 import { MenuActionContext } from './menuActions.types';
-import { open, save } from '@tauri-apps/plugin-dialog';
+import { ask, open } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile, stat } from '@tauri-apps/plugin-fs';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
@@ -7,8 +7,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { loadFolderTree } from '../domains/workspace/lib/loadFolderTree';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { openPrismWindow } from './openWindow';
-import { ask } from '@tauri-apps/plugin-dialog';
 import { addRecentFile } from './recentFiles';
+import { exportDocument, getExportFormatLabel, type ExportFormat } from './exportDocument';
 
 export async function executeMenuAction(
   action: string,
@@ -29,6 +29,14 @@ export async function executeMenuAction(
         return await handleSaveAs(context);
       case 'print':
         return await handlePrint();
+      case 'exportHtml':
+        return await handleExport('html', context);
+      case 'exportPdf':
+        return await handleExport('pdf', context);
+      case 'exportDocx':
+        return await handleExport('docx', context);
+      case 'exportPng':
+        return await handleExport('png', context);
 
       // ═══ 视图切换 ═══
       case 'sourceMode':
@@ -197,7 +205,12 @@ export async function executeMenuAction(
     }
   } catch (err) {
     console.error(`[Menu] Action "${action}" failed:`, err);
-    context.showToast?.(`操作失败: ${err}`);
+    const message = err instanceof Error
+      ? err.message
+      : err instanceof Event
+        ? err.type || '未知事件错误'
+        : String(err);
+    context.showToast?.(`操作失败: ${message}`);
   }
 }
 
@@ -300,9 +313,13 @@ async function handleSave(context: MenuActionContext): Promise<void> {
   let targetPath = doc.path;
 
   if (!targetPath) {
-    const chosen = await save({
-      filters: [{ name: 'Markdown', extensions: ['md'] }],
-      defaultPath: doc.name,
+    if (!context.requestSavePath) {
+      context.showToast?.('保存面板未就绪');
+      return;
+    }
+    const chosen = await context.requestSavePath({
+      filename: doc.name,
+      documentPath: doc.path,
     });
     if (!chosen) return;
     targetPath = chosen;
@@ -322,9 +339,14 @@ async function handleSaveAs(context: MenuActionContext): Promise<void> {
   const doc = context.documentStore.currentDocument;
   if (!doc) return;
 
-  const chosen = await save({
-    filters: [{ name: 'Markdown', extensions: ['md'] }],
-    defaultPath: doc.name,
+  if (!context.requestSavePath) {
+    context.showToast?.('保存面板未就绪');
+    return;
+  }
+
+  const chosen = await context.requestSavePath({
+    filename: doc.name,
+    documentPath: doc.path,
   });
   if (!chosen) return;
 
@@ -336,6 +358,47 @@ async function handleSaveAs(context: MenuActionContext): Promise<void> {
 
 async function handlePrint(): Promise<void> {
   window.print();
+}
+
+async function handleExport(format: ExportFormat, context: MenuActionContext): Promise<void> {
+  const doc = context.documentStore.currentDocument;
+  if (!doc) {
+    context.showToast?.('没有可导出的文档');
+    return;
+  }
+
+  const setExportProgress = (message: string | null) => {
+    window.dispatchEvent(new CustomEvent('prism-export-progress', {
+      detail: message ? { visible: true, message } : { visible: false },
+    }));
+  };
+
+  try {
+    if (!context.requestExportPath) {
+      context.showToast?.('导出保存面板未就绪');
+      return;
+    }
+
+    const outputPath = await context.requestExportPath({
+      format,
+      filename: doc.name,
+      documentPath: doc.path,
+    });
+    if (!outputPath) return;
+
+    const exported = await exportDocument({
+      content: doc.content,
+      filename: doc.name,
+      contentTheme: context.settingsStore.contentTheme,
+      onProgress: (message) => setExportProgress(message),
+    }, format, outputPath);
+
+    if (exported) {
+      context.showToast?.(`${getExportFormatLabel(format)} 导出完成`);
+    }
+  } finally {
+    setExportProgress(null);
+  }
 }
 
 // ══════════════════════════════════════════════════════════

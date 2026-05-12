@@ -17,6 +17,10 @@ export const ALL_COMMANDS: Command[] = [
   { id: 'paste', label: '粘贴', category: '编辑', shortcut: 'Ctrl+V', keywords: ['paste'] },
   { id: 'showSearch', label: '查找', category: '编辑', shortcut: 'Ctrl+F', keywords: ['find', 'search'] },
   { id: 'showReplace', label: '替换', category: '编辑', shortcut: 'Ctrl+H', keywords: ['replace', 'find'] },
+  { id: 'exportHtml', label: '导出为 HTML', category: '文件', keywords: ['export', 'html'] },
+  { id: 'exportPdf', label: '导出为 PDF', category: '文件', keywords: ['export', 'pdf'] },
+  { id: 'exportDocx', label: '导出为 Word', category: '文件', keywords: ['export', 'word', 'docx'] },
+  { id: 'exportPng', label: '导出为 PNG 图像', category: '文件', keywords: ['export', 'png', 'image'] },
 
   // 格式
   { id: 'bold', label: '加粗', category: '格式', shortcut: 'Ctrl+B', keywords: ['bold'] },

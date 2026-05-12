@@ -14,21 +14,25 @@ const CheckIcon = () => (
 );
 
 export function MenuDropdown({ items, onAction, onClose }: MenuDropdownProps) {
-  const visibleItems = items.filter((item) => {
-    if (item.type === 'separator') return true;
-    return !item.hidden;
-  });
+  const normalizeItems = (source: MenuItem[]) => {
+    const visibleItems = source.filter((item) => {
+      if (item.type === 'separator') return true;
+      return !item.hidden;
+    });
 
-  const cleanedItems = visibleItems.filter((item, idx, arr) => {
-    if (item.type !== 'separator') return true;
-    if (idx === 0 || idx === arr.length - 1) return false;
-    if (arr[idx - 1]?.type === 'separator') return false;
-    return true;
-  });
+    return visibleItems.filter((item, idx, arr) => {
+      if (item.type !== 'separator') return true;
+      if (idx === 0 || idx === arr.length - 1) return false;
+      if (arr[idx - 1]?.type === 'separator') return false;
+      return true;
+    });
+  };
+
+  const cleanedItems = normalizeItems(items);
 
   const handleItemClick = (item: MenuItem) => {
     if (item.type === 'separator') return;
-    if (item.disabled || item.submenu) return;
+    if (item.disabled || item.children?.length || item.submenu) return;
     if (item.action) {
       onAction(item.action);
       onClose();
@@ -48,25 +52,60 @@ export function MenuDropdown({ items, onAction, onClose }: MenuDropdownProps) {
           item.submenu ? styles.submenu : '',
         ].filter(Boolean).join(' ');
 
+        const submenuItems = item.children ? normalizeItems(item.children) : [];
+
         return (
-          <div
-            key={`${item.label}-${idx}`}
-            className={className}
-            role="menuitem"
-            aria-disabled={item.disabled ? true : undefined}
-            aria-haspopup={item.submenu ? true : undefined}
-            onClick={() => handleItemClick(item)}
-          >
-            <div className={styles.check}>
-              {item.checked ? <CheckIcon /> : null}
+          <div key={`${item.label}-${idx}`} className={styles.itemWrap}>
+            <div
+              className={className}
+              role="menuitem"
+              aria-disabled={item.disabled ? true : undefined}
+              aria-haspopup={item.submenu || submenuItems.length > 0 ? true : undefined}
+              onClick={() => handleItemClick(item)}
+            >
+              <div className={styles.check}>
+                {item.checked ? <CheckIcon /> : null}
+              </div>
+              <span className={styles.label}>{item.label}</span>
+              <span className={styles.meta}>
+                {item.shortcut ? (
+                  <span className={styles.shortcut}>{item.shortcut}</span>
+                ) : null}
+                {item.submenu || submenuItems.length > 0 ? <span className={styles.arrow}>›</span> : null}
+              </span>
             </div>
-            <span className={styles.label}>{item.label}</span>
-            <span className={styles.meta}>
-              {item.shortcut ? (
-                <span className={styles.shortcut}>{item.shortcut}</span>
-              ) : null}
-              {item.submenu ? <span className={styles.arrow}>›</span> : null}
-            </span>
+            {submenuItems.length > 0 ? (
+              <div className={styles.submenuPanel} role="menu">
+                {submenuItems.map((child, childIdx) => {
+                  if (child.type === 'separator') {
+                    return <div key={`child-sep-${childIdx}`} className={styles.separator} role="separator" />;
+                  }
+
+                  const childClassName = [
+                    styles.item,
+                    child.disabled ? styles.disabled : '',
+                  ].filter(Boolean).join(' ');
+
+                  return (
+                    <div
+                      key={`${child.label}-${childIdx}`}
+                      className={childClassName}
+                      role="menuitem"
+                      aria-disabled={child.disabled ? true : undefined}
+                      onClick={() => handleItemClick(child)}
+                    >
+                      <div className={styles.check}>
+                        {child.checked ? <CheckIcon /> : null}
+                      </div>
+                      <span className={styles.label}>{child.label}</span>
+                      <span className={styles.meta}>
+                        {child.shortcut ? <span className={styles.shortcut}>{child.shortcut}</span> : null}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
         );
       })}

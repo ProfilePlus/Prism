@@ -3,6 +3,7 @@ export interface MenuItemBase {
   shortcut?: string;
   disabled?: boolean;
   submenu?: boolean;
+  children?: MenuItem[];
   hidden?: boolean;
 }
 

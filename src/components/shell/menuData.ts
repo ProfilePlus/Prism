@@ -16,7 +16,16 @@ export const menuData: MenuSection = {
     { label: '保存全部打开的文件...', action: 'saveAll' },
     { type: 'separator' },
     { label: '导入...', action: 'import' },
-    { label: '导出', submenu: true },
+    {
+      label: '导出',
+      submenu: true,
+      children: [
+        { label: 'HTML', action: 'exportHtml' },
+        { label: 'PDF', action: 'exportPdf' },
+        { label: 'Word (.docx)', action: 'exportDocx' },
+        { label: 'PNG 图像', action: 'exportPng' },
+      ],
+    },
     { type: 'separator' },
     { label: '打印...', shortcut: 'Alt+Shift+P', action: 'print', hidden: true },
     { type: 'separator' },

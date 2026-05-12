@@ -1332,6 +1332,137 @@ body.dark .modal-overlay { background: rgba(0, 0, 0, 0.6); }
   margin-bottom: 24px;
 }
 
+.prism-export-save-modal {
+  max-width: 460px;
+}
+
+.prism-export-save-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.prism-export-save-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--c-ash);
+}
+
+.prism-export-save-field input {
+  height: 36px;
+  border: 1px solid var(--c-fog);
+  border-radius: 8px;
+  padding: 0 11px;
+  background: var(--c-canvas);
+  color: var(--c-void);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  outline: none;
+}
+
+.prism-export-save-field input:focus {
+  border-color: var(--c-graphite);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-graphite) 12%, transparent);
+}
+
+.prism-export-save-location {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.prism-export-save-location > div {
+  min-width: 0;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--c-fog);
+  border-radius: 8px;
+  padding: 0 11px;
+  color: var(--c-graphite);
+  background: var(--c-chalk);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prism-export-save-location button,
+.prism-export-save-footer button {
+  height: 36px;
+  border: 1px solid var(--c-fog);
+  border-radius: 8px;
+  padding: 0 14px;
+  background: var(--c-canvas);
+  color: var(--c-void);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.prism-export-save-location button:hover,
+.prism-export-save-footer button:hover {
+  background: var(--c-chalk);
+}
+
+.prism-export-save-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 22px 18px;
+  border-top: 1px solid var(--c-fog);
+}
+
+.prism-export-save-footer .primary {
+  border-color: var(--c-void);
+  background: var(--c-void);
+  color: var(--c-canvas);
+}
+
+.prism-export-save-footer .primary:hover {
+  background: var(--c-graphite);
+}
+
+.prism-export-save-footer .danger {
+  border-color: rgba(210, 61, 48, 0.28);
+  background: rgba(210, 61, 48, 0.12);
+  color: #b42318;
+}
+
+.prism-export-save-footer .danger:hover {
+  background: rgba(210, 61, 48, 0.18);
+}
+
+.prism-export-save-error,
+.prism-export-overwrite {
+  border-radius: 8px;
+  padding: 10px 11px;
+  font-size: 13px;
+}
+
+.prism-export-save-error {
+  color: #b42318;
+  background: rgba(210, 61, 48, 0.09);
+}
+
+.prism-export-overwrite {
+  color: var(--c-void);
+  background: color-mix(in srgb, #f7c948 16%, var(--c-canvas));
+  border: 1px solid color-mix(in srgb, #f7c948 36%, var(--c-fog));
+}
+
+.prism-export-overwrite-title {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.prism-export-overwrite-text {
+  color: var(--c-graphite);
+}
+
 .settings-group { margin-bottom: 28px; }
 .settings-group h4 {
   font-size: 10px;
@@ -1396,6 +1527,47 @@ body.dark .modal-overlay { background: rgba(0, 0, 0, 0.6); }
 @keyframes prism-toast-in {
   from { opacity: 0; transform: translateX(-50%) translateY(12px); }
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.prism-export-progress {
+  position: fixed;
+  right: 18px;
+  bottom: 54px;
+  z-index: 5001;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  max-width: min(360px, calc(100vw - 36px));
+  padding: 10px 14px;
+  border: 1px solid var(--c-fog);
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--c-canvas) 92%, transparent);
+  color: var(--c-void);
+  box-shadow: var(--shadow-float);
+  backdrop-filter: blur(18px);
+  font-size: 13px;
+  line-height: 1.35;
+  pointer-events: none;
+  animation: prism-export-progress-in 180ms var(--ease-out);
+}
+
+.prism-export-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--c-fog);
+  border-top-color: var(--c-void);
+  animation: prism-export-spin 820ms linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes prism-export-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes prism-export-progress-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* 上下文菜单（给 ContextMenu.tsx 用的全局类名） */
@@ -4221,6 +4393,42 @@ html[data-content-theme='miaoyan'] .kbd,
 html[data-content-theme='miaoyan'] .cmdk-shortcut,
 html[data-content-theme='miaoyan'] .custom-context-menu .menu-shortcut {
   font-family: var(--miaoyan-code-font);
+}
+
+html[data-content-theme='miaoyan'] .prism-export-save-field,
+html[data-content-theme='miaoyan'] .prism-export-save-location > div,
+html[data-content-theme='miaoyan'] .prism-export-overwrite-text {
+  color: var(--miaoyan-secondary-text);
+}
+
+html[data-content-theme='miaoyan'] .prism-export-save-field input,
+html[data-content-theme='miaoyan'] .prism-export-save-location > div,
+html[data-content-theme='miaoyan'] .prism-export-save-location button,
+html[data-content-theme='miaoyan'] .prism-export-save-footer button {
+  border-color: var(--miaoyan-divider);
+  border-radius: 8px;
+  background: var(--miaoyan-main-bg);
+  color: var(--miaoyan-text);
+  font-family: var(--miaoyan-font);
+}
+
+html[data-content-theme='miaoyan'] .prism-export-save-location > div {
+  background: var(--miaoyan-panel-secondary);
+}
+
+html[data-content-theme='miaoyan'] .prism-export-save-location button:hover,
+html[data-content-theme='miaoyan'] .prism-export-save-footer button:hover {
+  background: var(--miaoyan-selection);
+}
+
+html[data-content-theme='miaoyan'] .prism-export-save-footer {
+  border-top-color: var(--miaoyan-divider);
+}
+
+html[data-content-theme='miaoyan'] .prism-export-save-footer .primary {
+  border-color: var(--miaoyan-accent);
+  background: var(--miaoyan-accent);
+  color: #fff;
 }
 
 html[data-content-theme='miaoyan'] .prism-toast {
