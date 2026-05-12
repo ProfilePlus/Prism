@@ -91,3 +91,136 @@
   background: var(--c-fog);
   margin: 4px 6px;
 }
+
+:global(html[data-content-theme='miaoyan']) .dropdown {
+  top: calc(100% + 2px);
+  min-width: 220px;
+  padding: 5px;
+  border: 1px solid var(--miaoyan-divider);
+  border-radius: 8px;
+  background: var(--miaoyan-main-bg);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+  font-family: var(--miaoyan-font);
+  letter-spacing: 0.6px;
+  animation: none;
+}
+
+:global(html[data-content-theme='miaoyan']) .item {
+  min-height: 26px;
+  padding: 4px 8px;
+  gap: 8px;
+  border-radius: 6px;
+  color: var(--miaoyan-text);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+:global(html[data-content-theme='miaoyan']) .item:hover,
+:global(html[data-content-theme='miaoyan']) .item.hover {
+  background: var(--miaoyan-selection);
+}
+
+:global(html[data-content-theme='miaoyan']) .item.disabled {
+  color: var(--miaoyan-tertiary-text);
+}
+
+:global(html[data-content-theme='miaoyan']) .check {
+  width: 14px;
+  color: var(--miaoyan-accent);
+}
+
+:global(html[data-content-theme='miaoyan']) .shortcut {
+  color: var(--miaoyan-secondary-text);
+  font-family: var(--miaoyan-code-font);
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
+:global(html[data-content-theme='miaoyan']) .arrow {
+  color: var(--miaoyan-secondary-text);
+}
+
+:global(html[data-content-theme='miaoyan']) .separator {
+  background: var(--miaoyan-divider);
+  margin: 4px 8px;
+}
+
+:global(html[data-content-theme='inkstone']) .dropdown,
+:global(html[data-content-theme='slate']) .dropdown,
+:global(html[data-content-theme='mono']) .dropdown,
+:global(html[data-content-theme='nocturne']) .dropdown {
+  top: calc(100% + 2px);
+  min-width: 220px;
+  padding: 5px;
+  border: 1px solid var(--theme-divider);
+  border-radius: 8px;
+  background: var(--theme-main-bg);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+  font-family: var(--theme-font);
+  letter-spacing: 0.6px;
+  animation: none;
+}
+
+:global(html[data-content-theme='inkstone']) .item,
+:global(html[data-content-theme='slate']) .item,
+:global(html[data-content-theme='mono']) .item,
+:global(html[data-content-theme='nocturne']) .item {
+  min-height: 26px;
+  padding: 4px 8px;
+  gap: 8px;
+  border-radius: 6px;
+  color: var(--theme-text);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+:global(html[data-content-theme='inkstone']) .item:hover,
+:global(html[data-content-theme='inkstone']) .item.hover,
+:global(html[data-content-theme='slate']) .item:hover,
+:global(html[data-content-theme='slate']) .item.hover,
+:global(html[data-content-theme='mono']) .item:hover,
+:global(html[data-content-theme='mono']) .item.hover,
+:global(html[data-content-theme='nocturne']) .item:hover,
+:global(html[data-content-theme='nocturne']) .item.hover {
+  background: var(--theme-selection);
+}
+
+:global(html[data-content-theme='inkstone']) .item.disabled,
+:global(html[data-content-theme='slate']) .item.disabled,
+:global(html[data-content-theme='mono']) .item.disabled,
+:global(html[data-content-theme='nocturne']) .item.disabled {
+  color: var(--theme-tertiary-text);
+}
+
+:global(html[data-content-theme='inkstone']) .check,
+:global(html[data-content-theme='slate']) .check,
+:global(html[data-content-theme='mono']) .check,
+:global(html[data-content-theme='nocturne']) .check {
+  width: 14px;
+  color: var(--theme-accent);
+}
+
+:global(html[data-content-theme='inkstone']) .shortcut,
+:global(html[data-content-theme='slate']) .shortcut,
+:global(html[data-content-theme='mono']) .shortcut,
+:global(html[data-content-theme='nocturne']) .shortcut {
+  color: var(--theme-secondary-text);
+  font-family: var(--theme-code-font);
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
+:global(html[data-content-theme='inkstone']) .arrow,
+:global(html[data-content-theme='slate']) .arrow,
+:global(html[data-content-theme='mono']) .arrow,
+:global(html[data-content-theme='nocturne']) .arrow {
+  color: var(--theme-secondary-text);
+}
+
+:global(html[data-content-theme='inkstone']) .separator,
+:global(html[data-content-theme='slate']) .separator,
+:global(html[data-content-theme='mono']) .separator,
+:global(html[data-content-theme='nocturne']) .separator {
+  background: var(--theme-divider);
+  margin: 4px 8px;
+}

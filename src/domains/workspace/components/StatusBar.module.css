@@ -17,6 +17,7 @@
   height: 100%;
   display: flex;
   align-items: center;
+  gap: 2px;
   padding: 0 6px 0 8px;
   box-shadow: 1px 0 0 var(--c-fog);
   opacity: 0;
@@ -103,10 +104,10 @@
 
 .folder {
   flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
   height: 22px;
   padding: 0 10px;
   border-radius: var(--r-pill);
@@ -121,9 +122,20 @@
   border: none;
 }
 
+.folder span {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  white-space: nowrap;
+}
+
 .folder:hover {
   background: var(--c-chalk);
   color: var(--c-void);
+}
+
+.treeBtn {
+  flex-shrink: 0;
 }
 
 .sep {
@@ -197,4 +209,351 @@
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+}
+
+:global(html[data-content-theme='miaoyan']) .statusbar {
+  height: 26px;
+  border-top: 1px solid var(--miaoyan-hairline);
+  background: var(--miaoyan-pane-bg);
+  color: var(--miaoyan-secondary-text);
+  font-family: var(--miaoyan-font);
+  font-size: 11px;
+  letter-spacing: 0.6px;
+}
+
+:global(html[data-content-theme='miaoyan']) .sidebarZone {
+  width: var(--sidebar-w);
+  gap: 4px;
+  padding: 0 7px;
+  border-right: 1px solid var(--miaoyan-hairline);
+  box-shadow: none;
+  box-sizing: border-box;
+  opacity: 1;
+  transition: none;
+}
+
+:global(html[data-content-theme='miaoyan']) .main {
+  padding: 0 7px;
+}
+
+:global(html[data-content-theme='miaoyan']) .left,
+:global(html[data-content-theme='miaoyan']) .right {
+  gap: 6px;
+}
+
+:global(html[data-content-theme='miaoyan']) .main .left > .sep:first-of-type {
+  display: none;
+}
+
+:global(html[data-content-theme='miaoyan']) .btn,
+:global(html[data-content-theme='miaoyan']) .folder {
+  height: 19px;
+  border-radius: 6px;
+  color: var(--miaoyan-secondary-text);
+  font-family: var(--miaoyan-font);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.6px;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+:global(html[data-content-theme='miaoyan']) .btn {
+  padding: 0 6px;
+}
+
+:global(html[data-content-theme='miaoyan']) .iconBtn {
+  width: 20px;
+  padding: 0;
+}
+
+:global(html[data-content-theme='miaoyan']) .btn:hover,
+:global(html[data-content-theme='miaoyan']) .folder:hover {
+  background: var(--miaoyan-panel-secondary);
+  color: var(--miaoyan-toolbar-icon);
+}
+
+:global(html[data-content-theme='miaoyan']) .btn.active,
+:global(html[data-content-theme='miaoyan']) .modeBtn.active {
+  background: transparent;
+  color: var(--miaoyan-accent);
+  box-shadow: none;
+}
+
+:global(html[data-content-theme='miaoyan']) .btn svg,
+:global(html[data-content-theme='miaoyan']) .modeBtn svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 1.5;
+}
+
+:global(html[data-content-theme='miaoyan']) .folder {
+  justify-content: center;
+  padding: 0 8px;
+  color: var(--miaoyan-secondary-text);
+}
+
+:global(html[data-content-theme='miaoyan']) .sep {
+  height: 10px;
+  margin: 0 2px;
+  background: var(--miaoyan-hairline);
+}
+
+:global(html[data-content-theme='miaoyan']) .modeGroup {
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+}
+
+:global(html[data-content-theme='miaoyan']) .modeBtn {
+  width: 20px;
+  height: 19px;
+  border-radius: 6px;
+  color: var(--miaoyan-secondary-text);
+}
+
+:global(html[data-content-theme='miaoyan']) .modeBtn:hover {
+  background: var(--miaoyan-panel-secondary);
+  color: var(--miaoyan-toolbar-icon);
+}
+
+:global(html[data-content-theme='miaoyan']) .saveStatus {
+  padding: 0 4px;
+  color: var(--miaoyan-secondary-text);
+  font-family: var(--miaoyan-font);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.6px;
+}
+
+:global(html[data-content-theme='miaoyan']) .saveStatus.unsaved {
+  color: var(--miaoyan-accent);
+}
+
+:global(html[data-content-theme='miaoyan']) .statVal {
+  color: var(--miaoyan-secondary-text);
+  font-family: var(--miaoyan-code-font);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+:global(html[data-content-theme='miaoyan']) .statLbl {
+  color: var(--miaoyan-tertiary-text);
+  font-family: var(--miaoyan-font);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.6px;
+  text-transform: none;
+}
+
+:global(html[data-content-theme='inkstone']) .statusbar,
+:global(html[data-content-theme='slate']) .statusbar,
+:global(html[data-content-theme='mono']) .statusbar,
+:global(html[data-content-theme='nocturne']) .statusbar {
+  height: 26px;
+  border-top: 1px solid var(--theme-hairline);
+  background: var(--theme-pane-bg);
+  color: var(--theme-secondary-text);
+  font-family: var(--theme-font);
+  font-size: 11px;
+  letter-spacing: 0.6px;
+}
+
+:global(html[data-content-theme='inkstone']) .sidebarZone,
+:global(html[data-content-theme='slate']) .sidebarZone,
+:global(html[data-content-theme='mono']) .sidebarZone,
+:global(html[data-content-theme='nocturne']) .sidebarZone {
+  width: var(--sidebar-w);
+  gap: 4px;
+  padding: 0 7px;
+  border-right: 1px solid var(--theme-hairline);
+  box-shadow: none;
+  box-sizing: border-box;
+  opacity: 1;
+  transition: none;
+}
+
+:global(html[data-content-theme='inkstone']) .main,
+:global(html[data-content-theme='slate']) .main,
+:global(html[data-content-theme='mono']) .main,
+:global(html[data-content-theme='nocturne']) .main {
+  padding: 0 7px;
+}
+
+:global(html[data-content-theme='inkstone']) .left,
+:global(html[data-content-theme='inkstone']) .right,
+:global(html[data-content-theme='slate']) .left,
+:global(html[data-content-theme='slate']) .right,
+:global(html[data-content-theme='mono']) .left,
+:global(html[data-content-theme='mono']) .right,
+:global(html[data-content-theme='nocturne']) .left,
+:global(html[data-content-theme='nocturne']) .right {
+  gap: 6px;
+}
+
+:global(html[data-content-theme='inkstone']) .main .left > .sep:first-of-type,
+:global(html[data-content-theme='slate']) .main .left > .sep:first-of-type,
+:global(html[data-content-theme='mono']) .main .left > .sep:first-of-type,
+:global(html[data-content-theme='nocturne']) .main .left > .sep:first-of-type {
+  display: none;
+}
+
+:global(html[data-content-theme='inkstone']) .btn,
+:global(html[data-content-theme='inkstone']) .folder,
+:global(html[data-content-theme='slate']) .btn,
+:global(html[data-content-theme='slate']) .folder,
+:global(html[data-content-theme='mono']) .btn,
+:global(html[data-content-theme='mono']) .folder,
+:global(html[data-content-theme='nocturne']) .btn,
+:global(html[data-content-theme='nocturne']) .folder {
+  height: 19px;
+  border-radius: 6px;
+  color: var(--theme-secondary-text);
+  font-family: var(--theme-font);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.6px;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+:global(html[data-content-theme='inkstone']) .btn,
+:global(html[data-content-theme='slate']) .btn,
+:global(html[data-content-theme='mono']) .btn,
+:global(html[data-content-theme='nocturne']) .btn {
+  padding: 0 6px;
+}
+
+:global(html[data-content-theme='inkstone']) .iconBtn,
+:global(html[data-content-theme='slate']) .iconBtn,
+:global(html[data-content-theme='mono']) .iconBtn,
+:global(html[data-content-theme='nocturne']) .iconBtn {
+  width: 20px;
+  padding: 0;
+}
+
+:global(html[data-content-theme='inkstone']) .btn:hover,
+:global(html[data-content-theme='inkstone']) .folder:hover,
+:global(html[data-content-theme='slate']) .btn:hover,
+:global(html[data-content-theme='slate']) .folder:hover,
+:global(html[data-content-theme='mono']) .btn:hover,
+:global(html[data-content-theme='mono']) .folder:hover,
+:global(html[data-content-theme='nocturne']) .btn:hover,
+:global(html[data-content-theme='nocturne']) .folder:hover {
+  background: var(--theme-panel-secondary);
+  color: var(--theme-toolbar-icon);
+}
+
+:global(html[data-content-theme='inkstone']) .btn.active,
+:global(html[data-content-theme='inkstone']) .modeBtn.active,
+:global(html[data-content-theme='slate']) .btn.active,
+:global(html[data-content-theme='slate']) .modeBtn.active,
+:global(html[data-content-theme='mono']) .btn.active,
+:global(html[data-content-theme='mono']) .modeBtn.active,
+:global(html[data-content-theme='nocturne']) .btn.active,
+:global(html[data-content-theme='nocturne']) .modeBtn.active {
+  background: transparent;
+  color: var(--theme-accent);
+  box-shadow: none;
+}
+
+:global(html[data-content-theme='inkstone']) .btn svg,
+:global(html[data-content-theme='inkstone']) .modeBtn svg,
+:global(html[data-content-theme='slate']) .btn svg,
+:global(html[data-content-theme='slate']) .modeBtn svg,
+:global(html[data-content-theme='mono']) .btn svg,
+:global(html[data-content-theme='mono']) .modeBtn svg,
+:global(html[data-content-theme='nocturne']) .btn svg,
+:global(html[data-content-theme='nocturne']) .modeBtn svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 1.5;
+}
+
+:global(html[data-content-theme='inkstone']) .folder,
+:global(html[data-content-theme='slate']) .folder,
+:global(html[data-content-theme='mono']) .folder,
+:global(html[data-content-theme='nocturne']) .folder {
+  justify-content: center;
+  padding: 0 8px;
+  color: var(--theme-secondary-text);
+}
+
+:global(html[data-content-theme='inkstone']) .sep,
+:global(html[data-content-theme='slate']) .sep,
+:global(html[data-content-theme='mono']) .sep,
+:global(html[data-content-theme='nocturne']) .sep {
+  height: 10px;
+  margin: 0 2px;
+  background: var(--theme-hairline);
+}
+
+:global(html[data-content-theme='inkstone']) .modeGroup,
+:global(html[data-content-theme='slate']) .modeGroup,
+:global(html[data-content-theme='mono']) .modeGroup,
+:global(html[data-content-theme='nocturne']) .modeGroup {
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+}
+
+:global(html[data-content-theme='inkstone']) .modeBtn,
+:global(html[data-content-theme='slate']) .modeBtn,
+:global(html[data-content-theme='mono']) .modeBtn,
+:global(html[data-content-theme='nocturne']) .modeBtn {
+  width: 20px;
+  height: 19px;
+  border-radius: 6px;
+  color: var(--theme-secondary-text);
+}
+
+:global(html[data-content-theme='inkstone']) .modeBtn:hover,
+:global(html[data-content-theme='slate']) .modeBtn:hover,
+:global(html[data-content-theme='mono']) .modeBtn:hover,
+:global(html[data-content-theme='nocturne']) .modeBtn:hover {
+  background: var(--theme-panel-secondary);
+  color: var(--theme-toolbar-icon);
+}
+
+:global(html[data-content-theme='inkstone']) .saveStatus,
+:global(html[data-content-theme='slate']) .saveStatus,
+:global(html[data-content-theme='mono']) .saveStatus,
+:global(html[data-content-theme='nocturne']) .saveStatus {
+  padding: 0 4px;
+  color: var(--theme-secondary-text);
+  font-family: var(--theme-font);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.6px;
+}
+
+:global(html[data-content-theme='inkstone']) .saveStatus.unsaved,
+:global(html[data-content-theme='slate']) .saveStatus.unsaved,
+:global(html[data-content-theme='mono']) .saveStatus.unsaved,
+:global(html[data-content-theme='nocturne']) .saveStatus.unsaved {
+  color: var(--theme-accent);
+}
+
+:global(html[data-content-theme='inkstone']) .statVal,
+:global(html[data-content-theme='slate']) .statVal,
+:global(html[data-content-theme='mono']) .statVal,
+:global(html[data-content-theme='nocturne']) .statVal {
+  color: var(--theme-secondary-text);
+  font-family: var(--theme-code-font);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+:global(html[data-content-theme='inkstone']) .statLbl,
+:global(html[data-content-theme='slate']) .statLbl,
+:global(html[data-content-theme='mono']) .statLbl,
+:global(html[data-content-theme='nocturne']) .statLbl {
+  color: var(--theme-tertiary-text);
+  font-family: var(--theme-font);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.6px;
+  text-transform: none;
 }

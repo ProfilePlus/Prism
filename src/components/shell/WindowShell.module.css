@@ -6,3 +6,20 @@
   border-radius: 0;
   overflow: hidden;
 }
+
+:global(html[data-content-theme='miaoyan']) .windowShell {
+  background: var(--miaoyan-main-bg);
+  color: var(--miaoyan-text);
+  font-family: var(--miaoyan-font);
+  letter-spacing: 0.6px;
+}
+
+:global(html[data-content-theme='inkstone']) .windowShell,
+:global(html[data-content-theme='slate']) .windowShell,
+:global(html[data-content-theme='mono']) .windowShell,
+:global(html[data-content-theme='nocturne']) .windowShell {
+  background: var(--theme-main-bg);
+  color: var(--theme-text);
+  font-family: var(--theme-font);
+  letter-spacing: 0.6px;
+}

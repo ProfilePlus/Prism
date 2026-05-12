@@ -73,3 +73,131 @@
 .button[name='code']::before { content: '<>'; font-size: 12px; }
 .button[name='link']::before { content: '↗'; font-size: 15px; }
 .button[name='quote']::before { content: '\201C'; font-size: 18px; line-height: 1; }
+
+:global(html[data-content-theme='miaoyan']) .toolbar {
+  gap: 0;
+  padding: 4px;
+  border: 1px solid var(--miaoyan-divider);
+  border-radius: 8px;
+  background: var(--miaoyan-main-bg);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+  animation: none;
+  margin-top: -8px;
+}
+
+:global(html[data-content-theme='miaoyan']) .group {
+  gap: 8px;
+  padding: 0 4px;
+}
+
+:global(html[data-content-theme='miaoyan']) .button {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  color: var(--miaoyan-toolbar-icon);
+  font-family: var(--miaoyan-font);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.6px;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+:global(html[data-content-theme='miaoyan']) .button:hover {
+  background: var(--miaoyan-panel-secondary);
+}
+
+:global(html[data-content-theme='miaoyan']) .button:active {
+  transform: none;
+}
+
+:global(html[data-content-theme='miaoyan']) .button.active {
+  background: transparent;
+  color: var(--miaoyan-accent);
+}
+
+:global(html[data-content-theme='miaoyan']) .divider {
+  height: 14px;
+  margin: 0 4px;
+  background: var(--miaoyan-divider);
+}
+
+:global(html[data-content-theme='miaoyan']) .button[name='code'] {
+  font-family: var(--miaoyan-code-font);
+  letter-spacing: 0;
+}
+
+:global(html[data-content-theme='inkstone']) .toolbar,
+:global(html[data-content-theme='slate']) .toolbar,
+:global(html[data-content-theme='mono']) .toolbar,
+:global(html[data-content-theme='nocturne']) .toolbar {
+  gap: 0;
+  padding: 4px;
+  border: 1px solid var(--theme-divider);
+  border-radius: 8px;
+  background: var(--theme-main-bg);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+  animation: none;
+  margin-top: -8px;
+}
+
+:global(html[data-content-theme='inkstone']) .group,
+:global(html[data-content-theme='slate']) .group,
+:global(html[data-content-theme='mono']) .group,
+:global(html[data-content-theme='nocturne']) .group {
+  gap: 8px;
+  padding: 0 4px;
+}
+
+:global(html[data-content-theme='inkstone']) .button,
+:global(html[data-content-theme='slate']) .button,
+:global(html[data-content-theme='mono']) .button,
+:global(html[data-content-theme='nocturne']) .button {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  color: var(--theme-toolbar-icon);
+  font-family: var(--theme-font);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.6px;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+:global(html[data-content-theme='inkstone']) .button:hover,
+:global(html[data-content-theme='slate']) .button:hover,
+:global(html[data-content-theme='mono']) .button:hover,
+:global(html[data-content-theme='nocturne']) .button:hover {
+  background: var(--theme-panel-secondary);
+}
+
+:global(html[data-content-theme='inkstone']) .button:active,
+:global(html[data-content-theme='slate']) .button:active,
+:global(html[data-content-theme='mono']) .button:active,
+:global(html[data-content-theme='nocturne']) .button:active {
+  transform: none;
+}
+
+:global(html[data-content-theme='inkstone']) .button.active,
+:global(html[data-content-theme='slate']) .button.active,
+:global(html[data-content-theme='mono']) .button.active,
+:global(html[data-content-theme='nocturne']) .button.active {
+  background: transparent;
+  color: var(--theme-accent);
+}
+
+:global(html[data-content-theme='inkstone']) .divider,
+:global(html[data-content-theme='slate']) .divider,
+:global(html[data-content-theme='mono']) .divider,
+:global(html[data-content-theme='nocturne']) .divider {
+  height: 14px;
+  margin: 0 4px;
+  background: var(--theme-divider);
+}
+
+:global(html[data-content-theme='inkstone']) .button[name='code'],
+:global(html[data-content-theme='slate']) .button[name='code'],
+:global(html[data-content-theme='mono']) .button[name='code'],
+:global(html[data-content-theme='nocturne']) .button[name='code'] {
+  font-family: var(--theme-code-font);
+  letter-spacing: 0;
+}

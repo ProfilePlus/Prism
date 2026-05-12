@@ -280,6 +280,7 @@ export function FileTree({ nodes, activePath, onFileClick }: FileTreeProps) {
         onClick={() => onFileClick(node.path)}
         onContextMenu={(event) => handleContextMenu(event, node)}
         title={node.path}
+        data-active={isActive ? 'true' : undefined}
         style={{
           padding: '8px 14px',
           margin: '2px 8px',
@@ -299,7 +300,7 @@ export function FileTree({ nodes, activePath, onFileClick }: FileTreeProps) {
           animationDelay: `${Math.min(index, 24) * 0.02}s`,
           minHeight: '32px',
         }}
-        className="file-tree-item"
+        className={`file-tree-item ${isActive ? 'is-active' : ''}`}
       >
         {renderFileName(node, isActive)}
 

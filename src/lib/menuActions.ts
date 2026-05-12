@@ -114,18 +114,16 @@ export async function executeMenuAction(
         return handleZoom('in');
       case 'zoomOut':
         return handleZoom('out');
-      case 'themeClassic':
-        return context.settingsStore.setContentTheme('classic');
-      case 'themeGithub':
-        return context.settingsStore.setContentTheme('github');
-      case 'themeWhitey':
-        return context.settingsStore.setContentTheme('whitey');
-      case 'themeNewsprint':
-        return context.settingsStore.setContentTheme('newsprint');
-      case 'themePixyll':
-        return context.settingsStore.setContentTheme('pixyll');
-      case 'themeNight':
-        return context.settingsStore.setContentTheme('night');
+      case 'themeMiaoyan':
+        return context.settingsStore.setContentTheme('miaoyan');
+      case 'themeInkstone':
+        return context.settingsStore.setContentTheme('inkstone');
+      case 'themeSlate':
+        return context.settingsStore.setContentTheme('slate');
+      case 'themeMono':
+        return context.settingsStore.setContentTheme('mono');
+      case 'themeNocturne':
+        return context.settingsStore.setContentTheme('nocturne');
 
       // ═══ 帮助菜单 ═══
       case 'whatsNew':

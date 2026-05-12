@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { SettingsState, DEFAULT_SETTINGS, ContentTheme, AppearanceMode } from './types';
+import { SettingsState, DEFAULT_SETTINGS, ContentTheme, AppearanceMode, isContentTheme } from './types';
 import {
   readTextFile,
   writeTextFile,
@@ -47,8 +47,8 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   },
 
   setContentTheme: (contentTheme) => {
-    set({ contentTheme });
     document.documentElement.setAttribute('data-content-theme', contentTheme);
+    set({ contentTheme });
     get().saveSettings();
   },
 
@@ -77,8 +77,11 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       const configPath = await getConfigPath();
       const raw = await readTextFile(configPath);
       const saved = JSON.parse(raw) as Partial<SettingsState>;
+      const contentTheme = isContentTheme(saved.contentTheme)
+        ? saved.contentTheme
+        : DEFAULT_SETTINGS.contentTheme;
 
-      set({ ...DEFAULT_SETTINGS, ...saved });
+      set({ ...DEFAULT_SETTINGS, ...saved, contentTheme });
 
       // 应用保存的主题
       const theme = saved.theme || DEFAULT_SETTINGS.theme;
@@ -90,9 +93,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       }
       document.body.classList.add(actualTheme);
 
-      if (saved.contentTheme) {
-        document.documentElement.setAttribute('data-content-theme', saved.contentTheme);
-      }
+      document.documentElement.setAttribute('data-content-theme', contentTheme);
 
       // 监听系统主题变化
       if (theme === 'auto') {

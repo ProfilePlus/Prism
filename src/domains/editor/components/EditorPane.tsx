@@ -7,7 +7,7 @@ import {
   useState,
 } from 'react';
 import { EditorView, ViewUpdate, keymap, lineNumbers, highlightActiveLineGutter, highlightSpecialChars, drawSelection, dropCursor, rectangularSelection, crosshairCursor, highlightActiveLine, Decoration, DecorationSet } from '@codemirror/view';
-import { EditorState, Prec, StateEffect, StateField } from '@codemirror/state';
+import { Compartment, EditorState, Facet, Prec, StateEffect, StateField } from '@codemirror/state';
 
 // 定义闪烁效果的 Effect
 const addLineFlash = StateEffect.define<number>();
@@ -40,14 +40,65 @@ const lineFlashField = StateField.define<DecorationSet>({
 import { markdown } from '@codemirror/lang-markdown';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands';
-import { syntaxHighlighting, defaultHighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap } from '@codemirror/language';
+import { indentOnInput, bracketMatching, foldGutter, foldKeymap, syntaxTree } from '@codemirror/language';
+import { ViewPlugin } from '@codemirror/view';
+import { RangeSetBuilder } from '@codemirror/state';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { highlightSelectionMatches } from '@codemirror/search';
 import { SearchQuery, setSearchQuery, findNext, findPrevious, replaceNext, replaceAll, selectMatches } from '@codemirror/search';
+import hljs from 'highlight.js';
 import { useSettingsStore } from '../../settings/store';
+import type { ContentTheme } from '../../settings/types';
 import { useWorkspaceStore } from '../../workspace/store';
 import { FloatingToolbar } from './FloatingToolbar';
 import { SearchParams } from './SearchPanel';
+
+const editorLineNumbersCompartment = new Compartment();
+const editorDarkThemeCompartment = new Compartment();
+const editorContentThemeCompartment = new Compartment();
+const contentThemeFacet = Facet.define<ContentTheme, ContentTheme>({
+  combine: (values) => values[values.length - 1] ?? 'miaoyan',
+});
+const editorDarkThemeExtension = [
+  oneDark,
+  EditorView.theme(
+    {
+      '.cm-content': { color: '#E2E8F0' },
+      '.cm-gutters': { borderRight: '1px solid var(--stroke-surface)' },
+    },
+    { dark: true },
+  ),
+];
+
+const DARK_CONTENT_THEMES = new Set(['nocturne']);
+const LIGHT_CONTENT_THEMES = new Set(['miaoyan', 'inkstone', 'slate', 'mono']);
+const COMPATIBILITY_CODE_HIGHLIGHT_THEMES = new Set<ContentTheme>([
+  'miaoyan',
+  'inkstone',
+  'slate',
+  'mono',
+  'nocturne',
+]);
+
+function shouldUseDarkEditor(contentTheme: string, theme: string) {
+  return DARK_CONTENT_THEMES.has(contentTheme)
+    ? true
+    : LIGHT_CONTENT_THEMES.has(contentTheme)
+      ? false
+      : theme === 'dark';
+}
+
+function getLineNumberExtensions(showLineNumbers: boolean) {
+  return showLineNumbers ? [lineNumbers(), highlightActiveLineGutter()] : [];
+}
+
+function getDarkThemeExtensions(isEditorDark: boolean) {
+  return isEditorDark ? editorDarkThemeExtension : [];
+}
+
+function getContentThemeExtension(contentTheme: ContentTheme) {
+  return contentThemeFacet.of(contentTheme);
+}
 
 export interface EditorPaneHandle {
   jumpToLine: (line: number) => void;
@@ -62,7 +113,284 @@ interface EditorPaneProps {
   onCursorChange?: (cursor: { line: number; column: number }) => void;
   onScrollRatioChange?: (ratio: number) => void;
   onTopLineChange?: (line: number) => void;
+  onScroll?: () => void;
 }
+
+// Compatibility themes use semantic Markdown decorations; each theme owns the
+// final colors in CSS so the parser layer stays visual-theme agnostic.
+const compatibilityDecos = {
+  heading: Decoration.mark({ class: 'cm-md-heading' }),
+  listMark: Decoration.mark({ class: 'cm-md-list-marker' }),
+  quote: Decoration.mark({ class: 'cm-md-quote' }),
+  codeInline: Decoration.mark({ class: 'cm-md-code-inline' }),
+  fencedCode: Decoration.mark({ class: 'cm-md-fenced-code' }),
+  strong: Decoration.mark({ class: 'cm-md-strong' }),
+  emphasis: Decoration.mark({ class: 'cm-md-emphasis' }),
+  strike: Decoration.mark({ class: 'cm-md-strike' }),
+  linkText: Decoration.mark({ class: 'cm-md-link-text' }),
+  imageMark: Decoration.mark({ class: 'cm-md-image-mark' }),
+};
+
+type HighlightTokenRange = {
+  from: number;
+  to: number;
+  className: string;
+};
+
+type MiaoyanCodeHighlightTarget = {
+  code: string;
+  offset: number;
+  language?: string;
+};
+
+const MIAOYAN_CODE_BLOCK_HIGHLIGHT_LIMIT = 3000;
+const codeHighlightDecorationCache = new Map<string, Decoration>();
+const codeHighlightResultCache = new Map<string, HighlightTokenRange[]>();
+
+function getCodeHighlightDecoration(className: string) {
+  const cached = codeHighlightDecorationCache.get(className);
+  if (cached) return cached;
+  const decoration = Decoration.mark({ class: `cm-code-token ${className}` });
+  codeHighlightDecorationCache.set(className, decoration);
+  return decoration;
+}
+
+function getMiaoyanCodeLanguage(code: string) {
+  if (!code.startsWith('```')) return undefined;
+
+  const firstLineEnd = code.search(/\r?\n/);
+  if (firstLineEnd === -1) return undefined;
+
+  const language = code
+    .slice(3, firstLineEnd)
+    .trim();
+
+  if (!language || language === 'go' || !hljs.getLanguage(language)) {
+    return undefined;
+  }
+
+  return language;
+}
+
+function collectHighlightTokenRanges(html: string, originalLength: number) {
+  const template = document.createElement('template');
+  template.innerHTML = html;
+
+  const ranges: HighlightTokenRange[] = [];
+  let offset = 0;
+
+  const walk = (node: Node, inheritedClasses: string[]) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent ?? '';
+      const length = text.length;
+      if (length > 0 && inheritedClasses.length > 0) {
+        ranges.push({
+          from: offset,
+          to: offset + length,
+          className: inheritedClasses.join(' '),
+        });
+      }
+      offset += length;
+      return;
+    }
+
+    if (!(node instanceof Element)) {
+      node.childNodes.forEach((child) => walk(child, inheritedClasses));
+      return;
+    }
+
+    const ownClasses = Array.from(node.classList).filter((className) => className.startsWith('hljs-'));
+    const nextClasses = ownClasses.length > 0
+      ? Array.from(new Set([...inheritedClasses, ...ownClasses]))
+      : inheritedClasses;
+    node.childNodes.forEach((child) => walk(child, nextClasses));
+  };
+
+  template.content.childNodes.forEach((child) => walk(child, []));
+  return offset === originalLength ? ranges : [];
+}
+
+function getMiaoyanCodeHighlightTarget(code: string): MiaoyanCodeHighlightTarget {
+  const language = getMiaoyanCodeLanguage(code);
+  if (!code.startsWith('```')) {
+    return { code, offset: 0, language };
+  }
+
+  const firstLineEnd = code.search(/\r?\n/);
+  if (firstLineEnd === -1) {
+    return { code, offset: 0, language };
+  }
+
+  const firstLineBreak = code.match(/^.*?(\r?\n)/)?.[1] ?? '\n';
+  const bodyStart = firstLineEnd + firstLineBreak.length;
+  const closingFenceStart = code.lastIndexOf('\n```');
+  const bodyEnd = closingFenceStart > bodyStart ? closingFenceStart : code.length;
+
+  return {
+    code: code.slice(bodyStart, bodyEnd),
+    offset: bodyStart,
+    language,
+  };
+}
+
+function getMiaoyanCodeHighlightRanges(code: string) {
+  if (code.length === 0 || code.length > MIAOYAN_CODE_BLOCK_HIGHLIGHT_LIMIT) {
+    return [];
+  }
+
+  const target = getMiaoyanCodeHighlightTarget(code);
+  if (target.code.length === 0) {
+    return [];
+  }
+
+  const cacheKey = `${target.language ?? 'auto'}:${target.offset}\n${code}`;
+  const cached = codeHighlightResultCache.get(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const highlighted = target.language
+      ? hljs.highlight(target.code, { language: target.language, ignoreIllegals: true })
+      : hljs.highlightAuto(target.code);
+    const ranges = collectHighlightTokenRanges(highlighted.value, target.code.length)
+      .map((range) => ({
+        ...range,
+        from: range.from + target.offset,
+        to: range.to + target.offset,
+      }));
+
+    codeHighlightResultCache.set(cacheKey, ranges);
+    if (codeHighlightResultCache.size > 80) {
+      const firstKey = codeHighlightResultCache.keys().next().value;
+      if (firstKey !== undefined) {
+        codeHighlightResultCache.delete(firstKey);
+      }
+    }
+
+    return ranges;
+  } catch {
+    return [];
+  }
+}
+
+function addMiaoyanCodeHighlightDecorations(
+  builder: RangeSetBuilder<Decoration>,
+  view: EditorView,
+  from: number,
+  to: number,
+) {
+  const code = view.state.doc.sliceString(from, to);
+  const tokenRanges = getMiaoyanCodeHighlightRanges(code);
+  for (const tokenRange of tokenRanges) {
+    if (tokenRange.from === tokenRange.to) continue;
+    builder.add(
+      from + tokenRange.from,
+      from + tokenRange.to,
+      getCodeHighlightDecoration(tokenRange.className),
+    );
+  }
+}
+
+function shouldHighlightCompatibilityCode(view: EditorView) {
+  return COMPATIBILITY_CODE_HIGHLIGHT_THEMES.has(view.state.facet(contentThemeFacet));
+}
+
+function buildCompatibilityDecorations(view: EditorView): DecorationSet {
+  const builder = new RangeSetBuilder<Decoration>();
+  const enableCodeHighlight = shouldHighlightCompatibilityCode(view);
+  for (const { from, to } of view.visibleRanges) {
+    syntaxTree(view.state).iterate({
+      from,
+      to,
+      enter: (node) => {
+        const name = node.name;
+        // 整段标题（含 `#` 标记）= 紫
+        if (/^ATXHeading[1-6]$/.test(name) || name === 'SetextHeading1' || name === 'SetextHeading2') {
+          builder.add(node.from, node.to, compatibilityDecos.heading);
+          return false;
+        }
+        // 列表标记 `-` `*` `1.` = 棕橄榄（不染色列表内容）
+        if (name === 'ListMark') {
+          builder.add(node.from, node.to, compatibilityDecos.listMark);
+          return;
+        }
+        // 引用整段（含 `>` 标记和内容）= 棕橄榄
+        if (name === 'Blockquote') {
+          builder.add(node.from, node.to, compatibilityDecos.quote);
+          return;
+        }
+        // 内联代码（含 `` ` ` `` 反引号）= 橙
+        if (name === 'InlineCode') {
+          builder.add(node.from, node.to, compatibilityDecos.codeInline);
+          return false;
+        }
+        // 围栏代码块（含 ``` 围栏）= Menlo 等宽
+        if (name === 'FencedCode' || name === 'CodeBlock') {
+          builder.add(node.from, node.to, compatibilityDecos.fencedCode);
+          if (enableCodeHighlight) {
+            addMiaoyanCodeHighlightDecorations(builder, view, node.from, node.to);
+          }
+          return false;
+        }
+        // **加粗** 含标记 = 橙（不加粗）
+        if (name === 'StrongEmphasis') {
+          builder.add(node.from, node.to, compatibilityDecos.strong);
+          return false;
+        }
+        // *斜体* 含标记 = 紫（不变斜）
+        if (name === 'Emphasis') {
+          builder.add(node.from, node.to, compatibilityDecos.emphasis);
+          return false;
+        }
+        // ~~删除线~~ 含标记 = 橙（不画删除线）
+        if (name === 'Strikethrough') {
+          builder.add(node.from, node.to, compatibilityDecos.strike);
+          return false;
+        }
+        // 链接 [text](url)：方括号文本染青绿，括号/URL 保持默认
+        if (name === 'Link') {
+          const cursor = node.node.cursor();
+          let firstMarkEnd = -1;
+          let secondMarkStart = -1;
+          if (cursor.firstChild()) {
+            do {
+              if (cursor.name === 'LinkMark') {
+                if (firstMarkEnd === -1) firstMarkEnd = cursor.to;
+                else if (secondMarkStart === -1) { secondMarkStart = cursor.from; break; }
+              }
+            } while (cursor.nextSibling());
+          }
+          if (firstMarkEnd !== -1 && secondMarkStart !== -1 && firstMarkEnd < secondMarkStart) {
+            builder.add(firstMarkEnd, secondMarkStart, compatibilityDecos.linkText);
+          }
+          return false;
+        }
+        // 图片 ![alt](url)：整体染青绿
+        if (name === 'Image') {
+          builder.add(node.from, node.to, compatibilityDecos.imageMark);
+          return false;
+        }
+      },
+    });
+  }
+  return builder.finish();
+}
+
+const compatibilityMarkdownPlugin = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) {
+      this.decorations = buildCompatibilityDecorations(view);
+    }
+    update(update: ViewUpdate) {
+      const contentThemeChanged =
+        update.startState.facet(contentThemeFacet) !== update.state.facet(contentThemeFacet);
+      if (update.docChanged || update.viewportChanged || update.selectionSet || contentThemeChanged) {
+        this.decorations = buildCompatibilityDecorations(update.view);
+      }
+    }
+  },
+  { decorations: (v) => v.decorations },
+);
 
 function getCursorPosition(view: EditorView) {
   const pos = view.state.selection.main.head;
@@ -73,9 +401,16 @@ function getCursorPosition(view: EditorView) {
   };
 }
 
+export const __editorPaneTesting = {
+  getMiaoyanCodeLanguage,
+  getMiaoyanCodeHighlightRanges,
+  shouldHighlightCompatibilityCodeTheme: (theme: ContentTheme) => COMPATIBILITY_CODE_HIGHLIGHT_THEMES.has(theme),
+  MIAOYAN_CODE_BLOCK_HIGHLIGHT_LIMIT,
+};
+
 export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
   function EditorPane(
-    { content, onChange, onCursorChange, onScrollRatioChange, onTopLineChange },
+    { content, onChange, onCursorChange, onScrollRatioChange, onTopLineChange, onScroll },
     ref,
   ) {
     const editorRef = useRef<HTMLDivElement>(null);
@@ -84,9 +419,12 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     const onCursorChangeRef = useRef(onCursorChange);
     const onScrollRatioChangeRef = useRef(onScrollRatioChange);
     const onTopLineChangeRef = useRef(onTopLineChange);
-    const theme = useSettingsStore((s) => s.theme);
+    const onScrollRef = useRef(onScroll);
+    const contentTheme = useSettingsStore((s) => s.contentTheme);
+    const isEditorDark = useSettingsStore((s) => shouldUseDarkEditor(s.contentTheme, s.theme));
     const showLineNumbers = useSettingsStore((s) => s.showLineNumbers);
     const typewriterMode = useWorkspaceStore((s) => s.typewriterMode);
+    const typewriterModeRef = useRef(typewriterMode);
     
     // 关键标记：用于拦截因同步内容触发的 onChange
     const isUpdatingFromPropsRef = useRef(false);
@@ -113,28 +451,13 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       onTopLineChangeRef.current = onTopLineChange;
     }, [onTopLineChange]);
 
-    const isProgrammaticScrollRef = useRef(false);
-    const lastProgrammaticAtRef = useRef(0);
-    const scrollAnimRef = useRef<{ raf: number | null; target: number }>({ raf: null, target: 0 });
+    useEffect(() => {
+      onScrollRef.current = onScroll;
+    }, [onScroll]);
 
-    const smoothScrollTo = (scroller: HTMLElement, target: number) => {
-      scrollAnimRef.current.target = target;
-      if (scrollAnimRef.current.raf !== null) return;
-      const step = () => {
-        const goal = scrollAnimRef.current.target;
-        const current = scroller.scrollTop;
-        const delta = goal - current;
-        lastProgrammaticAtRef.current = Date.now();
-        if (Math.abs(delta) < 0.5) {
-          scroller.scrollTop = goal;
-          scrollAnimRef.current.raf = null;
-          return;
-        }
-        scroller.scrollTop = current + delta * 0.22;
-        scrollAnimRef.current.raf = requestAnimationFrame(step);
-      };
-      scrollAnimRef.current.raf = requestAnimationFrame(step);
-    };
+    useEffect(() => {
+      typewriterModeRef.current = typewriterMode;
+    }, [typewriterMode]);
 
     useImperativeHandle(ref, () => ({
       jumpToLine: (lineNumber: number) => {
@@ -169,22 +492,17 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         const scroller = view.scrollDOM;
         const maxScroll = scroller.scrollHeight - scroller.clientHeight;
         const targetScroll = Math.max(0, ratio) * maxScroll;
-        if (Math.abs(scroller.scrollTop - targetScroll) > 1) {
-          smoothScrollTo(scroller, targetScroll);
-        }
+        scroller.scrollTop = targetScroll;
       },
       scrollToLine: (lineNumber: number) => {
         const view = viewRef.current;
         if (!view) return;
         const targetLine = Math.max(1, Math.min(lineNumber, view.state.doc.lines));
         const line = view.state.doc.line(targetLine);
-        const block = view.lineBlockAt(line.from);
-        const scroller = view.scrollDOM;
-        const editorTop = view.documentTop;
-        const targetScroll = Math.max(0, block.top - editorTop);
-        if (Math.abs(scroller.scrollTop - targetScroll) > 1) {
-          smoothScrollTo(scroller, targetScroll);
-        }
+        // 使用 CodeMirror 自身的 scrollIntoView，正确处理视口虚拟化
+        view.dispatch({
+          effects: EditorView.scrollIntoView(line.from, { y: 'start' }),
+        });
       },
       execSearch: (action, params) => {
         const view = viewRef.current;
@@ -480,14 +798,15 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             }
           ])),
           lineFlashField,
-          ...(showLineNumbers ? [lineNumbers(), highlightActiveLineGutter()] : []),
+          editorLineNumbersCompartment.of(getLineNumberExtensions(showLineNumbers)),
           highlightSpecialChars(),
           history(),
           drawSelection(),
           dropCursor(),
           EditorState.allowMultipleSelections.of(true),
           indentOnInput(),
-          syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+          editorContentThemeCompartment.of(getContentThemeExtension(contentTheme)),
+          compatibilityMarkdownPlugin,
           bracketMatching(),
           closeBrackets(),
           rectangularSelection(),
@@ -504,7 +823,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           ]),
           EditorView.lineWrapping,
           markdown(),
-          theme === 'dark' ? oneDark : [],
+          editorDarkThemeCompartment.of(getDarkThemeExtensions(isEditorDark)),
           EditorView.theme({
             '&': { flex: 1, minHeight: 0, fontSize: '16px', fontFamily: 'inherit', backgroundColor: 'transparent' },
             '.cm-scroller': { overflow: 'auto', fontFamily: 'inherit', lineHeight: '1.7' },
@@ -518,9 +837,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             '.cm-selectionBackground': { backgroundColor: 'var(--accent-tint-strong) !important' },
             '&.cm-focused .cm-selectionBackground': { backgroundColor: 'var(--accent-tint-strong) !important' }
           }),
-          theme === 'dark'
-            ? EditorView.theme({ '.cm-content': { color: '#E2E8F0' }, '.cm-gutters': { borderRight: '1px solid var(--stroke-surface)' } }, { dark: true })
-            : [],
           EditorState.phrases.of({
             "Find": "查找内容", "Replace": "替换为", "next": "下一个", "previous": "上一个", "all": "全部",
             "match case": "大小写", "regexp": "正则", "by word": "全词", "replace": "替换", "replace all": "全部替换"
@@ -537,7 +853,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             }
             if (update.docChanged || update.selectionSet) {
               onCursorChangeRef.current?.(getCursorPosition(update.view));
-              if (typewriterMode && update.selectionSet) {
+              if (typewriterModeRef.current && update.selectionSet) {
                 update.view.dispatch({ effects: EditorView.scrollIntoView(update.state.selection.main.head, { y: 'center' }) });
               }
               const selection = update.state.selection.main;
@@ -569,12 +885,10 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
 
       view.dom.addEventListener('mouseup', handleMouseUp);
       const handleScroll = () => {
-        // 程序化滚动期间静音（避免回传形成反馈环）
-        if (Date.now() - lastProgrammaticAtRef.current < 160) return;
-        if (isProgrammaticScrollRef.current) { isProgrammaticScrollRef.current = false; return; }
         const scroller = view.scrollDOM;
         const maxScroll = scroller.scrollHeight - scroller.clientHeight;
         onScrollRatioChangeRef.current?.(maxScroll > 0 ? scroller.scrollTop / maxScroll : 0);
+        onScrollRef.current?.();
 
         if (onTopLineChangeRef.current) {
           const rect = scroller.getBoundingClientRect();
@@ -598,7 +912,31 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         viewRef.current = null;
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [theme, typewriterMode, showLineNumbers]);
+    }, []);
+
+    useEffect(() => {
+      const view = viewRef.current;
+      if (!view) return;
+      view.dispatch({
+        effects: editorDarkThemeCompartment.reconfigure(getDarkThemeExtensions(isEditorDark)),
+      });
+    }, [isEditorDark]);
+
+    useEffect(() => {
+      const view = viewRef.current;
+      if (!view) return;
+      view.dispatch({
+        effects: editorContentThemeCompartment.reconfigure(getContentThemeExtension(contentTheme)),
+      });
+    }, [contentTheme]);
+
+    useEffect(() => {
+      const view = viewRef.current;
+      if (!view) return;
+      view.dispatch({
+        effects: editorLineNumbersCompartment.reconfigure(getLineNumberExtensions(showLineNumbers)),
+      });
+    }, [showLineNumbers]);
 
     return (
       <>

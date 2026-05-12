@@ -1,0 +1,886 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Prism Theme Compatibility Directions</title>
+  <style>
+    @font-face {
+      font-family: "Demo Tsanger JinKai";
+      src: url("../src/assets/fonts/TsangerJinKai02-W04.ttf") format("truetype");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: "Demo IBM Plex Sans";
+      src: url("../src/assets/fonts/IBMPlexSans-Variable.woff2") format("woff2-variations");
+      font-weight: 100 700;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: "Demo JetBrains Mono";
+      src: url("../src/assets/fonts/JetBrainsMono-Regular.woff2") format("woff2");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: "Demo JetBrains Mono";
+      src: url("../src/assets/fonts/JetBrainsMono-Medium.woff2") format("woff2");
+      font-weight: 600;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: "Demo Newsreader";
+      src: url("../src/assets/fonts/Newsreader-Variable.woff2") format("woff2-variations");
+      font-weight: 200 800;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: "Demo Source Serif 4";
+      src: url("../src/assets/fonts/SourceSerif4-Variable.woff2") format("woff2-variations");
+      font-weight: 200 900;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    :root {
+      --app-bg: #f6f5f2;
+      --app-text: #20201f;
+      --muted: #77736c;
+      --hair: #dedbd4;
+      --panel: #ffffff;
+      --panel-2: #f0eee8;
+      --accent: #1c5d33;
+      --radius: 8px;
+      --shadow: 0 14px 42px rgba(31, 29, 24, 0.08);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--app-text);
+      background: var(--app-bg);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--app-bg);
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(320px, 420px) 1fr;
+    }
+
+    .brief {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+      padding: 28px;
+      border-right: 1px solid var(--hair);
+      background: #fbfaf7;
+    }
+
+    .brief h1 {
+      margin: 0 0 10px;
+      font-size: 26px;
+      line-height: 1.18;
+      letter-spacing: 0;
+    }
+
+    .brief .sub {
+      margin: 0 0 22px;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 14px;
+    }
+
+    .section-title {
+      margin: 26px 0 12px;
+      font-size: 12px;
+      color: #5d5a54;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .spec-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .spec-row {
+      display: grid;
+      grid-template-columns: 104px 1fr;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid #ece9e1;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .spec-row b {
+      color: #34322e;
+    }
+
+    .spec-row span {
+      color: #6c675f;
+    }
+
+    .chipline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      height: 24px;
+      padding: 0 9px;
+      border: 1px solid #dedbd4;
+      border-radius: 999px;
+      background: #fff;
+      color: #4e4a43;
+      font-size: 12px;
+    }
+
+    .main {
+      min-width: 0;
+      padding: 28px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    .topbar h2 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+
+    .topbar p {
+      margin: 8px 0 0;
+      max-width: 720px;
+      color: var(--muted);
+      line-height: 1.65;
+      font-size: 14px;
+    }
+
+    .choice-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(160px, 1fr));
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .choice {
+      border: 1px solid var(--hair);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: 12px;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+    }
+
+    .choice:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 24px rgba(31, 29, 24, 0.08);
+    }
+
+    .choice[aria-selected="true"] {
+      border-color: var(--choice-accent, #1c5d33);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--choice-accent, #1c5d33) 15%, transparent);
+    }
+
+    .swatches {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .swatch {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      background: var(--swatch);
+    }
+
+    .choice strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+      letter-spacing: 0;
+    }
+
+    .choice span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .preview-stage {
+      display: grid;
+      grid-template-columns: minmax(300px, 0.86fr) minmax(440px, 1.14fr);
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .editor, .preview {
+      min-height: 690px;
+      border-radius: var(--radius);
+      border: 1px solid var(--theme-hair);
+      overflow: hidden;
+      background: var(--theme-bg);
+      color: var(--theme-text);
+      box-shadow: var(--shadow);
+    }
+
+    .editor {
+      font-family: var(--theme-editor-font);
+    }
+
+    .preview {
+      font-family: var(--theme-preview-font);
+    }
+
+    .pane-head {
+      height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      border-bottom: 1px solid var(--theme-hair);
+      background: var(--theme-head);
+      color: var(--theme-muted);
+      font-size: 12px;
+    }
+
+    .mode-pill {
+      color: var(--theme-accent);
+      font-weight: 700;
+    }
+
+    .editor-body {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 30px clamp(28px, 6vw, 72px) 90px;
+      font-size: var(--theme-editor-size);
+      line-height: var(--theme-editor-line);
+      letter-spacing: var(--theme-editor-track);
+    }
+
+    .line {
+      min-height: calc(var(--theme-editor-size) * var(--theme-editor-line));
+      white-space: pre-wrap;
+    }
+
+    .md-title { color: var(--theme-title); }
+    .md-list { color: var(--theme-list); }
+    .md-code { color: var(--theme-code); }
+    .md-link { color: var(--theme-link); }
+    .md-quote { color: var(--theme-list); }
+
+    .write {
+      max-width: var(--theme-width);
+      margin: 0 auto;
+      padding: 28px 32px 96px;
+      font-size: var(--theme-preview-size);
+      line-height: var(--theme-preview-line);
+      letter-spacing: var(--theme-preview-track);
+    }
+
+    .write h1 {
+      margin: 0 0 22px;
+      font-family: var(--theme-heading-font);
+      font-size: var(--theme-h1);
+      line-height: 1.2;
+      color: var(--theme-heading);
+      font-weight: var(--theme-heading-weight);
+      letter-spacing: 0;
+    }
+
+    .write h2 {
+      margin: 42px 0 14px;
+      font-family: var(--theme-heading-font);
+      font-size: var(--theme-h2);
+      color: var(--theme-heading);
+      letter-spacing: 0;
+    }
+
+    .write p {
+      margin: 0 0 20px;
+      color: var(--theme-text);
+    }
+
+    .write code {
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: var(--theme-code-bg);
+      color: var(--theme-code);
+      font-family: var(--theme-code-font);
+      font-size: 0.92em;
+    }
+
+    .write blockquote {
+      margin: 26px 0;
+      padding: var(--theme-quote-pad);
+      border-left: var(--theme-quote-border);
+      border-radius: var(--theme-quote-radius);
+      color: var(--theme-quote-text);
+      background: var(--theme-quote-bg);
+    }
+
+    .write ul {
+      margin: 0 0 24px;
+      padding-left: 1.55em;
+    }
+
+    .write li {
+      margin: 7px 0;
+    }
+
+    .mermaid-card {
+      margin: 30px auto 0;
+      max-width: 640px;
+      padding: 24px;
+      border-radius: var(--theme-diagram-radius);
+      background: var(--theme-diagram-bg);
+      border: 1px solid var(--theme-diagram-hair);
+    }
+
+    .diagram {
+      display: grid;
+      justify-items: center;
+      gap: 12px;
+      color: var(--theme-diagram-text);
+      font-family: var(--theme-diagram-font);
+      font-size: 13px;
+    }
+
+    .node {
+      min-width: 180px;
+      padding: 12px 16px;
+      border: 1px solid var(--theme-diagram-line);
+      background: var(--theme-diagram-node);
+      text-align: center;
+      border-radius: var(--theme-diagram-node-radius);
+    }
+
+    .node.small {
+      min-width: 108px;
+      border-radius: 999px;
+    }
+
+    .arrow {
+      width: 1px;
+      height: 38px;
+      background: var(--theme-diagram-line);
+      position: relative;
+    }
+
+    .arrow::after {
+      content: "";
+      position: absolute;
+      left: -4px;
+      bottom: -1px;
+      width: 8px;
+      height: 8px;
+      border-right: 1px solid var(--theme-diagram-line);
+      border-bottom: 1px solid var(--theme-diagram-line);
+      transform: rotate(45deg);
+      background: transparent;
+    }
+
+    .cluster {
+      width: min(100%, 560px);
+      padding: 24px 20px 18px;
+      border: 1px solid var(--theme-diagram-line);
+      background: var(--theme-diagram-cluster);
+      position: relative;
+      border-radius: var(--theme-diagram-radius);
+    }
+
+    .cluster-label {
+      position: absolute;
+      top: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: var(--theme-muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .node-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .mini-node {
+      min-height: 74px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+      border: 1px solid var(--theme-diagram-hair);
+      background: var(--theme-diagram-node);
+      border-radius: var(--theme-diagram-node-radius);
+      text-align: center;
+      line-height: 1.35;
+    }
+
+    .implementation {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .impl-card {
+      padding: 13px;
+      border: 1px solid var(--hair);
+      border-radius: var(--radius);
+      background: #fff;
+      min-height: 112px;
+    }
+
+    .impl-card strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .impl-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    body[data-theme="ink"] {
+      --choice-accent: #466f57;
+      --theme-bg: #fcfbf7;
+      --theme-head: #f2eee4;
+      --theme-hair: #ded8cb;
+      --theme-text: #24231f;
+      --theme-muted: #817868;
+      --theme-accent: #466f57;
+      --theme-title: #3f5f4a;
+      --theme-list: #6b7560;
+      --theme-code: #2f6358;
+      --theme-link: #286c62;
+      --theme-editor-font: "Demo Tsanger JinKai", "Kaiti SC", "STKaiti", "Songti SC", serif;
+      --theme-editor-size: 17px;
+      --theme-editor-line: 1.62;
+      --theme-editor-track: 0.035em;
+      --theme-preview-font: "Demo Tsanger JinKai", "Kaiti SC", "STKaiti", "Songti SC", serif;
+      --theme-heading-font: "Demo Tsanger JinKai", "Kaiti SC", "STKaiti", serif;
+      --theme-heading: #24231f;
+      --theme-heading-weight: 700;
+      --theme-preview-size: 17px;
+      --theme-preview-line: 1.82;
+      --theme-preview-track: 0.04em;
+      --theme-width: 920px;
+      --theme-h1: 34px;
+      --theme-h2: 25px;
+      --theme-code-bg: #edf0e8;
+      --theme-code-font: "SF Mono", Menlo, monospace;
+      --theme-quote-bg: transparent;
+      --theme-quote-text: #6b6355;
+      --theme-quote-border: 4px solid #d5c6ac;
+      --theme-quote-pad: 4px 0 4px 18px;
+      --theme-quote-radius: 0;
+      --theme-diagram-bg: #f5f1e7;
+      --theme-diagram-node: #fffdf8;
+      --theme-diagram-cluster: #f0eadf;
+      --theme-diagram-text: #24231f;
+      --theme-diagram-line: #466f57;
+      --theme-diagram-hair: #d7cebd;
+      --theme-diagram-font: "Demo Tsanger JinKai", "Kaiti SC", "STKaiti", serif;
+      --theme-diagram-radius: 2px;
+      --theme-diagram-node-radius: 2px;
+    }
+
+    body[data-theme="slate"] {
+      --choice-accent: #587a85;
+      --theme-bg: #f7f8f8;
+      --theme-head: #eceff0;
+      --theme-hair: #d8dddd;
+      --theme-text: #222829;
+      --theme-muted: #6e7778;
+      --theme-accent: #587a85;
+      --theme-title: #4f6d7a;
+      --theme-list: #667985;
+      --theme-code: #315f6a;
+      --theme-link: #2a7080;
+      --theme-editor-font: "Demo IBM Plex Sans", "PingFang SC", "Hiragino Sans GB", -apple-system, BlinkMacSystemFont, sans-serif;
+      --theme-editor-size: 16.5px;
+      --theme-editor-line: 1.6;
+      --theme-editor-track: 0.01em;
+      --theme-preview-font: "Demo IBM Plex Sans", "PingFang SC", "Hiragino Sans GB", -apple-system, BlinkMacSystemFont, sans-serif;
+      --theme-heading-font: "Demo IBM Plex Sans", "PingFang SC", sans-serif;
+      --theme-heading: #1f292b;
+      --theme-heading-weight: 650;
+      --theme-preview-size: 16.5px;
+      --theme-preview-line: 1.76;
+      --theme-preview-track: 0;
+      --theme-width: 980px;
+      --theme-h1: 32px;
+      --theme-h2: 23px;
+      --theme-code-bg: #e6ecee;
+      --theme-code-font: "SF Mono", Menlo, monospace;
+      --theme-quote-bg: #eef1f1;
+      --theme-quote-text: #4e5a5c;
+      --theme-quote-border: 3px solid #91a3a7;
+      --theme-quote-pad: 12px 18px;
+      --theme-quote-radius: 0 6px 6px 0;
+      --theme-diagram-bg: #edf1f1;
+      --theme-diagram-node: #fbfcfc;
+      --theme-diagram-cluster: #e4e9e9;
+      --theme-diagram-text: #222829;
+      --theme-diagram-line: #587a85;
+      --theme-diagram-hair: #cbd4d5;
+      --theme-diagram-font: "Demo IBM Plex Sans", "PingFang SC", sans-serif;
+      --theme-diagram-radius: 6px;
+      --theme-diagram-node-radius: 5px;
+    }
+
+    body[data-theme="mono"] {
+      --choice-accent: #3b6f48;
+      --theme-bg: #fbfbfa;
+      --theme-head: #f0f0ee;
+      --theme-hair: #dcdcd8;
+      --theme-text: #171817;
+      --theme-muted: #70746d;
+      --theme-accent: #3b6f48;
+      --theme-title: #6d4c9f;
+      --theme-list: #59615a;
+      --theme-code: #2f5f45;
+      --theme-link: #14756c;
+      --theme-editor-font: "Demo JetBrains Mono", "SF Mono", Menlo, "PingFang SC", monospace;
+      --theme-editor-size: 15.5px;
+      --theme-editor-line: 1.72;
+      --theme-editor-track: 0;
+      --theme-preview-font: "Demo JetBrains Mono", "SF Mono", Menlo, "PingFang SC", monospace;
+      --theme-heading-font: "Demo JetBrains Mono", "SF Mono", Menlo, monospace;
+      --theme-heading: #171817;
+      --theme-heading-weight: 650;
+      --theme-preview-size: 15.5px;
+      --theme-preview-line: 1.78;
+      --theme-preview-track: 0;
+      --theme-width: 1040px;
+      --theme-h1: 26px;
+      --theme-h2: 20px;
+      --theme-code-bg: #e9ece7;
+      --theme-code-font: "Demo JetBrains Mono", "SF Mono", Menlo, monospace;
+      --theme-quote-bg: #f0f3ee;
+      --theme-quote-text: #4d564c;
+      --theme-quote-border: 0;
+      --theme-quote-pad: 14px 18px;
+      --theme-quote-radius: 6px;
+      --theme-diagram-bg: #f0f3ee;
+      --theme-diagram-node: #fbfbfa;
+      --theme-diagram-cluster: #e7ebe4;
+      --theme-diagram-text: #171817;
+      --theme-diagram-line: #3b6f48;
+      --theme-diagram-hair: #d4d8d0;
+      --theme-diagram-font: "Demo JetBrains Mono", "SF Mono", Menlo, monospace;
+      --theme-diagram-radius: 6px;
+      --theme-diagram-node-radius: 4px;
+    }
+
+    body[data-theme="nocturne"] {
+      --app-bg: #131514;
+      --app-text: #e5e1d7;
+      --muted: #9b9486;
+      --hair: #30342f;
+      --panel: #181b19;
+      --panel-2: #20241f;
+      --choice-accent: #86a878;
+      --theme-bg: #171a18;
+      --theme-head: #1d211e;
+      --theme-hair: #33382f;
+      --theme-text: #e5e1d7;
+      --theme-muted: #9b9486;
+      --theme-accent: #86a878;
+      --theme-title: #d8cdbc;
+      --theme-list: #9fb39a;
+      --theme-code: #b9c9b5;
+      --theme-link: #8cc7b0;
+      --theme-editor-font: "Demo Newsreader", "Demo Source Serif 4", "Songti SC", "STSong", "Iowan Old Style", Georgia, serif;
+      --theme-editor-size: 17px;
+      --theme-editor-line: 1.62;
+      --theme-editor-track: 0.01em;
+      --theme-preview-font: "Demo Newsreader", "Demo Source Serif 4", "Songti SC", "STSong", "Iowan Old Style", Georgia, serif;
+      --theme-heading-font: "Demo Newsreader", "Demo Source Serif 4", "Songti SC", Georgia, serif;
+      --theme-heading: #f1ece1;
+      --theme-heading-weight: 680;
+      --theme-preview-size: 18px;
+      --theme-preview-line: 1.82;
+      --theme-preview-track: 0.005em;
+      --theme-width: 900px;
+      --theme-h1: 38px;
+      --theme-h2: 27px;
+      --theme-code-bg: #252a24;
+      --theme-code-font: "SF Mono", Menlo, monospace;
+      --theme-quote-bg: #20241f;
+      --theme-quote-text: #cfc6b5;
+      --theme-quote-border: 3px solid #617a55;
+      --theme-quote-pad: 12px 18px;
+      --theme-quote-radius: 0 6px 6px 0;
+      --theme-diagram-bg: #20241f;
+      --theme-diagram-node: #171a18;
+      --theme-diagram-cluster: #262b25;
+      --theme-diagram-text: #e5e1d7;
+      --theme-diagram-line: #86a878;
+      --theme-diagram-hair: #394035;
+      --theme-diagram-font: "Demo Newsreader", "Demo Source Serif 4", "Songti SC", Georgia, serif;
+      --theme-diagram-radius: 6px;
+      --theme-diagram-node-radius: 5px;
+    }
+
+    body[data-theme="nocturne"] .brief,
+    body[data-theme="nocturne"] .choice,
+    body[data-theme="nocturne"] .impl-card {
+      background: #181b19;
+      border-color: #30342f;
+    }
+
+    body[data-theme="nocturne"] .brief h1,
+    body[data-theme="nocturne"] .topbar h2,
+    body[data-theme="nocturne"] .choice strong,
+    body[data-theme="nocturne"] .impl-card strong,
+    body[data-theme="nocturne"] .spec-row b {
+      color: #e5e1d7;
+    }
+
+    body[data-theme="nocturne"] .section-title {
+      color: #b5aD9f;
+    }
+
+    body[data-theme="nocturne"] .brief .sub,
+    body[data-theme="nocturne"] .spec-row span,
+    body[data-theme="nocturne"] .choice span,
+    body[data-theme="nocturne"] .impl-card p {
+      color: #9b9486;
+    }
+
+    body[data-theme="nocturne"] .spec-row {
+      border-bottom-color: #30342f;
+    }
+
+    body[data-theme="nocturne"] .chip {
+      background: #20241f;
+      border-color: #30342f;
+      color: #d8d0c0;
+    }
+
+    @media (max-width: 1180px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      .brief {
+        position: relative;
+        height: auto;
+      }
+
+      .choice-grid,
+      .implementation {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .preview-stage {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .brief, .main {
+        padding: 18px;
+      }
+
+      .choice-grid,
+      .implementation {
+        grid-template-columns: 1fr;
+      }
+
+      .editor, .preview {
+        min-height: 560px;
+      }
+    }
+  </style>
+</head>
+<body data-theme="ink">
+  <div class="shell">
+    <aside class="brief">
+      <h1>MiaoYan Compatibility Mode</h1>
+      <p class="sub">当前 miaoyan 不是普通配色，而是一套独立 compatibility mode。新主题要沿用同一个结构：独立 DOM、独立 Markdown pipeline 分支、独立编辑器染色、独立 Mermaid 配置。</p>
+
+      <div class="section-title">现有 miaoyan 架构</div>
+      <div class="spec-list">
+        <div class="spec-row"><b>DOM</b><span><code>.preview-compat--miaoyan &gt; #write.markdown-body.heti</code>，不走通用 <code>.markdown-preview</code>。</span></div>
+        <div class="spec-row"><b>Pipeline</b><span><code>markdownToHtml(..., compatibilityMode)</code>；miaoyan 跳过 Prism code header / copy chrome。</span></div>
+        <div class="spec-row"><b>编辑器</b><span>CodeMirror 独立字体、字号、行高、语法染色；禁用默认 highlight，模拟妙言“染色不变形”。</span></div>
+        <div class="spec-row"><b>预览</b><span><code>#write</code> 1000px 居中；正文 16px / 1.74；中文字距 0.04em；代码、表格、引用全部自管。</span></div>
+        <div class="spec-row"><b>Mermaid</b><span>主题专属变量、字体加载等待、SVG viewBox/overflow 补偿，避免中文标签裁切。</span></div>
+        <div class="spec-row"><b>交互</b><span>miaoyan 下跳过 Prism 图片 lightbox 与 code copy handler，减少通用逻辑污染。</span></div>
+      </div>
+
+      <div class="section-title">miaoyan 关键参数</div>
+      <div class="chipline">
+        <span class="chip">TsangerJinKai02-W04</span>
+        <span class="chip">Editor 17px / 26px</span>
+        <span class="chip">Preview 16px / 1.74</span>
+        <span class="chip">Text #1D1D1F / #262626</span>
+        <span class="chip">Line width 1000px</span>
+        <span class="chip">Mermaid #1C5D33</span>
+      </div>
+
+      <div class="section-title">删除旧主题时要动的地方</div>
+      <div class="spec-list">
+        <div class="spec-row"><b>类型</b><span><code>ContentTheme</code> 从 classic/github/whitey/newsprint/pixyll/night/miaoyan 收敛为 miaoyan + 四个新主题。</span></div>
+        <div class="spec-row"><b>菜单</b><span><code>menuData.ts</code> 和 <code>menuActions.ts</code> 删除旧 action，补新主题 action。</span></div>
+        <div class="spec-row"><b>渲染</b><span><code>PreviewPane</code> 从单一 miaoyan 分支扩展为 theme compatibility registry。</span></div>
+        <div class="spec-row"><b>CSS</b><span>删除旧 <code>.markdown-preview</code> 主题规则；每个新主题拥有完整 <code>.preview-compat--*</code>。</span></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div>
+          <h2>新主题候选方向</h2>
+          <p>下面 4 个方向都按 miaoyan 的 compatibility mode 思路设计：编辑器、预览、Mermaid、代码块和排版各自独立。现在四个方向会一起进入实现，其中 Nocturne 作为深色主题。</p>
+        </div>
+      </div>
+
+      <div class="choice-grid" role="tablist" aria-label="Theme directions">
+        <button class="choice" data-choice="ink" aria-selected="true" style="--choice-accent:#466f57">
+          <div class="swatches"><i class="swatch" style="--swatch:#fcfbf7"></i><i class="swatch" style="--swatch:#466f57"></i><i class="swatch" style="--swatch:#8f4638"></i></div>
+          <strong>Inkstone Light</strong>
+          <span>东方纸本、宋体、低对比边线，适合中文长文和知识库。</span>
+        </button>
+        <button class="choice" data-choice="slate" aria-selected="false" style="--choice-accent:#587a85">
+          <div class="swatches"><i class="swatch" style="--swatch:#f7f8f8"></i><i class="swatch" style="--swatch:#587a85"></i><i class="swatch" style="--swatch:#315f6a"></i></div>
+          <strong>Slate Manual</strong>
+          <span>冷静技术手册，人文无衬线，读 README、架构文档很稳。</span>
+        </button>
+        <button class="choice" data-choice="mono" aria-selected="false" style="--choice-accent:#3b6f48">
+          <div class="swatches"><i class="swatch" style="--swatch:#fbfbfa"></i><i class="swatch" style="--swatch:#3b6f48"></i><i class="swatch" style="--swatch:#6d4c9f"></i></div>
+          <strong>Mono Lab</strong>
+          <span>全等宽实验室，代码、规格、协议文档最像一个专注工作台。</span>
+        </button>
+        <button class="choice" data-choice="nocturne" aria-selected="false" style="--choice-accent:#86a878">
+          <div class="swatches"><i class="swatch" style="--swatch:#171a18"></i><i class="swatch" style="--swatch:#86a878"></i><i class="swatch" style="--swatch:#d1ad82"></i></div>
+          <strong>Nocturne Dark</strong>
+          <span>深色夜读，暖黑底、低眩光、保留 Mermaid 和代码可读性。</span>
+        </button>
+      </div>
+
+      <section class="preview-stage">
+        <div class="editor">
+          <div class="pane-head"><span>CodeMirror compatibility editor</span><span class="mode-pill" id="editorLabel">Inkstone</span></div>
+          <div class="editor-body">
+            <div class="line md-title"># 架构概览</div>
+            <div class="line"></div>
+            <div class="line">XBlog 采用“前端 + 后端 + 数据库 + 对象存储 + 反向代理”的标准拆分方式。</div>
+            <div class="line"></div>
+            <div class="line md-list">- apps/admin: 管理后台</div>
+            <div class="line md-list">- apps/api: 后端服务</div>
+            <div class="line md-list">- packages/contracts: 数据契约</div>
+            <div class="line"></div>
+            <div class="line md-quote">&gt; 公网访问统一从 Caddy 进入。</div>
+            <div class="line"></div>
+            <div class="line"><span class="md-code">`inline code`</span> 与 <span class="md-link">[链接文字]</span> 只染色，不改变字重和斜体。</div>
+          </div>
+        </div>
+
+        <div class="preview">
+          <div class="pane-head"><span>Independent preview DOM</span><span class="mode-pill" id="previewLabel">#write.centered</span></div>
+          <div class="write">
+            <h1>架构概览</h1>
+            <p>XBlog 采用“前端 + 后端 + 数据库 + 对象存储 + 反向代理”的标准拆分方式。公网访问统一从 <code>Caddy</code> 进入，内部服务彼此通过 Docker 网络通信。</p>
+            <ul>
+              <li><code>apps/admin</code>：管理后台</li>
+              <li><code>apps/api</code>：后端服务</li>
+              <li><code>packages/contracts</code>：前后端共享的数据契约</li>
+            </ul>
+            <blockquote>每个新主题都应该像 miaoyan 一样自带完整 Markdown 排印规则，而不是复用通用预览基座。</blockquote>
+            <h2>Mermaid 观感</h2>
+            <div class="mermaid-card">
+              <div class="diagram">
+                <div class="node">浏览器 / 后台 / 收录工具</div>
+                <div class="arrow"></div>
+                <div class="node small">Internet</div>
+                <div class="arrow"></div>
+                <div class="cluster">
+                  <div class="cluster-label">云服务器 / 单机</div>
+                  <div class="node">caddy 容器<br>HTTPS / 域名路由 / basic_auth</div>
+                  <div class="node-grid">
+                    <div class="mini-node">web 容器<br>Next.js</div>
+                    <div class="mini-node">admin 容器<br>后台</div>
+                    <div class="mini-node">api 容器<br>FastAPI</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="implementation">
+        <div class="impl-card"><strong>1. Theme Registry</strong><p>把 miaoyan 的判断抽象成 compatibility registry，但每个主题仍输出自己的 DOM 和 CSS，不共享排印。</p></div>
+        <div class="impl-card"><strong>2. Editor Mode</strong><p>每个新主题有独立 CodeMirror 参数：字体、字号、行高、语法染色、是否深色。</p></div>
+        <div class="impl-card"><strong>3. Preview Mode</strong><p>每个新主题拥有 <code>.preview-compat--name</code>，独立处理 h1、列表、表格、代码、引用、图片。</p></div>
+        <div class="impl-card"><strong>4. Mermaid Mode</strong><p>每个主题自带 Mermaid themeVariables、字体加载等待、viewBox/overflow 修正。</p></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const labels = {
+      ink: ["Inkstone", "#write.inkstone"],
+      slate: ["Slate", "#write.slate"],
+      mono: ["Mono Lab", "#write.mono"],
+      nocturne: ["Nocturne", "#write.nocturne"]
+    };
+
+    document.querySelectorAll(".choice").forEach((button) => {
+      button.addEventListener("click", () => {
+        const choice = button.dataset.choice;
+        document.body.dataset.theme = choice;
+        document.querySelectorAll(".choice").forEach((item) => {
+          item.setAttribute("aria-selected", String(item === button));
+        });
+        document.getElementById("editorLabel").textContent = labels[choice][0];
+        document.getElementById("previewLabel").textContent = labels[choice][1];
+      });
+    });
+  </script>
+</body>
+</html>

@@ -56,14 +56,6 @@ const IconList = () => (
     <path d="M3 4h10M3 8h10M3 12h10" />
   </svg>
 );
-const IconMore = () => (
-  <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor">
-    <circle cx="3" cy="6" r="1" />
-    <circle cx="6" cy="6" r="1" />
-    <circle cx="9" cy="6" r="1" />
-  </svg>
-);
-
 interface StatusBarProps {
   viewMode: 'edit' | 'split' | 'preview';
   wordCount: number;
@@ -136,20 +128,19 @@ export function StatusBar({
             <IconPlus />
           </button>
           <button
-            className={`${styles.btn} ${styles.iconBtn} ${fileTreeMode === 'list' ? styles.active + ' is-active' : ''}`}
-            title={fileTreeMode === 'tree' ? '切换到文档列表' : '切换到文档树'}
-            onClick={onToggleFileTreeMode}
-          >
-            {fileTreeMode === 'tree' ? <IconTree /> : <IconList />}
-          </button>
-          <button
             className={styles.folder}
             onContextMenu={onFolderContextMenu}
             onClick={onFolderContextMenu}
             title="工作区操作"
           >
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{rootName}</span>
-            <IconMore />
+          </button>
+          <button
+            className={`${styles.btn} ${styles.iconBtn} ${styles.treeBtn} ${fileTreeMode === 'list' ? styles.active + ' is-active' : ''}`}
+            title={fileTreeMode === 'tree' ? '切换到文档列表' : '切换到文档树'}
+            onClick={onToggleFileTreeMode}
+          >
+            {fileTreeMode === 'tree' ? <IconTree /> : <IconList />}
           </button>
         </div>
       )}

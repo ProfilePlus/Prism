@@ -55,6 +55,8 @@ export function Sidebar({
           return (
             <button
               key={tab.key}
+              className="sidebar-tab-button"
+              data-active={isActive ? 'true' : undefined}
               onClick={() => setSidebarTab(tab.key as SidebarTab)}
               style={{
                 flex: 1,

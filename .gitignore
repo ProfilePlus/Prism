@@ -7,6 +7,8 @@ src-tauri/gen/
 .DS_Store
 Thumbs.db
 .claude/
+.codex-screens/
+.playwright-mcp/
 release-latest/
 scripts/
 src-tauri/icons_backup/

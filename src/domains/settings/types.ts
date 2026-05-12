@@ -1,12 +1,12 @@
 export type AppearanceMode = 'light' | 'dark' | 'auto';
 
-export type ContentTheme =
-  | 'classic'
-  | 'github'
-  | 'whitey'
-  | 'newsprint'
-  | 'pixyll'
-  | 'night';
+export const CONTENT_THEMES = ['miaoyan', 'inkstone', 'slate', 'mono', 'nocturne'] as const;
+
+export type ContentTheme = (typeof CONTENT_THEMES)[number];
+
+export function isContentTheme(theme: unknown): theme is ContentTheme {
+  return typeof theme === 'string' && CONTENT_THEMES.includes(theme as ContentTheme);
+}
 
 export interface SettingsState {
   theme: AppearanceMode;
@@ -25,7 +25,7 @@ export interface SettingsState {
 
 export const DEFAULT_SETTINGS: SettingsState = {
   theme: 'auto',
-  contentTheme: 'classic',
+  contentTheme: 'miaoyan',
   fontSize: 16,
   editorFontFamily: 'Cascadia Code, Consolas, monospace',
   autoSaveInterval: 2000,

@@ -83,70 +83,12 @@ function remarkMark() {
   };
 }
 
-// 将 <pre><code> 包装为原型结构：
-//   <pre class="code-block">
-//     <div class="code-header">
-//       <span class="code-lang">TS</span>
-//       <button class="code-copy" data-code="...">复制</button>
-//     </div>
-//     <code>...</code>
-//   </pre>
-function rehypeCodeBlockStructure() {
-  return (tree: any) => {
-    visit(tree, 'element', (node: any) => {
-      if (node.tagName !== 'pre') return;
-      const codeEl = node.children?.[0];
-      if (!codeEl || codeEl.tagName !== 'code') return;
-
-      const codeText: string = (codeEl.children || [])
-        .map((child: any) => child.value || '')
-        .join('');
-
-      // 语言检测：code 节点上的 className="language-ts" 形式
-      const codeClass: string[] = codeEl.properties?.className || [];
-      const langToken = codeClass.find((c: string) => c.startsWith('language-'));
-      const lang = langToken ? langToken.replace('language-', '').toUpperCase() : 'TEXT';
-
-      // 把 pre 加 code-block 类
-      const preClasses: string[] = node.properties?.className || [];
-      if (!preClasses.includes('code-block')) preClasses.push('code-block');
-      node.properties = { ...(node.properties || {}), className: preClasses };
-
-      // 插入 header（作为 pre 的第一个子节点）
-      node.children = [
-        {
-          type: 'element',
-          tagName: 'div',
-          properties: { className: ['code-header'] },
-          children: [
-            {
-              type: 'element',
-              tagName: 'span',
-              properties: { className: ['code-lang'] },
-              children: [{ type: 'text', value: lang }],
-            },
-            {
-              type: 'element',
-              tagName: 'button',
-              properties: {
-                type: 'button',
-                className: ['code-copy'],
-                'data-code': codeText,
-                title: '复制代码',
-                'aria-label': '复制代码',
-              },
-              children: [{ type: 'text', value: '复制' }],
-            },
-          ],
-        },
-        codeEl,
-      ];
-    });
-  };
+interface MarkdownToHtmlOptions {
+  compatibilityMode?: 'miaoyan' | 'inkstone' | 'slate' | 'mono' | 'nocturne';
 }
 
-export function markdownToHtml(content: string): string {
-  const result = unified()
+export function markdownToHtml(content: string, _options: MarkdownToHtmlOptions = {}): string {
+  const processor = unified()
     .use(remarkParse)
     .use(remarkGfm)
     .use(remarkMath)
@@ -154,8 +96,10 @@ export function markdownToHtml(content: string): string {
     .use(remarkBlockLines)
     .use(remarkMermaid)
     .use(remarkRehype, { allowDangerousHtml: true })
-    .use(rehypeHighlight as any, { ignoreMissing: true })
-    .use(rehypeCodeBlockStructure)
+    // MiaoYan hands unlabeled fenced blocks to Highlightr for auto detection.
+    .use(rehypeHighlight as any, { ignoreMissing: true, detect: true });
+
+  const result = processor
     .use(rehypeKatex)
     .use(rehypeStringify, { allowDangerousHtml: true })
     .processSync(content);

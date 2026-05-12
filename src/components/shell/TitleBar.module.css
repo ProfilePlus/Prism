@@ -13,6 +13,10 @@
   app-region: drag;
 }
 
+.titlebar.macos {
+  padding-left: 84px;
+}
+
 .brand {
   display: flex;
   align-items: center;
@@ -100,4 +104,171 @@
 .btn.close:hover {
   background: #e81123;
   color: #fff;
+}
+
+:global(html[data-content-theme='miaoyan']) .titlebar {
+  height: 24px;
+  padding-left: 16px;
+  border-bottom: 0;
+  background: var(--miaoyan-main-bg);
+  color: var(--miaoyan-text);
+  font-family: var(--miaoyan-font);
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0.6px;
+}
+
+:global(html[data-content-theme='miaoyan']) .titlebar.macos {
+  padding-left: 78px;
+}
+
+:global(html[data-content-theme='miaoyan']) .brand {
+  gap: 0;
+}
+
+:global(html[data-content-theme='miaoyan']) .logo,
+:global(html[data-content-theme='miaoyan']) .sep,
+:global(html[data-content-theme='miaoyan']) .app {
+  display: none;
+}
+
+:global(html[data-content-theme='miaoyan']) .title {
+  letter-spacing: 0.6px;
+}
+
+:global(html[data-content-theme='miaoyan']) .docName {
+  color: var(--miaoyan-text);
+  font-weight: 400;
+}
+
+:global(html[data-content-theme='miaoyan']) .dirtyDot {
+  width: 5px;
+  height: 5px;
+  margin-left: 6px;
+  background: var(--miaoyan-accent);
+}
+
+:global(html[data-content-theme='miaoyan']) .controls {
+  height: 24px;
+}
+
+:global(html[data-content-theme='miaoyan']) .btn {
+  width: 34px;
+  height: 24px;
+  color: var(--miaoyan-secondary-text);
+  transition: background 120ms ease, color 120ms ease;
+}
+
+:global(html[data-content-theme='miaoyan']) .btn:hover {
+  background: var(--miaoyan-panel-secondary);
+  color: var(--miaoyan-text);
+}
+
+:global(html[data-content-theme='miaoyan']) .btn svg {
+  width: 11px;
+  height: 11px;
+  stroke-width: 1.3;
+}
+
+:global(html[data-content-theme='inkstone']) .titlebar,
+:global(html[data-content-theme='slate']) .titlebar,
+:global(html[data-content-theme='mono']) .titlebar,
+:global(html[data-content-theme='nocturne']) .titlebar {
+  height: 24px;
+  padding-left: 16px;
+  border-bottom: 0;
+  background: var(--theme-main-bg);
+  color: var(--theme-text);
+  font-family: var(--theme-font);
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0.6px;
+}
+
+:global(html[data-content-theme='inkstone']) .titlebar.macos,
+:global(html[data-content-theme='slate']) .titlebar.macos,
+:global(html[data-content-theme='mono']) .titlebar.macos,
+:global(html[data-content-theme='nocturne']) .titlebar.macos {
+  padding-left: 78px;
+}
+
+:global(html[data-content-theme='inkstone']) .brand,
+:global(html[data-content-theme='slate']) .brand,
+:global(html[data-content-theme='mono']) .brand,
+:global(html[data-content-theme='nocturne']) .brand {
+  gap: 0;
+}
+
+:global(html[data-content-theme='inkstone']) .logo,
+:global(html[data-content-theme='inkstone']) .sep,
+:global(html[data-content-theme='inkstone']) .app,
+:global(html[data-content-theme='slate']) .logo,
+:global(html[data-content-theme='slate']) .sep,
+:global(html[data-content-theme='slate']) .app,
+:global(html[data-content-theme='mono']) .logo,
+:global(html[data-content-theme='mono']) .sep,
+:global(html[data-content-theme='mono']) .app,
+:global(html[data-content-theme='nocturne']) .logo,
+:global(html[data-content-theme='nocturne']) .sep,
+:global(html[data-content-theme='nocturne']) .app {
+  display: none;
+}
+
+:global(html[data-content-theme='inkstone']) .title,
+:global(html[data-content-theme='slate']) .title,
+:global(html[data-content-theme='mono']) .title,
+:global(html[data-content-theme='nocturne']) .title {
+  letter-spacing: 0.6px;
+}
+
+:global(html[data-content-theme='inkstone']) .docName,
+:global(html[data-content-theme='slate']) .docName,
+:global(html[data-content-theme='mono']) .docName,
+:global(html[data-content-theme='nocturne']) .docName {
+  color: var(--theme-text);
+  font-weight: 400;
+}
+
+:global(html[data-content-theme='inkstone']) .dirtyDot,
+:global(html[data-content-theme='slate']) .dirtyDot,
+:global(html[data-content-theme='mono']) .dirtyDot,
+:global(html[data-content-theme='nocturne']) .dirtyDot {
+  width: 5px;
+  height: 5px;
+  margin-left: 6px;
+  background: var(--theme-accent);
+}
+
+:global(html[data-content-theme='inkstone']) .controls,
+:global(html[data-content-theme='slate']) .controls,
+:global(html[data-content-theme='mono']) .controls,
+:global(html[data-content-theme='nocturne']) .controls {
+  height: 24px;
+}
+
+:global(html[data-content-theme='inkstone']) .btn,
+:global(html[data-content-theme='slate']) .btn,
+:global(html[data-content-theme='mono']) .btn,
+:global(html[data-content-theme='nocturne']) .btn {
+  width: 34px;
+  height: 24px;
+  color: var(--theme-secondary-text);
+  transition: background 120ms ease, color 120ms ease;
+}
+
+:global(html[data-content-theme='inkstone']) .btn:hover,
+:global(html[data-content-theme='slate']) .btn:hover,
+:global(html[data-content-theme='mono']) .btn:hover,
+:global(html[data-content-theme='nocturne']) .btn:hover {
+  background: var(--theme-panel-secondary);
+  color: var(--theme-text);
+}
+
+:global(html[data-content-theme='inkstone']) .btn svg,
+:global(html[data-content-theme='slate']) .btn svg,
+:global(html[data-content-theme='mono']) .btn svg,
+:global(html[data-content-theme='nocturne']) .btn svg {
+  width: 11px;
+  height: 11px;
+  stroke-width: 1.3;
 }

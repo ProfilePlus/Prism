@@ -7,6 +7,8 @@ interface TitleBarProps {
   isDirty?: boolean;
 }
 
+const IS_MACOS = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform);
+
 const IconMin = () => (
   <svg viewBox="0 0 12 12" fill="none" stroke="currentColor">
     <path d="M2.5 6h7" />
@@ -37,7 +39,10 @@ export function TitleBar({ docName, isDirty = false }: TitleBarProps) {
   };
 
   return (
-    <div className={`${styles.titlebar} app-titlebar`} data-tauri-drag-region>
+    <div
+      className={`${styles.titlebar} ${IS_MACOS ? styles.macos : ''} app-titlebar`}
+      data-tauri-drag-region
+    >
       <div className={styles.brand}>
         <div className={styles.logo}>P</div>
         <div className={styles.title}>
@@ -47,17 +52,19 @@ export function TitleBar({ docName, isDirty = false }: TitleBarProps) {
           <span className={styles.app}>Prism</span>
         </div>
       </div>
-      <div className={styles.controls}>
-        <button className={styles.btn} onClick={handleMinimize} title="最小化" aria-label="最小化">
-          <IconMin />
-        </button>
-        <button className={styles.btn} onClick={handleMaximize} title="最大化" aria-label="最大化">
-          <IconMax />
-        </button>
-        <button className={`${styles.btn} ${styles.close}`} onClick={handleClose} title="关闭" aria-label="关闭">
-          <IconClose />
-        </button>
-      </div>
+      {!IS_MACOS && (
+        <div className={styles.controls}>
+          <button className={styles.btn} onClick={handleMinimize} title="最小化" aria-label="最小化">
+            <IconMin />
+          </button>
+          <button className={styles.btn} onClick={handleMaximize} title="最大化" aria-label="最大化">
+            <IconMax />
+          </button>
+          <button className={`${styles.btn} ${styles.close}`} onClick={handleClose} title="关闭" aria-label="关闭">
+            <IconClose />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
