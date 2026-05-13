@@ -17,7 +17,6 @@ export function MenuBar({ onAction }: MenuBarProps) {
   const contentTheme = useSettingsStore((s) => s.contentTheme);
   const { sidebarVisible, statusBarVisible, focusMode, typewriterMode, isFullscreen, isAlwaysOnTop } = useWorkspaceStore();
   const viewMode = useDocumentStore((s) => s.currentDocument?.viewMode);
-  const isDirty = useDocumentStore((s) => s.currentDocument?.isDirty ?? false);
 
   const processedMenuData = useMemo(() => {
     const newData = { ...menuData };
@@ -101,16 +100,6 @@ export function MenuBar({ onAction }: MenuBarProps) {
         </div>
       ))}
       <div className={styles.spacer} />
-      <div className={styles.actions}>
-        <button
-          className={styles.pillFilled}
-          onClick={() => onAction('save')}
-          disabled={!isDirty}
-          title="保存 (Ctrl+S)"
-        >
-          保存
-        </button>
-      </div>
     </div>
   );
 }

@@ -197,6 +197,12 @@ function getWorkspaceTargetDir(context: FileActionContext, requestedPath?: strin
 async function handleOpenFile(path: string, context: FileActionContext): Promise<void> {
   const content = await readTextFile(path);
   context.documentStore.openDocument(path, basename(path), content);
+
+  if (!context.workspaceStore.rootPath) {
+    const dir = dirname(path);
+    context.workspaceStore.setRootPath(dir);
+    await refreshWorkspace(context, dir);
+  }
 }
 
 async function handleOpenNewWindow(path: string | undefined, context: FileActionContext): Promise<void> {

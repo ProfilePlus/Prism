@@ -1,5 +1,5 @@
 .titlebar {
-  height: 36px;
+  height: 40px;
   display: flex;
   align-items: center;
   padding-left: 16px;
@@ -39,6 +39,15 @@
   flex-shrink: 0;
 }
 
+.titleGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: hidden;
+  min-width: 0;
+}
+
 .title {
   display: flex;
   align-items: center;
@@ -46,19 +55,17 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   letter-spacing: 0;
+  line-height: 1.2;
+}
+
+.editedLabel {
+  font-size: 10px;
+  color: var(--c-ash);
+  line-height: 1;
+  margin-top: 1px;
 }
 
 .docName { color: var(--c-void); }
-
-.dirtyDot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--c-void);
-  margin-left: 6px;
-  flex-shrink: 0;
-}
 
 .sep {
   color: var(--c-ash);
@@ -76,7 +83,7 @@
 
 .btn {
   width: 44px;
-  height: 36px;
+  height: 40px;
   display: grid;
   place-items: center;
   border: none;
@@ -107,7 +114,7 @@
 }
 
 :global(html[data-content-theme='miaoyan']) .titlebar {
-  height: 24px;
+  height: 28px;
   padding-left: 16px;
   border-bottom: 0;
   background: var(--miaoyan-main-bg);
@@ -141,20 +148,19 @@
   font-weight: 400;
 }
 
-:global(html[data-content-theme='miaoyan']) .dirtyDot {
-  width: 5px;
-  height: 5px;
-  margin-left: 6px;
-  background: var(--miaoyan-accent);
+:global(html[data-content-theme='miaoyan']) .editedLabel {
+  font-size: 9px;
+  color: var(--miaoyan-accent);
+  margin-top: 1px;
 }
 
 :global(html[data-content-theme='miaoyan']) .controls {
-  height: 24px;
+  height: 28px;
 }
 
 :global(html[data-content-theme='miaoyan']) .btn {
   width: 34px;
-  height: 24px;
+  height: 28px;
   color: var(--miaoyan-secondary-text);
   transition: background 120ms ease, color 120ms ease;
 }
@@ -174,7 +180,7 @@
 :global(html[data-content-theme='slate']) .titlebar,
 :global(html[data-content-theme='mono']) .titlebar,
 :global(html[data-content-theme='nocturne']) .titlebar {
-  height: 24px;
+  height: 28px;
   padding-left: 16px;
   border-bottom: 0;
   background: var(--theme-main-bg);
@@ -229,21 +235,20 @@
   font-weight: 400;
 }
 
-:global(html[data-content-theme='inkstone']) .dirtyDot,
-:global(html[data-content-theme='slate']) .dirtyDot,
-:global(html[data-content-theme='mono']) .dirtyDot,
-:global(html[data-content-theme='nocturne']) .dirtyDot {
-  width: 5px;
-  height: 5px;
-  margin-left: 6px;
-  background: var(--theme-accent);
+:global(html[data-content-theme='inkstone']) .editedLabel,
+:global(html[data-content-theme='slate']) .editedLabel,
+:global(html[data-content-theme='mono']) .editedLabel,
+:global(html[data-content-theme='nocturne']) .editedLabel {
+  font-size: 9px;
+  color: var(--theme-accent);
+  margin-top: 1px;
 }
 
 :global(html[data-content-theme='inkstone']) .controls,
 :global(html[data-content-theme='slate']) .controls,
 :global(html[data-content-theme='mono']) .controls,
 :global(html[data-content-theme='nocturne']) .controls {
-  height: 24px;
+  height: 28px;
 }
 
 :global(html[data-content-theme='inkstone']) .btn,
@@ -251,7 +256,7 @@
 :global(html[data-content-theme='mono']) .btn,
 :global(html[data-content-theme='nocturne']) .btn {
   width: 34px;
-  height: 24px;
+  height: 28px;
   color: var(--theme-secondary-text);
   transition: background 120ms ease, color 120ms ease;
 }

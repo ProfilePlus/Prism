@@ -45,11 +45,13 @@ export function TitleBar({ docName, isDirty = false }: TitleBarProps) {
     >
       <div className={styles.brand}>
         <div className={styles.logo}>P</div>
-        <div className={styles.title}>
-          <span className={styles.docName}>{docName}</span>
-          {isDirty && <span className={styles.dirtyDot} title="未保存" />}
-          <span className={styles.sep}>—</span>
-          <span className={styles.app}>Prism</span>
+        <div className={styles.titleGroup}>
+          <div className={styles.title}>
+            <span className={styles.docName}>{docName}</span>
+            <span className={styles.sep}>—</span>
+            <span className={styles.app}>Prism</span>
+          </div>
+          {isDirty && <span className={styles.editedLabel}>已编辑</span>}
         </div>
       </div>
       {!IS_MACOS && (

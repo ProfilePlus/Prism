@@ -1,4 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
+import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
 import { useDocumentStore } from './domains/document/store';
 import { useSettingsStore } from './domains/settings/store';
 import { useWorkspaceStore } from './domains/workspace/store';
@@ -202,6 +204,27 @@ function App() {
       showToast,
     });
   }, [showToast]);
+
+  useEffect(() => {
+    let mounted = true;
+    const unlisten = listen<string[]>('file-opened', (event) => {
+      const paths = event.payload;
+      if (paths.length > 0 && mounted) {
+        handleFileAction({ action: 'openFile', path: paths[0] });
+      }
+    });
+
+    invoke<string[]>('get_pending_files').then((paths) => {
+      if (paths.length > 0 && mounted) {
+        handleFileAction({ action: 'openFile', path: paths[0] });
+      }
+    }).catch(() => {});
+
+    return () => {
+      mounted = false;
+      unlisten.then(fn => fn());
+    };
+  }, [handleFileAction]);
 
   const handleFileClick = useCallback(async (path: string) => {
     await handleFileAction({ action: 'openFile', path });
