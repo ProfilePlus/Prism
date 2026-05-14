@@ -1,0 +1,133 @@
+import type { MenuActionContext } from '../../lib/menuActions.types';
+
+export type CommandCategory =
+  | '文件'
+  | '编辑'
+  | '插入'
+  | '格式'
+  | '视图'
+  | '主题'
+  | '窗口'
+  | '帮助';
+
+export type CommandId =
+  | 'new'
+  | 'newWindow'
+  | 'open'
+  | 'openFolder'
+  | 'save'
+  | 'saveAs'
+  | 'print'
+  | 'openCurrentLocation'
+  | 'closeDocument'
+  | 'exportHtml'
+  | 'exportPdf'
+  | 'exportDocx'
+  | 'exportPng'
+  | 'undo'
+  | 'redo'
+  | 'cut'
+  | 'copy'
+  | 'paste'
+  | 'pastePlain'
+  | 'selectAll'
+  | 'showSearch'
+  | 'showReplace'
+  | 'copyPlain'
+  | 'copyMd'
+  | 'copyHtml'
+  | 'link'
+  | 'codeBlock'
+  | 'mathBlock'
+  | 'quote'
+  | 'orderedList'
+  | 'unorderedList'
+  | 'taskList'
+  | 'hr'
+  | 'footnote'
+  | 'linkReference'
+  | 'toc'
+  | 'yaml'
+  | 'bold'
+  | 'italic'
+  | 'underline'
+  | 'strikethrough'
+  | 'inlineCode'
+  | 'paragraph'
+  | 'h1'
+  | 'h2'
+  | 'h3'
+  | 'h4'
+  | 'h5'
+  | 'h6'
+  | 'increaseHeading'
+  | 'decreaseHeading'
+  | 'clearFormat'
+  | 'sourceMode'
+  | 'splitMode'
+  | 'previewMode'
+  | 'toggleSidebar'
+  | 'showFiles'
+  | 'showDocs'
+  | 'showOutline'
+  | 'focusMode'
+  | 'typewriterMode'
+  | 'statusBar'
+  | 'actualSize'
+  | 'zoomIn'
+  | 'zoomOut'
+  | 'devTools'
+  | 'themeMiaoyan'
+  | 'themeInkstone'
+  | 'themeSlate'
+  | 'themeMono'
+  | 'themeNocturne'
+  | 'minimize'
+  | 'fullscreen'
+  | 'alwaysOnTop'
+  | 'preferences'
+  | 'commandPalette'
+  | 'mdReference'
+  | 'showShortcuts'
+  | 'github'
+  | 'feedback'
+  | 'about';
+
+export type AppPlatform = 'mac' | 'windows' | 'linux';
+
+export interface ShortcutBinding {
+  code: string;
+  mod?: boolean;
+  ctrl?: boolean;
+  meta?: boolean;
+  shift?: boolean;
+  alt?: boolean;
+  label?: string | Partial<Record<AppPlatform, string>>;
+}
+
+export interface CommandContext extends MenuActionContext {
+  openAbout?: () => void;
+  openSettings?: () => void;
+  openShortcuts?: () => void;
+  openCommandPalette?: () => void;
+}
+
+export interface CommandDefinition {
+  id: CommandId;
+  label: string;
+  category: CommandCategory;
+  keywords?: string[];
+  shortcuts?: ShortcutBinding[];
+  palette?: boolean;
+  enabled?: (context: CommandContext) => boolean;
+  checked?: (context: CommandContext) => boolean;
+  run: (context: CommandContext) => void | Promise<void>;
+}
+
+export interface CommandPaletteItem {
+  id: CommandId;
+  label: string;
+  category: CommandCategory;
+  shortcut?: string;
+  keywords?: string[];
+}
