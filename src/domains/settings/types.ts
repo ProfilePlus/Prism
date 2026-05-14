@@ -1,4 +1,7 @@
 export type AppearanceMode = 'light' | 'dark' | 'auto';
+export type DefaultViewMode = 'edit' | 'split' | 'preview';
+export type ShortcutStyle = 'auto' | 'mac' | 'windows';
+export type ExportDefaultFormat = 'html' | 'pdf' | 'docx' | 'png';
 
 export const CONTENT_THEMES = ['miaoyan', 'inkstone', 'slate', 'mono', 'nocturne'] as const;
 
@@ -13,6 +16,16 @@ export interface SettingsState {
   contentTheme: ContentTheme;
   fontSize: number;
   editorFontFamily: string;
+  editorLineHeight: number;
+  previewFontFamily: string;
+  previewFontSize: number;
+  defaultViewMode: DefaultViewMode;
+  exportDefaults: {
+    format: ExportDefaultFormat;
+    pngScale: number;
+    htmlIncludeTheme: boolean;
+  };
+  shortcutStyle: ShortcutStyle;
   autoSaveInterval: number;
   showLineNumbers: boolean;
   windowState: {
@@ -28,6 +41,16 @@ export const DEFAULT_SETTINGS: SettingsState = {
   contentTheme: 'miaoyan',
   fontSize: 16,
   editorFontFamily: 'Cascadia Code, Consolas, monospace',
+  editorLineHeight: 1.72,
+  previewFontFamily: 'inherit',
+  previewFontSize: 16,
+  defaultViewMode: 'edit',
+  exportDefaults: {
+    format: 'pdf',
+    pngScale: 2,
+    htmlIncludeTheme: true,
+  },
+  shortcutStyle: 'auto',
   autoSaveInterval: 2000,
   showLineNumbers: false,
   windowState: {

@@ -39,6 +39,7 @@ import { scrollPrimarySelectionToCenter } from '../extensions/typewriter';
 const editorLineNumbersCompartment = new Compartment();
 const editorDarkThemeCompartment = new Compartment();
 const editorContentThemeCompartment = new Compartment();
+const editorTypographyCompartment = new Compartment();
 const editorDarkThemeExtension = [
   oneDark,
   EditorView.theme(
@@ -71,6 +72,19 @@ function getDarkThemeExtensions(isEditorDark: boolean) {
 
 function getContentThemeExtension(contentTheme: ContentTheme) {
   return contentThemeFacet.of(contentTheme);
+}
+
+function getTypographyExtension(fontSize: number, lineHeight: number, fontFamily: string) {
+  return EditorView.theme({
+    '&': {
+      fontSize: `${fontSize}px`,
+      fontFamily,
+    },
+    '.cm-scroller': {
+      fontFamily,
+      lineHeight: String(lineHeight),
+    },
+  });
 }
 
 export interface EditorPaneHandle {
@@ -124,6 +138,10 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     const contentTheme = useSettingsStore((s) => s.contentTheme);
     const isEditorDark = useSettingsStore((s) => shouldUseDarkEditor(s.contentTheme, s.theme));
     const showLineNumbers = useSettingsStore((s) => s.showLineNumbers);
+    const editorFontSize = useSettingsStore((s) => s.fontSize);
+    const editorFontFamily = useSettingsStore((s) => s.editorFontFamily);
+    const editorLineHeight = useSettingsStore((s) => s.editorLineHeight);
+    const shortcutStyle = useSettingsStore((s) => s.shortcutStyle);
     const typewriterMode = useWorkspaceStore((s) => s.typewriterMode);
     const typewriterModeRef = useRef(typewriterMode);
     
@@ -550,6 +568,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           EditorState.allowMultipleSelections.of(true),
           indentOnInput(),
           editorContentThemeCompartment.of(getContentThemeExtension(contentTheme)),
+          editorTypographyCompartment.of(getTypographyExtension(editorFontSize, editorLineHeight, editorFontFamily)),
           compatibilityMarkdownPlugin,
           editorSelectionPlugin,
           bracketMatching(),
@@ -569,8 +588,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           markdown(),
           editorDarkThemeCompartment.of(getDarkThemeExtensions(isEditorDark)),
           EditorView.theme({
-            '&': { flex: 1, minHeight: 0, fontSize: '16px', fontFamily: 'inherit', backgroundColor: 'transparent' },
-            '.cm-scroller': { overflow: 'auto', fontFamily: 'inherit', lineHeight: '1.7' },
+            '&': { flex: 1, minHeight: 0, backgroundColor: 'transparent' },
+            '.cm-scroller': { overflow: 'auto' },
             '.cm-content': { padding: '32px 48px', color: 'var(--text-primary)', maxWidth: '860px', margin: '0 auto' },
             '.cm-line-flash': { animation: 'cm-flash 2s cubic-bezier(0.16, 1, 0.3, 1)' },
             '.cm-gutters': { display: 'none' },
@@ -697,6 +716,18 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       });
     }, [showLineNumbers]);
 
+    useEffect(() => {
+      const view = viewRef.current;
+      if (!view) return;
+      view.dispatch({
+        effects: editorTypographyCompartment.reconfigure(getTypographyExtension(
+          editorFontSize,
+          editorLineHeight,
+          editorFontFamily,
+        )),
+      });
+    }, [editorFontFamily, editorFontSize, editorLineHeight]);
+
     return (
       <>
         <div
@@ -707,7 +738,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           <ContextMenu
             x={editorContextMenu.x}
             y={editorContextMenu.y}
-            items={getEditorContextMenuItems(editorContextMenu.hasSelection)}
+            items={getEditorContextMenuItems(editorContextMenu.hasSelection, shortcutStyle)}
             onAction={handleEditorContextMenuAction}
             onClose={() => setEditorContextMenu(null)}
           />

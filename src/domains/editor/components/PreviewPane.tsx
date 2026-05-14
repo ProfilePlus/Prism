@@ -2,6 +2,7 @@ import { useMemo, useEffect, useRef, useState } from 'react';
 import { markdownToHtml } from '../../../lib/markdownToHtml';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { ContentTheme, DEFAULT_SETTINGS, isContentTheme } from '../../settings/types';
+import { useSettingsStore } from '../../settings/store';
 
 interface PreviewPaneProps {
   content: string;
@@ -78,6 +79,8 @@ function normalizeMermaidSvg(svg: SVGSVGElement) {
 export function PreviewPane({ content }: PreviewPaneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [contentTheme, setContentTheme] = useState<ContentTheme>(getCurrentContentTheme);
+  const previewFontFamily = useSettingsStore((s) => s.previewFontFamily);
+  const previewFontSize = useSettingsStore((s) => s.previewFontSize);
 
   const html = useMemo(() => {
     try {
@@ -350,6 +353,10 @@ export function PreviewPane({ content }: PreviewPaneProps) {
       <div
         id="write"
         className={previewWriteClassByTheme[contentTheme]}
+        style={{
+          fontFamily: previewFontFamily === 'inherit' ? undefined : previewFontFamily,
+          fontSize: `${previewFontSize}px`,
+        }}
         dangerouslySetInnerHTML={{ __html: html }}
       />
     </div>

@@ -5,6 +5,7 @@ import {
   getPrimaryShortcutLabel,
   isCommandEnabled,
 } from './registry';
+import type { ShortcutDisplayStyle } from './platform';
 
 type MenuModelItem =
   | { type: 'separator' }
@@ -174,14 +175,18 @@ function normalizeItems(items: MenuItem[]): MenuItem[] {
   });
 }
 
-function toMenuItem(item: MenuModelItem, context: CommandContext): MenuItem | null {
+function toMenuItem(
+  item: MenuModelItem,
+  context: CommandContext,
+  displayStyle: ShortcutDisplayStyle,
+): MenuItem | null {
   if ('hidden' in item && item.hidden?.(context)) return null;
   if ('type' in item && item.type === 'separator') return { type: 'separator' };
 
   if ('children' in item) {
     const children = normalizeItems(
       item.children
-        .map((child) => toMenuItem(child, context))
+        .map((child) => toMenuItem(child, context, displayStyle))
         .filter((child): child is MenuItem => Boolean(child)),
     );
 
@@ -200,19 +205,21 @@ function toMenuItem(item: MenuModelItem, context: CommandContext): MenuItem | nu
   return {
     label: item.label ?? definition.label,
     action: definition.id,
-    shortcut: getPrimaryShortcutLabel(definition.id),
+    shortcut: getPrimaryShortcutLabel(definition.id, displayStyle),
     checked: definition.checked?.(context) ?? false,
     disabled: !isCommandEnabled(definition.id, context),
   };
 }
 
 export function getMenuSections(context: CommandContext): MenuSection {
+  const displayStyle = context.settingsStore.shortcutStyle;
+
   return Object.fromEntries(
     Object.entries(menuModel).map(([section, items]) => [
       section,
       normalizeItems(
         items
-          .map((item) => toMenuItem(item, context))
+          .map((item) => toMenuItem(item, context, displayStyle))
           .filter((item): item is MenuItem => Boolean(item)),
       ),
     ]),
@@ -220,7 +227,9 @@ export function getMenuSections(context: CommandContext): MenuSection {
 }
 
 export function getCommandMenuItems(ids: CommandId[], context: CommandContext): MenuItem[] {
+  const displayStyle = context.settingsStore.shortcutStyle;
+
   return normalizeItems(
-    ids.map((id) => toMenuItem({ command: id }, context)).filter((item): item is MenuItem => Boolean(item)),
+    ids.map((id) => toMenuItem({ command: id }, context, displayStyle)).filter((item): item is MenuItem => Boolean(item)),
   );
 }

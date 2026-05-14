@@ -110,8 +110,10 @@ function getSaveDialogOverwriteText(dialog: SaveDialogState) {
 function App() {
   const currentDocument = useDocumentStore((s) => s.currentDocument);
 
-  const { loadSettings } = useSettingsStore();
+  const loadSettings = useSettingsStore((s) => s.loadSettings);
   const contentTheme = useSettingsStore((s) => s.contentTheme);
+  const shortcutStyle = useSettingsStore((s) => s.shortcutStyle);
+  const autoSaveInterval = useSettingsStore((s) => s.autoSaveInterval);
   const workspace = useWorkspaceStore();
 
   const editorRef = useRef<EditorPaneHandle>(null);
@@ -133,7 +135,7 @@ function App() {
   const [settingsVisible, setSettingsVisible] = useState(false);
 
   useBootstrap();
-  useAutoSave(2000);
+  useAutoSave(autoSaveInterval);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -361,6 +363,7 @@ function App() {
     workspace.isFullscreen,
     workspace.isAlwaysOnTop,
     contentTheme,
+    shortcutStyle,
   ]);
 
   const menuSections = useMemo(

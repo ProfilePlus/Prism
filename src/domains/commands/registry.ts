@@ -14,7 +14,13 @@ import type {
   CommandId,
   CommandPaletteItem,
 } from './types';
-import { getCurrentPlatform, getShortcutLabel, shortcutMatchesEvent } from './platform';
+import {
+  getCurrentPlatform,
+  getShortcutDisplayPlatform,
+  getShortcutLabel,
+  shortcutMatchesEvent,
+  type ShortcutDisplayStyle,
+} from './platform';
 
 function dirname(path: string): string {
   const parts = path.split(/[\\/]/);
@@ -211,6 +217,8 @@ async function handleExport(format: ExportFormat, context: CommandContext): Prom
       content: doc.content,
       filename: doc.name,
       contentTheme: context.settingsStore.contentTheme,
+      htmlIncludeTheme: context.settingsStore.exportDefaults.htmlIncludeTheme,
+      pngScale: context.settingsStore.exportDefaults.pngScale,
       onProgress: (message) => setExportProgress(message),
     }, format, outputPath);
 
@@ -1000,12 +1008,17 @@ export function findCommandByKeyboardEvent(event: KeyboardEvent): CommandDefinit
   return null;
 }
 
-export function getPrimaryShortcutLabel(id: CommandId): string | undefined {
+export function getPrimaryShortcutLabel(
+  id: CommandId,
+  displayStyle: ShortcutDisplayStyle = 'auto',
+): string | undefined {
   const shortcut = getCommandDefinition(id).shortcuts?.[0];
-  return getShortcutLabel(shortcut);
+  return getShortcutLabel(shortcut, getShortcutDisplayPlatform(displayStyle));
 }
 
 export function getCommandPaletteItems(context: CommandContext): CommandPaletteItem[] {
+  const displayPlatform = getShortcutDisplayPlatform(context.settingsStore.shortcutStyle);
+
   return commandRegistry
     .filter((definition) => definition.palette !== false)
     .filter((definition) => isCommandEnabled(definition.id, context))
@@ -1013,7 +1026,7 @@ export function getCommandPaletteItems(context: CommandContext): CommandPaletteI
       id: definition.id,
       label: definition.label,
       category: definition.category,
-      shortcut: getShortcutLabel(definition.shortcuts?.[0]),
+      shortcut: getShortcutLabel(definition.shortcuts?.[0], displayPlatform),
       keywords: definition.keywords,
     }));
 }

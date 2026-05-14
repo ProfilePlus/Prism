@@ -1,5 +1,7 @@
 import type { AppPlatform, ShortcutBinding } from './types';
 
+export type ShortcutDisplayStyle = 'auto' | 'mac' | 'windows';
+
 const keyLabelByCode: Record<string, string> = {
   Backquote: '`',
   Backslash: '\\',
@@ -32,6 +34,11 @@ export function getCurrentPlatform(): AppPlatform {
   if (platform.includes('mac') || userAgent.includes('mac os')) return 'mac';
   if (platform.includes('win') || userAgent.includes('windows')) return 'windows';
   return 'linux';
+}
+
+export function getShortcutDisplayPlatform(style: ShortcutDisplayStyle = 'auto'): AppPlatform {
+  if (style === 'mac' || style === 'windows') return style;
+  return getCurrentPlatform();
 }
 
 function getKeyLabel(code: string): string {

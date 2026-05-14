@@ -1,5 +1,14 @@
 import { create } from 'zustand';
-import { SettingsState, DEFAULT_SETTINGS, ContentTheme, AppearanceMode, isContentTheme } from './types';
+import {
+  SettingsState,
+  DEFAULT_SETTINGS,
+  ContentTheme,
+  AppearanceMode,
+  DefaultViewMode,
+  ExportDefaultFormat,
+  ShortcutStyle,
+} from './types';
+import { normalizeSettings } from './normalize';
 import {
   readTextFile,
   writeTextFile,
@@ -15,11 +24,31 @@ async function getConfigPath(): Promise<string> {
   return `${appData}${CONFIG_FILENAME}`;
 }
 
+function applyAppearanceTheme(theme: AppearanceMode) {
+  let actualTheme: 'light' | 'dark' = 'light';
+  if (theme === 'auto') {
+    actualTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  } else {
+    actualTheme = theme;
+  }
+
+  const classes = Array.from(document.body.classList).filter(c => c !== 'light' && c !== 'dark');
+  document.body.className = [...classes, actualTheme].join(' ');
+}
+
 interface SettingsStore extends SettingsState {
   setTheme: (theme: AppearanceMode) => void;
   setContentTheme: (theme: ContentTheme) => void;
   setFontSize: (size: number) => void;
   setEditorFontFamily: (family: string) => void;
+  setEditorLineHeight: (lineHeight: number) => void;
+  setPreviewFontFamily: (family: string) => void;
+  setPreviewFontSize: (size: number) => void;
+  setDefaultViewMode: (viewMode: DefaultViewMode) => void;
+  setExportDefaultFormat: (format: ExportDefaultFormat) => void;
+  setExportPngScale: (scale: number) => void;
+  setExportHtmlIncludeTheme: (includeTheme: boolean) => void;
+  setShortcutStyle: (style: ShortcutStyle) => void;
   setAutoSaveInterval: (interval: number) => void;
   setShowLineNumbers: (show: boolean) => void;
   loadSettings: () => Promise<void>;
@@ -31,18 +60,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   setTheme: (theme) => {
     set({ theme });
-
-    // 计算实际应用的主题
-    let actualTheme: 'light' | 'dark' = 'light';
-    if (theme === 'auto') {
-      actualTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    } else {
-      actualTheme = theme;
-    }
-
-    // 更新 body class，主要影响 UI 外壳
-    const classes = Array.from(document.body.classList).filter(c => c !== 'light' && c !== 'dark');
-    document.body.className = [...classes, actualTheme].join(' ');
+    applyAppearanceTheme(theme);
     get().saveSettings();
   },
 
@@ -62,6 +80,46 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     get().saveSettings();
   },
 
+  setEditorLineHeight: (editorLineHeight) => {
+    set({ editorLineHeight });
+    get().saveSettings();
+  },
+
+  setPreviewFontFamily: (previewFontFamily) => {
+    set({ previewFontFamily });
+    get().saveSettings();
+  },
+
+  setPreviewFontSize: (previewFontSize) => {
+    set({ previewFontSize });
+    get().saveSettings();
+  },
+
+  setDefaultViewMode: (defaultViewMode) => {
+    set({ defaultViewMode });
+    get().saveSettings();
+  },
+
+  setExportDefaultFormat: (format) => {
+    set((state) => ({ exportDefaults: { ...state.exportDefaults, format } }));
+    get().saveSettings();
+  },
+
+  setExportPngScale: (pngScale) => {
+    set((state) => ({ exportDefaults: { ...state.exportDefaults, pngScale } }));
+    get().saveSettings();
+  },
+
+  setExportHtmlIncludeTheme: (htmlIncludeTheme) => {
+    set((state) => ({ exportDefaults: { ...state.exportDefaults, htmlIncludeTheme } }));
+    get().saveSettings();
+  },
+
+  setShortcutStyle: (shortcutStyle) => {
+    set({ shortcutStyle });
+    get().saveSettings();
+  },
+
   setAutoSaveInterval: (autoSaveInterval) => {
     set({ autoSaveInterval });
     get().saveSettings();
@@ -77,26 +135,17 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       const configPath = await getConfigPath();
       const raw = await readTextFile(configPath);
       const saved = JSON.parse(raw) as Partial<SettingsState>;
-      const contentTheme = isContentTheme(saved.contentTheme)
-        ? saved.contentTheme
-        : DEFAULT_SETTINGS.contentTheme;
+      const settings = normalizeSettings(saved);
 
-      set({ ...DEFAULT_SETTINGS, ...saved, contentTheme });
+      set(settings);
 
       // 应用保存的主题
-      const theme = saved.theme || DEFAULT_SETTINGS.theme;
-      let actualTheme: 'light' | 'dark' = 'light';
-      if (theme === 'auto') {
-        actualTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      } else {
-        actualTheme = theme as 'light' | 'dark';
-      }
-      document.body.classList.add(actualTheme);
+      applyAppearanceTheme(settings.theme);
 
-      document.documentElement.setAttribute('data-content-theme', contentTheme);
+      document.documentElement.setAttribute('data-content-theme', settings.contentTheme);
 
       // 监听系统主题变化
-      if (theme === 'auto') {
+      if (settings.theme === 'auto') {
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
         const handleChange = (e: MediaQueryListEvent) => {
           const newTheme = e.matches ? 'dark' : 'light';
@@ -110,8 +159,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     } catch {
       console.log('[Settings] No config found, using defaults');
       // 默认应用
-      const actualTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      document.body.classList.add(actualTheme);
+      applyAppearanceTheme(DEFAULT_SETTINGS.theme);
       document.documentElement.setAttribute('data-content-theme', DEFAULT_SETTINGS.contentTheme);
 
       // 监听系统主题变化
@@ -134,9 +182,37 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       }
 
       const configPath = await getConfigPath();
-      const { theme, contentTheme, fontSize, editorFontFamily, autoSaveInterval, showLineNumbers, windowState } = get();
+      const {
+        theme,
+        contentTheme,
+        fontSize,
+        editorFontFamily,
+        editorLineHeight,
+        previewFontFamily,
+        previewFontSize,
+        defaultViewMode,
+        exportDefaults,
+        shortcutStyle,
+        autoSaveInterval,
+        showLineNumbers,
+        windowState,
+      } = get();
       const data = JSON.stringify(
-        { theme, contentTheme, fontSize, editorFontFamily, autoSaveInterval, showLineNumbers, windowState },
+        {
+          theme,
+          contentTheme,
+          fontSize,
+          editorFontFamily,
+          editorLineHeight,
+          previewFontFamily,
+          previewFontSize,
+          defaultViewMode,
+          exportDefaults,
+          shortcutStyle,
+          autoSaveInterval,
+          showLineNumbers,
+          windowState,
+        },
         null,
         2,
       );

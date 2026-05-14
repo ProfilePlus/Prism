@@ -443,8 +443,12 @@ async function createRenderedExportNode(input: ExportDocumentInput) {
   }
 }
 
-async function buildStandaloneHtml(input: ExportDocumentInput, renderedRoot?: HTMLElement) {
-  const css = await collectExportCss();
+async function buildStandaloneHtml(
+  input: ExportDocumentInput,
+  renderedRoot?: HTMLElement,
+  options: { includeTheme?: boolean } = {},
+) {
+  const css = options.includeTheme === false ? '' : await collectExportCss();
   const body = (() => {
     if (!renderedRoot) {
       return `<div class="prism-export-document preview-compat preview-compat--${input.contentTheme}">
@@ -463,7 +467,7 @@ async function buildStandaloneHtml(input: ExportDocumentInput, renderedRoot?: HT
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(stripMarkdownExtension(input.filename))}</title>
-  <style>${css}</style>
+  ${css ? `<style>${css}</style>` : ''}
 </head>
 <body class="${document.body.classList.contains('dark') ? 'dark' : ''}">
 ${body}
@@ -530,7 +534,9 @@ export async function exportHtml(input: ExportDocumentInput, outputPath?: string
   reportProgress(input, '正在生成 HTML');
   const node = await createRenderedExportNode(input);
   try {
-    await writeTextFile(targetPath, await buildStandaloneHtml(input, node));
+    await writeTextFile(targetPath, await buildStandaloneHtml(input, node, {
+      includeTheme: input.htmlIncludeTheme !== false,
+    }));
   } finally {
     node.remove();
   }
@@ -614,7 +620,7 @@ export async function exportPng(input: ExportDocumentInput, outputPath?: string)
   if (!targetPath) return false;
 
   reportProgress(input, '正在渲染 PNG 图像');
-  const image = await createRenderedPng(input);
+  const image = await createRenderedPng(input, { scale: input.pngScale });
   reportProgress(input, '正在写入 PNG 文件');
   await writeFile(targetPath, dataUrlToBytes(image.dataUrl));
   return true;

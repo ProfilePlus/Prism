@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { DocumentState } from './types';
+import { useSettingsStore } from '../settings/store';
 
 interface DocumentStore extends DocumentState {
   openDocument: (path: string, name: string, content: string) => void;
@@ -22,7 +23,7 @@ export const useDocumentStore = create<DocumentStore>((set) => ({
         content,
         isDirty: false,
         lastSavedAt: Date.now(),
-        viewMode: 'edit',
+        viewMode: useSettingsStore.getState().defaultViewMode,
       },
     });
   },
@@ -39,7 +40,7 @@ export const useDocumentStore = create<DocumentStore>((set) => ({
         content: '',
         isDirty: false,
         lastSavedAt: Date.now(),
-        viewMode: 'edit',
+        viewMode: useSettingsStore.getState().defaultViewMode,
       },
     });
   },

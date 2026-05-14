@@ -7,6 +7,7 @@ import {
   runCommand,
   type CommandContext,
 } from './index';
+import { DEFAULT_SETTINGS } from '../settings/types';
 
 function createCommandContext(overrides: Partial<CommandContext> = {}): CommandContext {
   return {
@@ -21,17 +22,19 @@ function createCommandContext(overrides: Partial<CommandContext> = {}): CommandC
       markSaved: vi.fn(),
     },
     settingsStore: {
-      theme: 'auto',
-      contentTheme: 'miaoyan',
-      fontSize: 16,
-      editorFontFamily: 'Cascadia Code, Consolas, monospace',
-      autoSaveInterval: 2000,
-      showLineNumbers: false,
-      windowState: { width: 1200, height: 800, x: 100, y: 100 },
+      ...DEFAULT_SETTINGS,
       setTheme: vi.fn(),
       setContentTheme: vi.fn(),
       setFontSize: vi.fn(),
       setEditorFontFamily: vi.fn(),
+      setEditorLineHeight: vi.fn(),
+      setPreviewFontFamily: vi.fn(),
+      setPreviewFontSize: vi.fn(),
+      setDefaultViewMode: vi.fn(),
+      setExportDefaultFormat: vi.fn(),
+      setExportPngScale: vi.fn(),
+      setExportHtmlIncludeTheme: vi.fn(),
+      setShortcutStyle: vi.fn(),
       setAutoSaveInterval: vi.fn(),
       setShowLineNumbers: vi.fn(),
       loadSettings: vi.fn(),

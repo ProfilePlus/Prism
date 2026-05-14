@@ -6,6 +6,8 @@ export interface ExportDocumentInput {
   content: string;
   filename: string;
   contentTheme: ContentTheme;
+  htmlIncludeTheme?: boolean;
+  pngScale?: number;
   onProgress?: (message: string) => void;
 }
 

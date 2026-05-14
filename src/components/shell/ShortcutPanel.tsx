@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { commandRegistry, getPrimaryShortcutLabel } from '../../domains/commands';
+import { useSettingsStore } from '../../domains/settings/store';
 
 interface ShortcutItem {
   category: string;
@@ -8,13 +9,13 @@ interface ShortcutItem {
 
 const CATEGORY_ORDER = ['文件', '编辑', '插入', '格式', '视图', '窗口', '帮助'];
 
-function getShortcutItems(): ShortcutItem[] {
+function getShortcutItems(shortcutStyle: ReturnType<typeof useSettingsStore.getState>['shortcutStyle']): ShortcutItem[] {
   return CATEGORY_ORDER.map((category) => ({
     category,
     shortcuts: commandRegistry
       .filter((command) => command.category === category)
       .map((command) => ({
-        keys: getPrimaryShortcutLabel(command.id),
+        keys: getPrimaryShortcutLabel(command.id, shortcutStyle),
         description: command.label,
       }))
       .filter((item): item is { keys: string; description: string } => Boolean(item.keys)),
@@ -27,6 +28,8 @@ interface ShortcutPanelProps {
 }
 
 export function ShortcutPanel({ visible, onClose }: ShortcutPanelProps) {
+  const shortcutStyle = useSettingsStore((s) => s.shortcutStyle);
+
   useEffect(() => {
     if (!visible) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -38,7 +41,7 @@ export function ShortcutPanel({ visible, onClose }: ShortcutPanelProps) {
 
   if (!visible) return null;
 
-  const shortcuts = getShortcutItems();
+  const shortcuts = getShortcutItems(shortcutStyle);
 
   return (
     <>
