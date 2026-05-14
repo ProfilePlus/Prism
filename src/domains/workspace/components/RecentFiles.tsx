@@ -1,11 +1,8 @@
+import { basename } from '../services';
+
 interface RecentFilesProps {
   recentFiles: string[];
   onFileClick: (path: string) => void;
-}
-
-function basename(path: string): string {
-  const parts = path.split(/[\\/]/);
-  return parts[parts.length - 1] || path;
 }
 
 export function RecentFiles({ recentFiles, onFileClick }: RecentFilesProps) {

@@ -1,0 +1,38 @@
+export {
+  MARKDOWN_FILE_FILTERS,
+  SUPPORTED_MARKDOWN_EXTENSIONS,
+  isSupportedMarkdownPath,
+} from './fileAssociation';
+export {
+  collectDirectoryPaths,
+  flattenFiles,
+  isDirectoryNode,
+  searchWorkspaceNodes,
+  sortFileNodes,
+  type FlatFileNode,
+} from './fileTree';
+export {
+  getFileManagerName,
+  getRuntimePlatform,
+  getShowInFileManagerLabel,
+  type RuntimePlatform,
+} from './platform';
+export {
+  basename,
+  dirname,
+  isPathInside,
+  isSamePath,
+  joinPath,
+  normalizePathForCompare,
+  replacePathPrefix,
+} from './path';
+export {
+  addRecentFile,
+  clearRecentFiles,
+  getRecentFiles,
+  type RecentFile,
+} from './recentFiles';
+export {
+  rankQuickOpenFiles,
+  type QuickOpenResult,
+} from './quickOpen';

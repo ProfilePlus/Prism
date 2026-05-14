@@ -1,4 +1,5 @@
 import type { AppPlatform, ShortcutBinding } from './types';
+import { getRuntimePlatform } from '../workspace/services';
 
 export type ShortcutDisplayStyle = 'auto' | 'mac' | 'windows';
 
@@ -26,14 +27,7 @@ const keyLabelByCode: Record<string, string> = {
 };
 
 export function getCurrentPlatform(): AppPlatform {
-  if (typeof navigator === 'undefined') return 'mac';
-
-  const platform = navigator.platform.toLowerCase();
-  const userAgent = navigator.userAgent.toLowerCase();
-
-  if (platform.includes('mac') || userAgent.includes('mac os')) return 'mac';
-  if (platform.includes('win') || userAgent.includes('windows')) return 'windows';
-  return 'linux';
+  return getRuntimePlatform();
 }
 
 export function getShortcutDisplayPlatform(style: ShortcutDisplayStyle = 'auto'): AppPlatform {

@@ -1,5 +1,6 @@
-import { readDir, readTextFile } from '@tauri-apps/plugin-fs';
+import { readDir, readTextFile, stat } from '@tauri-apps/plugin-fs';
 import { FileNode } from '../types';
+import { isSupportedMarkdownPath, joinPath } from '../services';
 
 const IGNORE_DIRS = new Set([
   'node_modules',
@@ -15,16 +16,6 @@ const IGNORE_DIRS = new Set([
 ]);
 
 const MAX_DEPTH = 8;
-
-function shouldIncludeFile(name: string): boolean {
-  return /\.(md|markdown|txt)$/i.test(name);
-}
-
-function joinPath(dir: string, name: string): string {
-  const normalizedDir = dir.replace(/[\\/]$/, '');
-  const sep = dir.includes('\\') ? '\\' : '/';
-  return `${normalizedDir}${sep}${name}`;
-}
 
 function stripFrontmatter(content: string): string {
   if (content.startsWith('---')) {
@@ -65,6 +56,21 @@ function extractPreview(content: string): string {
 
 async function buildFileNode(path: string, name: string): Promise<FileNode> {
   let preview = '';
+  let size: number | undefined;
+  let createdAt: number | undefined;
+  let modifiedAt: number | undefined;
+
+  try {
+    const info = await stat(path);
+    size = info.size;
+    createdAt = info.birthtime?.getTime();
+    modifiedAt = info.mtime?.getTime();
+  } catch {
+    size = undefined;
+    createdAt = undefined;
+    modifiedAt = undefined;
+  }
+
   try {
     const content = await readTextFile(path);
     preview = extractPreview(content);
@@ -77,6 +83,9 @@ async function buildFileNode(path: string, name: string): Promise<FileNode> {
     name,
     kind: 'file',
     preview,
+    size,
+    createdAt,
+    modifiedAt,
   };
 }
 
@@ -94,7 +103,7 @@ async function readFolderChildren(folderPath: string, depth: number): Promise<Fi
   const visibleEntries = entries
     .filter((entry) => !entry.name.startsWith('.'))
     .filter((entry) => {
-      if (!entry.isDirectory) return entry.isFile && shouldIncludeFile(entry.name);
+      if (!entry.isDirectory) return entry.isFile && isSupportedMarkdownPath(entry.name);
       return !IGNORE_DIRS.has(entry.name);
     })
     .sort((a, b) => {

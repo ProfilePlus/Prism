@@ -3,18 +3,8 @@ import { readTextFile } from '@tauri-apps/plugin-fs';
 import { useDocumentStore } from '../store';
 import { useWorkspaceStore } from '../../workspace/store';
 import { loadFolderTree } from '../../workspace/lib/loadFolderTree';
+import { MARKDOWN_FILE_FILTERS, basename, dirname } from '../../workspace/services';
 import { openPrismWindow } from '../../../lib/openWindow';
-
-function basename(path: string): string {
-  const parts = path.split(/[\\/]/);
-  return parts[parts.length - 1] || path;
-}
-
-function dirname(path: string): string {
-  const parts = path.split(/[\\/]/);
-  parts.pop();
-  return parts.join(path.includes('\\') ? '\\' : '/');
-}
 
 export function OpenFileButton() {
   const currentDocument = useDocumentStore((s) => s.currentDocument);
@@ -25,10 +15,7 @@ export function OpenFileButton() {
     try {
       const selected = await open({
         multiple: false,
-        filters: [
-          { name: 'Markdown', extensions: ['md', 'markdown'] },
-          { name: 'Text', extensions: ['txt'] },
-        ],
+        filters: MARKDOWN_FILE_FILTERS,
       });
 
       if (typeof selected !== 'string') return;

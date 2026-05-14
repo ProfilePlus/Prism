@@ -2,6 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { FileNode } from '../types';
 import { useWorkspaceStore } from '../store';
 import { ContextMenu, ContextMenuItem } from '../../../components/shell/ContextMenu';
+import {
+  collectDirectoryPaths,
+  dirname,
+  flattenFiles,
+  getShowInFileManagerLabel,
+  isDirectoryNode,
+  sortFileNodes,
+} from '../services';
 
 interface FileTreeProps {
   nodes: FileNode[];
@@ -15,53 +23,10 @@ interface RenameFieldProps {
   onCancel: () => void;
 }
 
-interface FlatFileNode {
-  node: FileNode;
-  folderLabel: string;
-}
-
 function stripExtension(name: string): { stem: string; ext: string } {
   const idx = name.lastIndexOf('.');
   if (idx <= 0) return { stem: name, ext: '' };
   return { stem: name.slice(0, idx), ext: name.slice(idx) };
-}
-
-function dirname(path: string): string {
-  const parts = path.split(/[\\/]/);
-  parts.pop();
-  return parts.join(path.includes('\\') ? '\\' : '/');
-}
-
-function isDirectory(node: FileNode): boolean {
-  return node.kind === 'directory' || Array.isArray(node.children);
-}
-
-function collectDirectoryPaths(nodes: FileNode[], out = new Set<string>()): Set<string> {
-  for (const node of nodes) {
-    if (isDirectory(node)) {
-      out.add(node.path);
-      collectDirectoryPaths(node.children ?? [], out);
-    }
-  }
-  return out;
-}
-
-function flattenFiles(nodes: FileNode[], rootPath: string | null, out: FlatFileNode[] = []): FlatFileNode[] {
-  for (const node of nodes) {
-    if (isDirectory(node)) {
-      flattenFiles(node.children ?? [], rootPath, out);
-      continue;
-    }
-
-    const parent = dirname(node.path);
-    const folderLabel = rootPath && parent !== rootPath
-      ? parent.replace(rootPath, '').replace(/^[\\/]/, '')
-      : '';
-
-    out.push({ node, folderLabel });
-  }
-
-  return out;
 }
 
 function dispatchFileAction(action: string, detail?: { path?: string; name?: string }): void {
@@ -154,7 +119,8 @@ export function FileTree({ nodes, activePath, onFileClick }: FileTreeProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activePath]);
 
-  const flatFiles = useMemo(() => flattenFiles(nodes, rootPath, []), [nodes, rootPath]);
+  const sortedNodes = useMemo(() => sortFileNodes(nodes, fileSortMode), [nodes, fileSortMode]);
+  const flatFiles = useMemo(() => flattenFiles(sortedNodes, rootPath), [sortedNodes, rootPath]);
 
   const commitRename = (path: string, name: string) => {
     setRenamingPath(null);
@@ -162,8 +128,9 @@ export function FileTree({ nodes, activePath, onFileClick }: FileTreeProps) {
   };
 
   const makeContextItems = (node?: FileNode): ContextMenuItem[] => {
-    const nodeIsDirectory = node ? isDirectory(node) : false;
+    const nodeIsDirectory = node ? isDirectoryNode(node) : false;
     const targetDir = node ? (nodeIsDirectory ? node.path : dirname(node.path)) : undefined;
+    const showInFileManagerLabel = getShowInFileManagerLabel();
 
     if (!node) {
       return [
@@ -185,7 +152,7 @@ export function FileTree({ nodes, activePath, onFileClick }: FileTreeProps) {
         { label: '刷新', action: 'refreshFolder' },
         { type: 'separator' },
         { label: '复制工作区路径', action: 'copyRootPath' },
-        { label: '在访达中显示', action: 'openRootLocation' },
+        { label: showInFileManagerLabel, action: 'openRootLocation' },
       ];
     }
 
@@ -199,7 +166,7 @@ export function FileTree({ nodes, activePath, onFileClick }: FileTreeProps) {
         { label: '删除', action: `delete:${node.path}`, danger: true },
         { type: 'separator' },
         { label: '复制文件路径', action: `copyPath:${node.path}` },
-        { label: '在访达中显示', action: `openLocation:${node.path}` },
+        { label: showInFileManagerLabel, action: `openLocation:${node.path}` },
       ];
     }
 
@@ -213,7 +180,7 @@ export function FileTree({ nodes, activePath, onFileClick }: FileTreeProps) {
       { label: '删除', action: `delete:${node.path}`, danger: true },
       { type: 'separator' },
       { label: '复制文件夹路径', action: `copyPath:${node.path}` },
-      { label: '在访达中显示', action: `openLocation:${node.path}` },
+      { label: showInFileManagerLabel, action: `openLocation:${node.path}` },
     ];
   };
 
@@ -348,7 +315,7 @@ export function FileTree({ nodes, activePath, onFileClick }: FileTreeProps) {
         {expanded && (
           <div>
             {(node.children ?? []).map((child, index) => (
-              isDirectory(child)
+              isDirectoryNode(child)
                 ? renderDirectoryNode(child, depth + 1)
                 : renderFileNode(child, depth + 1, index)
             ))}
@@ -377,8 +344,8 @@ export function FileTree({ nodes, activePath, onFileClick }: FileTreeProps) {
       ) : fileTreeMode === 'list' ? (
         flatFiles.map(({ node, folderLabel }, index) => renderFileNode(node, 0, index, folderLabel))
       ) : (
-        nodes.map((node, index) => (
-          isDirectory(node)
+        sortedNodes.map((node, index) => (
+          isDirectoryNode(node)
             ? renderDirectoryNode(node, 0)
             : renderFileNode(node, 0, index)
         ))

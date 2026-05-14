@@ -1,0 +1,41 @@
+import { describe, expect, it } from 'vitest';
+import type { FileNode } from '../types';
+import { flattenFiles, searchWorkspaceNodes, sortFileNodes } from './fileTree';
+import { rankQuickOpenFiles } from './quickOpen';
+
+const nodes: FileNode[] = [
+  {
+    path: '/notes/b',
+    name: 'b',
+    kind: 'directory',
+    modifiedAt: 10,
+    children: [
+      { path: '/notes/b/z.md', name: 'z.md', kind: 'file', modifiedAt: 20, createdAt: 2, size: 20, preview: 'Zeta' },
+      { path: '/notes/b/a.md', name: 'a.md', kind: 'file', modifiedAt: 40, createdAt: 4, size: 5, preview: 'Alpha' },
+    ],
+  },
+  { path: '/notes/root.md', name: 'root.md', kind: 'file', modifiedAt: 30, createdAt: 3, size: 10, preview: 'Root file' },
+];
+
+describe('workspace file tree services', () => {
+  it('sorts folders first and files by the selected mode', () => {
+    const sorted = sortFileNodes(nodes, 'modified');
+
+    expect(sorted[0].name).toBe('b');
+    expect(sorted[1].name).toBe('root.md');
+    expect(sorted[0].children?.map((node) => node.name)).toEqual(['a.md', 'z.md']);
+  });
+
+  it('flattens and searches markdown files', () => {
+    const flat = flattenFiles(nodes, '/notes');
+
+    expect(flat.map((item) => item.node.name)).toEqual(['z.md', 'a.md', 'root.md']);
+    expect(flat[0].folderLabel).toBe('b');
+    expect(searchWorkspaceNodes(nodes, 'alpha').map((node) => node.name)).toEqual(['a.md']);
+  });
+
+  it('ranks quick-open results by name relevance first', () => {
+    expect(rankQuickOpenFiles(nodes, 'root')[0].node.name).toBe('root.md');
+    expect(rankQuickOpenFiles(nodes, 'zeta')[0].node.name).toBe('z.md');
+  });
+});

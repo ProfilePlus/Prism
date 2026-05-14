@@ -8,6 +8,9 @@ export interface FileNode {
   name: string;
   kind?: 'file' | 'directory';
   preview?: string;
+  size?: number;
+  createdAt?: number;
+  modifiedAt?: number;
   children?: FileNode[];
 }
 

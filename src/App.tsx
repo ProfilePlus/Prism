@@ -33,22 +33,7 @@ import {
   runCommand,
   type CommandContext,
 } from './domains/commands';
-
-function basename(path: string): string {
-  const parts = path.split(/[\\/]/);
-  return parts[parts.length - 1] || path;
-}
-
-function dirname(path: string): string {
-  const parts = path.split(/[\\/]/);
-  parts.pop();
-  return parts.join(path.includes('\\') ? '\\' : '/');
-}
-
-function joinPath(dir: string, name: string): string {
-  const separator = dir.includes('\\') ? '\\' : '/';
-  return `${dir.replace(/[\\/]$/, '')}${separator}${name}`;
-}
+import { basename, dirname, getShowInFileManagerLabel, joinPath } from './domains/workspace/services';
 
 const exportExtensionByFormat: Record<ExportFormat, string> = {
   html: 'html',
@@ -430,6 +415,7 @@ function App() {
 
   const handleFolderContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
+    const showInFileManagerLabel = getShowInFileManagerLabel();
     const items: ContextMenuItem[] = [
       { label: '在新窗口中打开', action: 'openNewWindow' },
       { type: 'separator' },
@@ -451,7 +437,7 @@ function App() {
       { label: '刷新', action: 'refreshFolder' },
       { type: 'separator' },
       { label: '复制工作区路径', action: 'copyRootPath' },
-      { label: '在访达中显示', action: 'openRootLocation' },
+      { label: showInFileManagerLabel, action: 'openRootLocation' },
     ];
     setGlobalContextMenu({ x: e.clientX, y: e.clientY, items, kind: 'file' });
   };

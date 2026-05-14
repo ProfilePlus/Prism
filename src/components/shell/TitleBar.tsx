@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { ViewModeSwitch } from '../../domains/document/components/ViewModeSwitch';
+import { getRuntimePlatform } from '../../domains/workspace/services';
 import styles from './TitleBar.module.css';
 
 interface TitleBarProps {
@@ -8,7 +9,7 @@ interface TitleBarProps {
   isDirty?: boolean;
 }
 
-const IS_MACOS = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform);
+const IS_MACOS = getRuntimePlatform() === 'mac';
 
 const IconMin = () => (
   <svg viewBox="0 0 12 12" fill="none" stroke="currentColor">

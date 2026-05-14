@@ -12,6 +12,15 @@ import { openPath, revealItemInDir } from '@tauri-apps/plugin-opener';
 import { useDocumentStore } from '../domains/document/store';
 import { useWorkspaceStore } from '../domains/workspace/store';
 import { loadFolderTree } from '../domains/workspace/lib/loadFolderTree';
+import {
+  addRecentFile,
+  basename,
+  dirname,
+  isPathInside,
+  isSamePath,
+  joinPath,
+  replacePathPrefix,
+} from '../domains/workspace/services';
 import { openPrismWindow } from './openWindow';
 
 export type FileActionInput =
@@ -63,48 +72,10 @@ function parseAction(input: FileActionInput): ParsedFileAction {
   };
 }
 
-function basename(path: string): string {
-  const parts = path.split(/[\\/]/);
-  return parts[parts.length - 1] || path;
-}
-
-function dirname(path: string): string {
-  const parts = path.split(/[\\/]/);
-  parts.pop();
-  return parts.join(path.includes('\\') ? '\\' : '/');
-}
-
-function joinPath(dir: string, name: string): string {
-  const normalizedDir = dir.replace(/[\\/]$/, '');
-  const sep = dir.includes('\\') ? '\\' : '/';
-  return `${normalizedDir}${sep}${name}`;
-}
-
 function splitName(name: string): { stem: string; ext: string } {
   const index = name.lastIndexOf('.');
   if (index <= 0) return { stem: name, ext: '' };
   return { stem: name.slice(0, index), ext: name.slice(index) };
-}
-
-function normalizeForCompare(path: string): string {
-  return path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
-}
-
-function isSamePath(a: string, b: string): boolean {
-  return normalizeForCompare(a) === normalizeForCompare(b);
-}
-
-function isPathInside(path: string, possibleParent: string): boolean {
-  const normalizedPath = normalizeForCompare(path);
-  const normalizedParent = normalizeForCompare(possibleParent);
-  return normalizedPath === normalizedParent || normalizedPath.startsWith(`${normalizedParent}/`);
-}
-
-function replacePathPrefix(path: string, oldPrefix: string, newPrefix: string): string {
-  if (!isPathInside(path, oldPrefix)) return path;
-  const trimmedOldPrefix = oldPrefix.replace(/[\\/]+$/, '');
-  const suffix = path.slice(trimmedOldPrefix.length);
-  return `${newPrefix}${suffix}`;
 }
 
 function formatError(err: unknown): string {
@@ -197,6 +168,7 @@ function getWorkspaceTargetDir(context: FileActionContext, requestedPath?: strin
 async function handleOpenFile(path: string, context: FileActionContext): Promise<void> {
   const content = await readTextFile(path);
   context.documentStore.openDocument(path, basename(path), content);
+  addRecentFile(path, basename(path));
 
   if (!context.workspaceStore.rootPath) {
     const dir = dirname(path);

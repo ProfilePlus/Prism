@@ -3,17 +3,7 @@ import { readTextFile } from '@tauri-apps/plugin-fs';
 import { useDocumentStore } from '../domains/document/store';
 import { useWorkspaceStore } from '../domains/workspace/store';
 import { loadFolderTree } from '../domains/workspace/lib/loadFolderTree';
-
-function basename(path: string): string {
-  const parts = path.split(/[\\/]/);
-  return parts[parts.length - 1] || path;
-}
-
-function dirname(path: string): string {
-  const parts = path.split(/[\\/]/);
-  parts.pop();
-  return parts.join(path.includes('\\') ? '\\' : '/');
-}
+import { basename, dirname } from '../domains/workspace/services';
 
 export function useBootstrap() {
   const currentDocument = useDocumentStore((s) => s.currentDocument);

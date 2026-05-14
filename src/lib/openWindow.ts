@@ -1,4 +1,5 @@
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { getRuntimePlatform } from '../domains/workspace/services';
 
 let windowCounter = 0;
 
@@ -20,7 +21,7 @@ export async function openPrismWindow(params: {
 
   console.log('[openPrismWindow] Creating window:', { label, url });
 
-  const isMacOS = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform);
+  const isMacOS = getRuntimePlatform() === 'mac';
 
   const webview = new WebviewWindow(label, {
     url,

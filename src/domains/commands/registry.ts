@@ -6,7 +6,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
 import { loadFolderTree } from '../workspace/lib/loadFolderTree';
 import { openPrismWindow } from '../../lib/openWindow';
-import { addRecentFile } from '../../lib/recentFiles';
+import { MARKDOWN_FILE_FILTERS, addRecentFile, basename, dirname } from '../workspace/services';
 import { exportDocument, getExportFormatLabel, type ExportFormat } from '../export';
 import type {
   CommandContext,
@@ -21,17 +21,6 @@ import {
   shortcutMatchesEvent,
   type ShortcutDisplayStyle,
 } from './platform';
-
-function dirname(path: string): string {
-  const parts = path.split(/[\\/]/);
-  parts.pop();
-  return parts.join(path.includes('\\') ? '\\' : '/');
-}
-
-function basename(path: string): string {
-  const parts = path.split(/[\\/]/);
-  return parts[parts.length - 1] || path;
-}
 
 function formatError(err: unknown): string {
   if (err instanceof Error) return err.message;
@@ -75,7 +64,7 @@ async function handleNew(context: CommandContext): Promise<void> {
 async function handleOpen(context: CommandContext): Promise<void> {
   const selected = await open({
     multiple: false,
-    filters: [{ name: 'Markdown', extensions: ['md', 'markdown', 'txt'] }],
+    filters: MARKDOWN_FILE_FILTERS,
   });
 
   if (!selected || Array.isArray(selected)) return;
@@ -396,7 +385,7 @@ export const commandRegistry = [
   }),
   command({
     id: 'openCurrentLocation',
-    label: '在访达中显示',
+    label: '在文件管理器中显示',
     category: '文件',
     enabled: (context) => hasSavedDocumentPath(context) || Boolean(context.workspaceStore.rootPath),
     run: handleOpenCurrentLocation,
