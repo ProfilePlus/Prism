@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Prism",
-  "version": "0.1.1",
+  "version": "1.0.3",
   "identifier": "com.prism.editor.v1",
   "build": {
     "frontendDist": "../dist",
