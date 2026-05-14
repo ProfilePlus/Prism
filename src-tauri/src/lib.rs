@@ -11,6 +11,7 @@ fn get_pending_files(state: State<PendingFiles>) -> Vec<String> {
   result
 }
 
+#[cfg(not(target_os = "macos"))]
 fn extract_file_paths_from_args() -> Vec<String> {
   std::env::args()
     .skip(1)
