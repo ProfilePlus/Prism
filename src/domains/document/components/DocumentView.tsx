@@ -29,8 +29,6 @@ export const DocumentView = forwardRef<EditorPaneHandle, DocumentViewProps>(
       );
     }
 
-    console.log('[DocumentView] render path:', currentDocument.path, 'contentLen:', currentDocument.content.length);
-
     return (
       <div
         style={{
@@ -39,6 +37,7 @@ export const DocumentView = forwardRef<EditorPaneHandle, DocumentViewProps>(
           flexDirection: 'column',
           minHeight: 0,
           minWidth: 0,
+          position: 'relative',
         }}
       >
         <SplitView

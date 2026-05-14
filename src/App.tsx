@@ -102,8 +102,7 @@ function getSaveDialogOverwriteText(dialog: SaveDialogState) {
 
 function App() {
   const currentDocument = useDocumentStore((s) => s.currentDocument);
-  const setViewMode = useDocumentStore((s) => s.setViewMode);
-  
+
   const { loadSettings } = useSettingsStore();
   const workspace = useWorkspaceStore();
 
@@ -365,6 +364,12 @@ function App() {
     return () => window.removeEventListener('prism-file-action' as any, handler);
   }, [handleFileAction]);
 
+  useEffect(() => {
+    const handler = () => setSettingsVisible(true);
+    window.addEventListener('prism-open-settings', handler);
+    return () => window.removeEventListener('prism-open-settings', handler);
+  }, []);
+
   const handleKeyDown = useCallback(async (e: KeyboardEvent) => {
     if (e.key === 'Escape' && workspace.focusMode) {
       workspace.toggleFocusMode();
@@ -400,6 +405,8 @@ function App() {
       } as Record<string, string>)[code] ?? null;
     } else if (!ctrl && !shift && !alt) {
       action = ({ F8: 'focusMode', F9: 'typewriterMode', F11: 'fullscreen' } as Record<string, string>)[code] ?? null;
+    } else if (!ctrl && shift && alt && code === 'Digit5') {
+      action = 'strikethrough';
     } else if (!ctrl && shift && !alt && code === 'F12') {
       action = 'devTools';
     }
@@ -471,14 +478,12 @@ function App() {
       {currentDocument && workspace.statusBarVisible && (
         <div className="app-statusbar">
           <StatusBar
-            viewMode={currentDocument.viewMode}
             wordCount={currentDocument.content.split(/\s+/).filter(Boolean).length}
             cursor={cursor}
             sidebarVisible={workspace.sidebarVisible}
             isSidebarHovered={isSidebarHovered}
             onMouseEnter={() => setIsSidebarHovered(true)}
             onMouseLeave={() => setIsSidebarHovered(false)}
-            onViewModeChange={setViewMode}
             onExportHtml={() => handleMenuAction('exportHtml')}
             onToggleFocusMode={() => workspace.toggleFocusMode()}
             onToggleSidebar={() => workspace.toggleSidebar()}

@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Prism MiaoYan-Inspired Custom SVG Icons</title>
+  <style>
+    :root {
+      --paper: #f7f7f4;
+      --panel: rgba(255, 255, 255, 0.86);
+      --canvas: #ffffff;
+      --ink: #20201d;
+      --muted: #74746e;
+      --hairline: rgba(0, 0, 0, 0.1);
+      --blue: #2377ff;
+      --green: #1c5d33;
+      --shadow: 0 22px 54px rgba(22, 22, 18, 0.12);
+      color: var(--ink);
+      background: var(--paper);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 50% -12%, rgba(255,255,255,0.98), rgba(255,255,255,0.18) 46%, transparent 62%),
+        var(--paper);
+    }
+    button { font: inherit; }
+
+    .page {
+      width: min(1220px, calc(100vw - 48px));
+      margin: 0 auto;
+      padding: 42px 0 58px;
+    }
+
+    .intro {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 24px;
+      align-items: end;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 28px;
+      line-height: 1.2;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    .brief {
+      margin: 0;
+      max-width: 850px;
+      color: #676760;
+      font-size: 14px;
+      line-height: 1.8;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      height: 28px;
+      padding: 0 12px;
+      border: 1px solid var(--hairline);
+      border-radius: 999px;
+      color: #5f5f58;
+      background: rgba(255,255,255,0.72);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .grammar {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin: 0 0 24px;
+    }
+
+    .grammar span {
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.62);
+      color: #62625b;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .card {
+      --accent: var(--blue);
+      --idle: #85857f;
+      --smallIcon: 18px;
+      --largeIcon: 31px;
+      --gap: 8px;
+      overflow: hidden;
+      border: 1px solid var(--hairline);
+      border-radius: 14px;
+      background: var(--panel);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.78);
+      transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+    }
+
+    .card:hover {
+      transform: translateY(-1px);
+      border-color: color-mix(in srgb, var(--accent) 36%, rgba(0,0,0,0.12));
+      box-shadow: var(--shadow);
+    }
+
+    .cardHeader {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: baseline;
+      padding: 16px 18px 12px;
+    }
+
+    .name {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    .note {
+      max-width: 260px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+      text-align: right;
+    }
+
+    .mockWindow {
+      margin: 0 14px 14px;
+      overflow: hidden;
+      border: 1px solid rgba(0,0,0,0.12);
+      border-radius: 10px;
+      background: var(--canvas);
+    }
+
+    .titlebar {
+      height: 30px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 10px;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+      background: #fbfbfa;
+    }
+
+    .traffic {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      display: block;
+    }
+
+    .redDot { background: #ff5f57; }
+    .yellowDot { background: #ffbd2e; }
+    .greenDot { background: #28c840; }
+
+    .title {
+      min-width: 0;
+      flex: 1;
+      color: #242421;
+      font-size: 12px;
+      letter-spacing: 0.7px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .modeGroup,
+    .largeGroup {
+      display: flex;
+      align-items: center;
+      gap: var(--gap);
+      color: var(--idle);
+    }
+
+    .modeButton,
+    .largeButton {
+      display: grid;
+      place-items: center;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    .modeButton {
+      width: 23px;
+      height: 23px;
+    }
+
+    .largeButton {
+      width: 40px;
+      height: 40px;
+      border-radius: 9px;
+      background: rgba(0,0,0,0.025);
+    }
+
+    .modeButton.active,
+    .largeButton.active { color: var(--accent); }
+
+    .softActive .modeButton.active,
+    .softActive .largeButton.active {
+      background: transparent;
+    }
+
+    svg {
+      display: block;
+      width: var(--smallIcon);
+      height: var(--smallIcon);
+      fill: currentColor;
+      stroke: none;
+      transform: translateY(0.5px);
+    }
+
+    .largeButton svg {
+      width: var(--largeIcon);
+      height: var(--largeIcon);
+      transform: none;
+    }
+
+    .bodyPreview {
+      height: 94px;
+      display: grid;
+      grid-template-columns: 118px 1fr;
+      background: #fff;
+    }
+
+    .side {
+      padding: 12px 14px;
+      border-right: 1px solid rgba(0,0,0,0.07);
+      background: #f5f5f3;
+    }
+
+    .pill,
+    .sideLine,
+    .textLine,
+    .heading { border-radius: 999px; }
+
+    .pill {
+      height: 22px;
+      margin-bottom: 12px;
+      background: #d9d9d5;
+    }
+
+    .sideLine {
+      height: 6px;
+      margin-bottom: 8px;
+      background: rgba(0,0,0,0.1);
+    }
+
+    .sideLine:nth-child(3) { width: 70%; }
+    .sideLine:nth-child(4) { width: 88%; }
+
+    .doc { padding: 16px 24px; }
+
+    .heading {
+      width: 44%;
+      height: 9px;
+      margin-bottom: 18px;
+      background: #7b3fc5;
+    }
+
+    .textLine {
+      height: 7px;
+      margin-bottom: 9px;
+      background: rgba(0,0,0,0.12);
+    }
+
+    .textLine:nth-child(2) { width: 64%; }
+    .textLine:nth-child(3) { width: 82%; }
+    .textLine:nth-child(4) { width: 54%; }
+
+    .zoom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 18px 16px;
+      border-top: 1px solid rgba(0,0,0,0.06);
+    }
+
+    .largeGroup { gap: calc(var(--gap) + 7px); }
+
+    .labels {
+      display: flex;
+      gap: 8px;
+      color: #777771;
+      font-size: 12px;
+    }
+
+    .labels span {
+      display: inline-flex;
+      align-items: center;
+      height: 22px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: #f0f0ed;
+    }
+
+    .v1 { --accent: #2377ff; --idle: #7c817a; }
+    .v2 { --accent: #1c5d33; --idle: #7d7d76; }
+    .v3 { --accent: #7356c8; --idle: #858080; }
+    .v4 { --accent: #235c89; --idle: #7d8282; }
+    .v5 { --accent: #7b3f2c; --idle: #7f7970; }
+    .v6 { --accent: #404040; --idle: #777; }
+    .v7 { --accent: #1b7482; --idle: #808783; }
+    .v8 { --accent: #8f2f25; --idle: #8a8178; }
+    .v9 { --accent: #4f5f25; --idle: #828277; }
+    .v10 { --accent: #111; --idle: #777; }
+
+    @media (max-width: 900px) {
+      .page { width: min(100vw - 28px, 620px); padding-top: 26px; }
+      .intro { grid-template-columns: 1fr; align-items: start; }
+      .grammar { grid-template-columns: 1fr; }
+      .grid { grid-template-columns: 1fr; }
+      .note { text-align: left; }
+      .cardHeader { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="intro">
+      <div>
+        <h1>Prism Paper 图标最终方案</h1>
+        <p class="brief">已选定 01 方案，并把颜色规则收敛清楚：图标本身永远是 template glyph，不自带颜色；未选中统一灰色，只有当前模式进入激活态时才变成主题色。下面只展示 01 方案在不同选中状态下的表现。</p>
+      </div>
+      <span class="chip">01 selected · inactive gray / active tint</span>
+    </section>
+
+    <section class="grammar">
+      <span>20x20 画布，图形主体控制在 15-17px 内</span>
+      <span>不用描边 outline，用填充体块模拟圆润线条</span>
+      <span>边角和内孔都偏圆，避免尖锐科技感</span>
+      <span>未选中灰色；选中才使用主题 tint</span>
+    </section>
+
+    <section class="grid" id="grid"></section>
+  </main>
+
+  <script>
+    const modes = [
+      { key: 'edit', label: '编辑' },
+      { key: 'split', label: '分栏' },
+      { key: 'preview', label: '预览' }
+    ];
+
+    const glyphs = {
+      v1: {
+        edit: '<svg viewBox="0 0 20 20"><path d="M5.9 2.9h6.7c1.1 0 1.8.1 2.35.38.48.24.87.63 1.11 1.11.28.55.38 1.25.38 2.35v2.38a.67.67 0 0 1-1.34 0V6.78c0-.83-.04-1.32-.18-1.6a1.54 1.54 0 0 0-.67-.67c-.28-.14-.77-.18-1.6-.18H5.94c-.83 0-1.32.04-1.6.18-.29.15-.52.38-.67.67-.14.28-.18.77-.18 1.6v6.44c0 .83.04 1.32.18 1.6.15.29.38.52.67.67.28.14.77.18 1.6.18h2.98a.67.67 0 1 1 0 1.34H5.9c-1.1 0-1.8-.1-2.35-.38a2.89 2.89 0 0 1-1.11-1.11c-.28-.55-.38-1.25-.38-2.35V6.74c0-1.1.1-1.8.38-2.35.24-.48.63-.87 1.11-1.11.55-.28 1.25-.38 2.35-.38Zm.13 3.62c0-.34.28-.62.62-.62h5.88a.62.62 0 1 1 0 1.24H6.65a.62.62 0 0 1-.62-.62Zm0 3.02c0-.34.28-.62.62-.62h4.28a.62.62 0 1 1 0 1.24H6.65a.62.62 0 0 1-.62-.62Zm8.58 1.48a1.1 1.1 0 0 1 1.56 0l.62.62c.43.43.43 1.13 0 1.56l-3.2 3.2c-.2.2-.46.34-.74.4l-1.73.37a.58.58 0 0 1-.69-.69l.37-1.73c.06-.28.2-.54.4-.74l3.41-2.99Z"/></svg>',
+        split: '<svg viewBox="0 0 20 20"><path d="M4.9 3.15h10.2c1.15 0 1.8.12 2.33.4.43.23.78.58 1.01 1.01.28.53.4 1.18.4 2.33v6.22c0 1.15-.12 1.8-.4 2.33-.23.43-.58.78-1.01 1.01-.53.28-1.18.4-2.33.4H4.9c-1.15 0-1.8-.12-2.33-.4a2.42 2.42 0 0 1-1.01-1.01c-.28-.53-.4-1.18-.4-2.33V6.89c0-1.15.12-1.8.4-2.33.23-.43.58-.78 1.01-1.01.53-.28 1.18-.4 2.33-.4Zm4.28 1.36H4.92c-.8 0-1.18.05-1.47.2-.2.11-.36.27-.47.47-.15.29-.2.67-.2 1.47v6.7c0 .8.05 1.18.2 1.47.11.2.27.36.47.47.29.15.67.2 1.47.2h4.26V4.51Zm1.36 10.98h4.54c.8 0 1.18-.05 1.47-.2.2-.11.36-.27.47-.47.15-.29.2-.67.2-1.47v-6.7c0-.8-.05-1.18-.2-1.47a1.06 1.06 0 0 0-.47-.47c-.29-.15-.67-.2-1.47-.2h-4.54v10.98Z"/></svg>',
+        preview: '<svg viewBox="0 0 20 20"><path d="M10 2.95c3.32 0 5.86 2.05 7.37 4.93.7 1.34.7 2.9 0 4.24-1.51 2.88-4.05 4.93-7.37 4.93s-5.86-2.05-7.37-4.93a4.55 4.55 0 0 1 0-4.24C4.14 5 6.68 2.95 10 2.95Zm0 1.36c-2.77 0-4.88 1.68-6.17 4.2a3.2 3.2 0 0 0 0 2.98c1.29 2.52 3.4 4.2 6.17 4.2s4.88-1.68 6.17-4.2a3.2 3.2 0 0 0 0-2.98c-1.29-2.52-3.4-4.2-6.17-4.2Zm0 2.45a3.24 3.24 0 1 1 0 6.48 3.24 3.24 0 0 1 0-6.48Zm0 1.35a1.89 1.89 0 1 0 0 3.78 1.89 1.89 0 0 0 0-3.78Z"/></svg>'
+      },
+      v2: {
+        edit: '<svg viewBox="0 0 20 20"><path d="M6.2 2.75h7.6c1.05 0 1.9.85 1.9 1.9v10.7c0 1.05-.85 1.9-1.9 1.9H6.2c-1.05 0-1.9-.85-1.9-1.9V4.65c0-1.05.85-1.9 1.9-1.9Zm1.1 3.35a.62.62 0 1 0 0 1.24h5.4a.62.62 0 1 0 0-1.24H7.3Zm0 3a.62.62 0 1 0 0 1.24h4.2a.62.62 0 0 0 0-1.24H7.3Zm0 3a.62.62 0 1 0 0 1.24h2.3a.62.62 0 1 0 0-1.24H7.3Zm5.26-.5-1.48 1.48-.33 1.46 1.46-.33 1.48-1.48-1.13-1.13Zm.85-.85 1.13 1.13.44-.44a.8.8 0 0 0 0-1.13.8.8 0 0 0-1.13 0l-.44.44Z"/></svg>',
+        split: '<svg viewBox="0 0 20 20"><path d="M4.75 3.1h10.5c1.1 0 2 .9 2 2v9.8c0 1.1-.9 2-2 2H4.75c-1.1 0-2-.9-2-2V5.1c0-1.1.9-2 2-2Zm4.45 1.35H4.95a.85.85 0 0 0-.85.85v9.4c0 .47.38.85.85.85H9.2V4.45Zm1.45 11.1h4.4c.47 0 .85-.38.85-.85V5.3a.85.85 0 0 0-.85-.85h-4.4v11.1Z"/></svg>',
+        preview: '<svg viewBox="0 0 20 20"><path d="M4.6 3.35h10.8c1.02 0 1.85.83 1.85 1.85v9.6c0 1.02-.83 1.85-1.85 1.85H4.6a1.85 1.85 0 0 1-1.85-1.85V5.2c0-1.02.83-1.85 1.85-1.85Zm.2 1.35a.7.7 0 0 0-.7.7v9.2c0 .39.31.7.7.7h10.4c.39 0 .7-.31.7-.7V5.4a.7.7 0 0 0-.7-.7H4.8Zm5.2 2.5c2.3 0 3.9 1.37 4.78 2.35.23.26.23.64 0 .9-.88.98-2.48 2.35-4.78 2.35s-3.9-1.37-4.78-2.35a.68.68 0 0 1 0-.9C6.1 8.57 7.7 7.2 10 7.2Zm0 1.25a1.55 1.55 0 1 0 0 3.1 1.55 1.55 0 0 0 0-3.1Z"/></svg>'
+      },
+      v3: {
+        edit: '<svg viewBox="0 0 20 20"><path d="M5.2 2.9h7.2c1.2 0 1.9.12 2.45.42.45.24.81.6 1.05 1.05.3.55.42 1.25.42 2.45v2.35a.67.67 0 1 1-1.34 0V6.86c0-.86-.06-1.32-.21-1.61a1.25 1.25 0 0 0-.52-.52c-.29-.15-.75-.21-1.61-.21H5.36c-.47 0-.86.39-.86.86v9.24c0 .47.39.86.86.86h3.8a.67.67 0 1 1 0 1.34H5.2a2.2 2.2 0 0 1-2.2-2.2V5.1a2.2 2.2 0 0 1 2.2-2.2Zm1.5 3.52h5.55a.62.62 0 1 1 0 1.24H6.7a.62.62 0 1 1 0-1.24Zm0 3h4.35a.62.62 0 1 1 0 1.24H6.7a.62.62 0 0 1 0-1.24Zm7.36 1.42 2.32 2.32-3.28 3.28c-.19.19-.44.33-.71.4l-1.66.44a.55.55 0 0 1-.67-.67l.44-1.66c.07-.27.21-.52.4-.71l3.16-3.4Z"/></svg>',
+        split: '<svg viewBox="0 0 20 20"><path d="M3.2 5.25A2.05 2.05 0 0 1 5.25 3.2h9.5a2.05 2.05 0 0 1 2.05 2.05v9.5a2.05 2.05 0 0 1-2.05 2.05h-9.5a2.05 2.05 0 0 1-2.05-2.05v-9.5Zm1.35.12v9.26c0 .45.37.82.82.82h3.68V4.55H5.37a.82.82 0 0 0-.82.82Zm5.78 10.08h4.3c.45 0 .82-.37.82-.82V5.37a.82.82 0 0 0-.82-.82h-4.3v10.9Zm1.4-7.72a.56.56 0 0 1 .56-.56h1.74a.56.56 0 1 1 0 1.12h-1.74a.56.56 0 0 1-.56-.56Zm0 2.75c0-.31.25-.56.56-.56h1.74a.56.56 0 0 1 0 1.12h-1.74a.56.56 0 0 1-.56-.56Z"/></svg>',
+        preview: '<svg viewBox="0 0 20 20"><path d="M10 3.1c3.42 0 5.96 2.12 7.42 5.02.6 1.18.6 2.58 0 3.76-1.46 2.9-4 5.02-7.42 5.02s-5.96-2.12-7.42-5.02a4.2 4.2 0 0 1 0-3.76C4.04 5.22 6.58 3.1 10 3.1Zm0 1.36c-2.8 0-4.92 1.72-6.2 4.28a2.86 2.86 0 0 0 0 2.52c1.28 2.56 3.4 4.28 6.2 4.28s4.92-1.72 6.2-4.28a2.86 2.86 0 0 0 0-2.52C14.92 6.18 12.8 4.46 10 4.46Zm0 2.28a3.26 3.26 0 1 1 0 6.52 3.26 3.26 0 0 1 0-6.52Zm0 1.36a1.9 1.9 0 1 0 0 3.8 1.9 1.9 0 0 0 0-3.8Z"/></svg>'
+      },
+      v4: {
+        edit: '<svg viewBox="0 0 20 20"><path d="M5.65 2.85h8.7c1.05 0 1.9.85 1.9 1.9v5.15a.66.66 0 0 1-1.32 0V4.75a.58.58 0 0 0-.58-.58h-8.7a.58.58 0 0 0-.58.58v10.5c0 .32.26.58.58.58h3.62a.66.66 0 1 1 0 1.32H5.65a1.9 1.9 0 0 1-1.9-1.9V4.75c0-1.05.85-1.9 1.9-1.9Zm1.35 3.4h6a.62.62 0 0 1 0 1.24H7a.62.62 0 0 1 0-1.24Zm0 3h4.6a.62.62 0 1 1 0 1.24H7a.62.62 0 0 1 0-1.24Zm7.05 1.74c.43-.43 1.13-.43 1.56 0l.6.6c.43.43.43 1.13 0 1.56l-3.18 3.18c-.2.2-.46.35-.74.42l-1.5.4a.56.56 0 0 1-.69-.69l.4-1.5c.07-.28.22-.54.42-.74l3.13-3.23Z"/></svg>',
+        split: '<svg viewBox="0 0 20 20"><path d="M4.95 3.05h10.1c1.13 0 1.78.12 2.3.39.43.22.79.58 1.01 1.01.27.52.39 1.17.39 2.3v6.5c0 1.13-.12 1.78-.39 2.3-.22.43-.58.79-1.01 1.01-.52.27-1.17.39-2.3.39H4.95c-1.13 0-1.78-.12-2.3-.39a2.44 2.44 0 0 1-1.01-1.01c-.27-.52-.39-1.17-.39-2.3v-6.5c0-1.13.12-1.78.39-2.3.22-.43.58-.79 1.01-1.01.52-.27 1.17-.39 2.3-.39Zm4.2 1.34H4.96c-.78 0-1.16.05-1.44.2-.2.1-.36.26-.46.46-.15.28-.2.66-.2 1.44v7.02c0 .78.05 1.16.2 1.44.1.2.26.36.46.46.28.15.66.2 1.44.2h4.19V4.39Zm1.7 11.22h4.19c.78 0 1.16-.05 1.44-.2.2-.1.36-.26.46-.46.15-.28.2-.66.2-1.44V6.49c0-.78-.05-1.16-.2-1.44-.1-.2-.26-.36-.46-.46-.28-.15-.66-.2-1.44-.2h-4.19v11.22Z"/></svg>',
+        preview: '<svg viewBox="0 0 20 20"><path d="M4.8 3.4h10.4c1.05 0 1.9.85 1.9 1.9v9.4c0 1.05-.85 1.9-1.9 1.9H4.8a1.9 1.9 0 0 1-1.9-1.9V5.3c0-1.05.85-1.9 1.9-1.9Zm.1 1.32a.68.68 0 0 0-.68.68v9.2c0 .38.3.68.68.68h10.2c.38 0 .68-.3.68-.68V5.4a.68.68 0 0 0-.68-.68H4.9ZM10 7.18c2.3 0 3.9 1.38 4.77 2.37.23.26.23.64 0 .9-.87.99-2.47 2.37-4.77 2.37s-3.9-1.38-4.77-2.37a.68.68 0 0 1 0-.9C6.1 8.56 7.7 7.18 10 7.18Zm0 1.25a1.57 1.57 0 1 0 0 3.14 1.57 1.57 0 0 0 0-3.14Z"/></svg>'
+      },
+      v5: {
+        edit: '<svg viewBox="0 0 20 20"><path d="M5.8 3.05h8.4c.96 0 1.75.79 1.75 1.75v5.42a.66.66 0 1 1-1.32 0V4.8a.43.43 0 0 0-.43-.43H5.8a.43.43 0 0 0-.43.43v10.4c0 .24.19.43.43.43h3.84a.66.66 0 1 1 0 1.32H5.8a1.75 1.75 0 0 1-1.75-1.75V4.8c0-.96.79-1.75 1.75-1.75Zm1.45 3.36h5.5a.62.62 0 0 1 0 1.24h-5.5a.62.62 0 0 1 0-1.24Zm0 3h3.86a.62.62 0 0 1 0 1.24H7.25a.62.62 0 0 1 0-1.24Zm6.98 1.2 2.22 2.22-3.57 3.57-2.62.7a.5.5 0 0 1-.61-.61l.7-2.62 3.88-3.26Z"/></svg>',
+        split: '<svg viewBox="0 0 20 20"><path d="M4.82 3.2h10.36c1.1 0 2 .9 2 2v9.6c0 1.1-.9 2-2 2H4.82c-1.1 0-2-.9-2-2V5.2c0-1.1.9-2 2-2Zm4.05 1.32H5.02a.88.88 0 0 0-.88.88v9.2c0 .49.39.88.88.88h3.85V4.52Zm1.45 10.96h4.66c.49 0 .88-.39.88-.88V5.4a.88.88 0 0 0-.88-.88h-4.66v10.96Zm1.42-8.1c0-.32.26-.58.58-.58h1.8a.58.58 0 0 1 0 1.16h-1.8a.58.58 0 0 1-.58-.58Zm0 2.72c0-.32.26-.58.58-.58h1.8a.58.58 0 0 1 0 1.16h-1.8a.58.58 0 0 1-.58-.58Z"/></svg>',
+        preview: '<svg viewBox="0 0 20 20"><path d="M10 2.9c3.42 0 6.02 2.14 7.5 5.13.61 1.23.61 2.71 0 3.94-1.48 2.99-4.08 5.13-7.5 5.13s-6.02-2.14-7.5-5.13a4.45 4.45 0 0 1 0-3.94C3.98 5.04 6.58 2.9 10 2.9Zm0 1.36c-2.84 0-5.03 1.75-6.26 4.36a3.12 3.12 0 0 0 0 2.76c1.23 2.61 3.42 4.36 6.26 4.36s5.03-1.75 6.26-4.36a3.12 3.12 0 0 0 0-2.76C15.03 6.01 12.84 4.26 10 4.26Zm0 2.58a3.16 3.16 0 1 1 0 6.32 3.16 3.16 0 0 1 0-6.32Zm0 1.35a1.81 1.81 0 1 0 0 3.62 1.81 1.81 0 0 0 0-3.62Z"/></svg>'
+      },
+      v6: {
+        edit: '<svg viewBox="0 0 20 20"><path d="M6.05 2.85h7.9c1.1 0 2 .9 2 2v10.3c0 1.1-.9 2-2 2h-7.9c-1.1 0-2-.9-2-2V4.85c0-1.1.9-2 2-2Zm0 1.34a.66.66 0 0 0-.66.66v10.3c0 .36.3.66.66.66h7.9c.36 0 .66-.3.66-.66V4.85a.66.66 0 0 0-.66-.66h-7.9Zm1.85 2.5h4.2a.64.64 0 1 1 0 1.28H7.9a.64.64 0 1 1 0-1.28Zm0 3.05h4.2a.64.64 0 1 1 0 1.28H7.9a.64.64 0 1 1 0-1.28Zm0 3.05h2.55a.64.64 0 1 1 0 1.28H7.9a.64.64 0 1 1 0-1.28Z"/></svg>',
+        split: '<svg viewBox="0 0 20 20"><path d="M4.9 3.1h10.2c1.1 0 2 .9 2 2v9.8c0 1.1-.9 2-2 2H4.9c-1.1 0-2-.9-2-2V5.1c0-1.1.9-2 2-2Zm4.25 1.35H5.1a.85.85 0 0 0-.85.85v9.4c0 .47.38.85.85.85h4.05V4.45Zm1.7 11.1h4.05c.47 0 .85-.38.85-.85V5.3a.85.85 0 0 0-.85-.85h-4.05v11.1Z"/></svg>',
+        preview: '<svg viewBox="0 0 20 20"><path d="M10 3.18c3.36 0 5.88 2.02 7.36 4.86a4.35 4.35 0 0 1 0 3.92c-1.48 2.84-4 4.86-7.36 4.86s-5.88-2.02-7.36-4.86a4.35 4.35 0 0 1 0-3.92C4.12 5.2 6.64 3.18 10 3.18Zm0 1.36c-2.76 0-4.88 1.65-6.13 4.12a2.98 2.98 0 0 0 0 2.68c1.25 2.47 3.37 4.12 6.13 4.12s4.88-1.65 6.13-4.12a2.98 2.98 0 0 0 0-2.68C14.88 6.19 12.76 4.54 10 4.54Zm0 2.54a2.92 2.92 0 1 1 0 5.84 2.92 2.92 0 0 1 0-5.84Z"/></svg>'
+      },
+      v7: {
+        edit: '<svg viewBox="0 0 20 20"><path d="M5.4 3.05h9.2c1 0 1.8.8 1.8 1.8v5.5a.66.66 0 0 1-1.32 0v-5.5a.48.48 0 0 0-.48-.48H5.4a.48.48 0 0 0-.48.48v10.3c0 .27.21.48.48.48h3.7a.66.66 0 0 1 0 1.32H5.4a1.8 1.8 0 0 1-1.8-1.8V4.85c0-1 .8-1.8 1.8-1.8Zm1.55 3.2h6.1a.62.62 0 1 1 0 1.24h-6.1a.62.62 0 1 1 0-1.24Zm0 3h4.5a.62.62 0 1 1 0 1.24h-4.5a.62.62 0 0 1 0-1.24Zm7.08 1.72 2.26 2.26-3.16 3.16c-.2.2-.46.35-.74.42l-1.53.41a.54.54 0 0 1-.66-.66l.41-1.53c.07-.28.22-.54.42-.74l3-3.32Z"/></svg>',
+        split: '<svg viewBox="0 0 20 20"><path d="M4.75 3h10.5c1.1 0 2 .9 2 2v10c0 1.1-.9 2-2 2H4.75c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2Zm4.48 1.35H4.95a.85.85 0 0 0-.85.85v9.6c0 .47.38.85.85.85h4.28V4.35Zm1.54 11.3h4.28c.47 0 .85-.38.85-.85V5.2a.85.85 0 0 0-.85-.85h-4.28v11.3Z"/></svg>',
+        preview: '<svg viewBox="0 0 20 20"><path d="M10 2.98c3.45 0 6.05 2.17 7.52 5.17a4.35 4.35 0 0 1 0 3.7c-1.47 3-4.07 5.17-7.52 5.17s-6.05-2.17-7.52-5.17a4.35 4.35 0 0 1 0-3.7C3.95 5.15 6.55 2.98 10 2.98Zm0 1.37c-2.84 0-5.03 1.76-6.28 4.4a2.98 2.98 0 0 0 0 2.5c1.25 2.64 3.44 4.4 6.28 4.4s5.03-1.76 6.28-4.4a2.98 2.98 0 0 0 0-2.5C15.03 6.11 12.84 4.35 10 4.35Zm3.15 5.65a3.15 3.15 0 1 1-6.3 0 3.15 3.15 0 0 1 6.3 0Zm-1.35 0a1.8 1.8 0 1 0-3.6 0 1.8 1.8 0 0 0 3.6 0Z"/></svg>'
+      },
+      v8: {
+        edit: '<svg viewBox="0 0 20 20"><path d="M6.4 2.8h5.78l3.42 3.42v8.83c0 1.13-.92 2.05-2.05 2.05H6.4a2.05 2.05 0 0 1-2.05-2.05V4.85c0-1.13.92-2.05 2.05-2.05Zm5.15 1.36v2.2c0 .48.39.87.87.87h2.2l-3.07-3.07ZM7.1 8.35a.62.62 0 1 0 0 1.24h5.8a.62.62 0 1 0 0-1.24H7.1Zm0 3a.62.62 0 1 0 0 1.24h4.2a.62.62 0 0 0 0-1.24H7.1Zm0 3a.62.62 0 1 0 0 1.24h2.45a.62.62 0 0 0 0-1.24H7.1Z"/></svg>',
+        split: '<svg viewBox="0 0 20 20"><path d="M4.8 3.1h10.4c1.05 0 1.9.85 1.9 1.9v10c0 1.05-.85 1.9-1.9 1.9H4.8A1.9 1.9 0 0 1 2.9 15V5c0-1.05.85-1.9 1.9-1.9Zm4.3 1.35H5a.75.75 0 0 0-.75.75v9.6c0 .41.34.75.75.75h4.1V4.45Zm1.55 11.1H15c.41 0 .75-.34.75-.75V5.2a.75.75 0 0 0-.75-.75h-4.35v11.1Z"/></svg>',
+        preview: '<svg viewBox="0 0 20 20"><path d="M6.1 2.85h5.85l3.4 3.4v1.45c.9.68 1.58 1.5 2.02 2.3.23.42.23.94 0 1.36-1.18 2.14-3.55 4.39-7.07 4.39-1.8 0-3.3-.59-4.5-1.44a2.04 2.04 0 0 1-1.75-2.02V4.9c0-1.13.92-2.05 2.05-2.05Zm5.2 1.36v2.18c0 .48.39.87.87.87h2.18L11.3 4.21Zm-1 4.57c-2.57 0-4.32 1.5-5.3 2.96a.38.38 0 0 0 0 .42c.98 1.46 2.73 2.96 5.3 2.96s4.32-1.5 5.3-2.96a.38.38 0 0 0 0-.42c-.98-1.46-2.73-2.96-5.3-2.96Zm0 1.48a1.68 1.68 0 1 1 0 3.36 1.68 1.68 0 0 1 0-3.36Z"/></svg>'
+      },
+      v9: {
+        edit: '<svg viewBox="0 0 20 20"><path d="M4.4 3.1h11.2c.94 0 1.7.76 1.7 1.7v10.4c0 .94-.76 1.7-1.7 1.7H4.4c-.94 0-1.7-.76-1.7-1.7V4.8c0-.94.76-1.7 1.7-1.7Zm.15 1.3a.55.55 0 0 0-.55.55v10.1c0 .3.25.55.55.55h10.9c.3 0 .55-.25.55-.55V4.95a.55.55 0 0 0-.55-.55H4.55Zm3.16 2.2c.36 0 .65.29.65.65v5.5a.65.65 0 1 1-1.3 0v-5.5c0-.36.29-.65.65-.65Zm4.58 0c.36 0 .65.29.65.65v5.5a.65.65 0 1 1-1.3 0v-5.5c0-.36.29-.65.65-.65Z"/></svg>',
+        split: '<svg viewBox="0 0 20 20"><path d="M4.4 3.1h11.2c.94 0 1.7.76 1.7 1.7v10.4c0 .94-.76 1.7-1.7 1.7H4.4c-.94 0-1.7-.76-1.7-1.7V4.8c0-.94.76-1.7 1.7-1.7Zm4.8 1.3H4.55a.55.55 0 0 0-.55.55v10.1c0 .3.25.55.55.55H9.2V4.4Zm1.6 11.2h4.65c.3 0 .55-.25.55-.55V4.95a.55.55 0 0 0-.55-.55H10.8v11.2Z"/></svg>',
+        preview: '<svg viewBox="0 0 20 20"><path d="M10 3.2c3.3 0 5.78 1.95 7.23 4.68a4.48 4.48 0 0 1 0 4.24C15.78 14.85 13.3 16.8 10 16.8s-5.78-1.95-7.23-4.68a4.48 4.48 0 0 1 0-4.24C4.22 5.15 6.7 3.2 10 3.2Zm0 1.36c-2.72 0-4.8 1.6-6.03 3.96a3.13 3.13 0 0 0 0 2.96c1.23 2.36 3.31 3.96 6.03 3.96s4.8-1.6 6.03-3.96a3.13 3.13 0 0 0 0-2.96C14.8 6.16 12.72 4.56 10 4.56Zm0 2.48a2.96 2.96 0 1 1 0 5.92 2.96 2.96 0 0 1 0-5.92Z"/></svg>'
+      },
+      v10: {
+        edit: '<svg viewBox="0 0 20 20"><path d="M5.3 2.95h8.3c1.1 0 2 .9 2 2v5.55a.66.66 0 0 1-1.32 0V4.95a.68.68 0 0 0-.68-.68H5.3a.68.68 0 0 0-.68.68v10.1c0 .37.31.68.68.68h3.98a.66.66 0 1 1 0 1.32H5.3a2 2 0 0 1-2-2V4.95c0-1.1.9-2 2-2Zm1.45 3.35h5.55a.62.62 0 1 1 0 1.24H6.75a.62.62 0 0 1 0-1.24Zm0 3.05h4.05a.62.62 0 1 1 0 1.24H6.75a.62.62 0 0 1 0-1.24Zm7.18 1.55 2.32 2.32-3.08 3.08c-.2.2-.46.35-.73.42l-1.6.43a.54.54 0 0 1-.66-.66l.43-1.6c.07-.27.22-.53.42-.73l2.9-3.26Z"/></svg>',
+        split: '<svg viewBox="0 0 20 20"><path d="M4.75 3.08h10.5c1.12 0 1.78.12 2.31.4.42.22.76.56.98.98.28.53.4 1.19.4 2.31v6.46c0 1.12-.12 1.78-.4 2.31-.22.42-.56.76-.98.98-.53.28-1.19.4-2.31.4H4.75c-1.12 0-1.78-.12-2.31-.4a2.35 2.35 0 0 1-.98-.98c-.28-.53-.4-1.19-.4-2.31V6.77c0-1.12.12-1.78.4-2.31.22-.42.56-.76.98-.98.53-.28 1.19-.4 2.31-.4Zm4.42 1.34H4.8c-.78 0-1.17.05-1.45.2-.18.1-.33.25-.43.43-.15.28-.2.67-.2 1.45v7c0 .78.05 1.17.2 1.45.1.18.25.33.43.43.28.15.67.2 1.45.2h4.37V4.42Zm1.52 11.16h4.51c.78 0 1.17-.05 1.45-.2.18-.1.33-.25.43-.43.15-.28.2-.67.2-1.45v-7c0-.78-.05-1.17-.2-1.45-.1-.18-.25-.33-.43-.43-.28-.15-.67-.2-1.45-.2h-4.51v11.16Z"/></svg>',
+        preview: '<svg viewBox="0 0 20 20"><path d="M10 2.95c3.38 0 5.96 2.1 7.45 5.06.62 1.24.62 2.74 0 3.98-1.49 2.96-4.07 5.06-7.45 5.06s-5.96-2.1-7.45-5.06a4.45 4.45 0 0 1 0-3.98C4.04 5.05 6.62 2.95 10 2.95Zm0 1.36c-2.81 0-4.98 1.72-6.22 4.31a3.12 3.12 0 0 0 0 2.76c1.24 2.59 3.41 4.31 6.22 4.31s4.98-1.72 6.22-4.31a3.12 3.12 0 0 0 0-2.76C14.98 6.03 12.81 4.31 10 4.31Zm0 2.42a3.27 3.27 0 1 1 0 6.54 3.27 3.27 0 0 1 0-6.54Zm0 1.36a1.91 1.91 0 1 0 0 3.82 1.91 1.91 0 0 0 0-3.82Z"/></svg>'
+      }
+    };
+
+    const options = [
+      { key: 'v1', className: 'v1', activeMode: 'split', name: '01 · 分栏选中', note: '默认状态。分栏为当前模式，编辑和预览保持灰色' },
+      { key: 'v1', className: 'v1', activeMode: 'edit', name: '01 · 编辑选中', note: '编辑为当前模式，另外两个图标不带颜色' },
+      { key: 'v1', className: 'v1', activeMode: 'preview', name: '01 · 预览选中', note: '预览为当前模式，只让眼睛图标变成主题色' },
+      { key: 'v1', className: 'v1', activeMode: 'none', name: '01 · 未选中基准', note: '全部未激活时统一灰色，用来检查图标本体是否干净' }
+    ];
+
+    function renderButtons(option, large = false) {
+      return modes.map((mode) => `
+        <button class="${large ? 'largeButton' : 'modeButton'} ${option.activeMode === mode.key ? 'active' : ''}" data-mode="${mode.key}" aria-label="${mode.label}">
+          ${glyphs[option.key][mode.key]}
+        </button>
+      `).join('');
+    }
+
+    function renderCard(option) {
+      return `
+        <article class="card ${option.className}">
+          <div class="cardHeader">
+            <h2 class="name">${option.name}</h2>
+            <p class="note">${option.note}</p>
+          </div>
+          <div class="mockWindow">
+            <div class="titlebar">
+              <div class="traffic"><i class="dot redDot"></i><i class="dot yellowDot"></i><i class="dot greenDot"></i></div>
+              <div class="title">TESTING_CHECKLIST.md</div>
+              <div class="modeGroup">${renderButtons(option)}</div>
+            </div>
+            <div class="bodyPreview">
+              <div class="side"><div class="pill"></div><div class="sideLine"></div><div class="sideLine"></div></div>
+              <div class="doc"><div class="heading"></div><div class="textLine"></div><div class="textLine"></div><div class="textLine"></div></div>
+            </div>
+          </div>
+          <div class="zoom">
+            <div class="largeGroup">${renderButtons(option, true)}</div>
+            <div class="labels"><span>编辑</span><span>分栏</span><span>预览</span></div>
+          </div>
+        </article>
+      `;
+    }
+
+    const grid = document.getElementById('grid');
+    grid.innerHTML = options.map(renderCard).join('');
+
+    grid.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-mode]');
+      if (!button) return;
+      const card = button.closest('.card');
+      const mode = button.dataset.mode;
+      card.querySelectorAll('button[data-mode]').forEach((candidate) => {
+        candidate.classList.toggle('active', candidate.dataset.mode === mode);
+      });
+    });
+  </script>
+</body>
+</html>

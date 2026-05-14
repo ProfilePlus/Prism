@@ -307,6 +307,7 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
     }, [viewMode]);
 
     useImperativeHandle(ref, () => ({
+      focus: () => editorRef.current?.focus(),
       jumpToLine: (line) => {
         editorRef.current?.jumpToLine(line);
         const preview = previewContainerRef.current;
@@ -327,6 +328,14 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
       restoreSearch: (params, currentMatch) => editorRef.current?.restoreSearch?.(params, currentMatch),
       getSelectedText: () => editorRef.current?.getSelectedText?.() ?? '',
     }));
+
+    useEffect(() => {
+      if (viewMode === 'preview') return;
+      const frame = requestAnimationFrame(() => {
+        editorRef.current?.focus();
+      });
+      return () => cancelAnimationFrame(frame);
+    }, [viewMode]);
 
     const getPreviewSelectedText = useCallback(() => {
       const selection = window.getSelection();
@@ -521,52 +530,50 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
       editorRef.current?.scrollToLine?.(Math.round(line));
     };
 
+    const isPreviewOnly = viewMode === 'preview';
+    const showPreview = viewMode !== 'edit';
+    const isSplit = viewMode === 'split';
+
     return (
       <div style={{ display: 'flex', flex: 1, minHeight: 0, minWidth: 0, backgroundColor: 'transparent', position: 'relative' }}>
-        {viewMode === 'edit' && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-editor)' }}>
+        <div
+          aria-hidden={isPreviewOnly}
+          style={{
+            flex: isSplit ? 1 : '1 1 auto',
+            minWidth: 0,
+            display: isPreviewOnly ? 'none' : 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            borderRight: isSplit ? '1px solid var(--border-color)' : '0',
+            background: 'var(--bg-editor)',
+          }}
+        >
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             <EditorPane
               ref={editorRef}
               content={content}
               onChange={onChange}
               onCursorChange={onCursorChange}
+              onTopLineChange={isSplit ? syncPreviewByEditor : undefined}
             />
           </div>
-        )}
+        </div>
 
-        {viewMode === 'preview' && (
+        {showPreview && (
           <div
             ref={previewContainerRef}
             onScroll={handlePreviewScroll}
-            style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto', background: 'var(--bg-preview)' }}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'auto',
+              background: 'var(--bg-preview)',
+            }}
           >
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               <PreviewPane content={content} />
-            </div>
-          </div>
-        )}
-
-        {viewMode === 'split' && (
-          <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRight: '1px solid var(--border-color)', background: 'var(--bg-editor)' }}>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                <EditorPane
-                  ref={editorRef}
-                  content={content}
-                  onChange={onChange}
-                  onCursorChange={onCursorChange}
-                  onTopLineChange={syncPreviewByEditor}
-                />
-              </div>
-            </div>
-            <div
-              ref={previewContainerRef}
-              onScroll={handlePreviewScroll}
-              style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', background: 'var(--bg-preview)' }}
-            >
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                <PreviewPane content={content} />
-              </div>
             </div>
           </div>
         )}

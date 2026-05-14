@@ -3,10 +3,9 @@ import { render, screen } from '@testing-library/react';
 import { StatusBar } from './StatusBar';
 
 describe('StatusBar', () => {
-  it('renders mode, word count, line and column', () => {
+  it('renders word count, line and column', () => {
     render(
       <StatusBar
-        viewMode="split"
         wordCount={128}
         cursor={{ line: 1, column: 1 }}
         sidebarVisible={true}
@@ -14,7 +13,6 @@ describe('StatusBar', () => {
       />
     );
 
-    expect(screen.getByTitle('分栏')).toHaveClass('is-active');
     expect(screen.getByText('128')).toBeInTheDocument();
     expect(screen.getByText('词')).toBeInTheDocument();
     expect(screen.getByText('LN')).toBeInTheDocument();

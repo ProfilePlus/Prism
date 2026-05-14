@@ -47,3 +47,77 @@ describe('EditorPane Miaoyan code highlighting', () => {
     expect(__editorPaneTesting.shouldHighlightCompatibilityCodeTheme('nocturne')).toBe(true);
   });
 });
+
+describe('EditorPane context menu formatting', () => {
+  const applyEditorFormatAt = (
+    doc: string,
+    from: number,
+    to: number,
+    format: Parameters<typeof __editorPaneTesting.getEditorFormatResult>[3],
+  ) => {
+    const result = __editorPaneTesting.getEditorFormatResult(doc, from, to, format);
+    return {
+      doc: `${doc.slice(0, result.from)}${result.insert}${doc.slice(result.to)}`,
+      selection: [
+        result.selectionFrom,
+        result.selectionTo,
+      ],
+    };
+  };
+
+  const applyEditorFormat = (
+    doc: string,
+    selectedText: string,
+    format: Parameters<typeof __editorPaneTesting.getEditorFormatResult>[3],
+  ) => {
+    const from = doc.indexOf(selectedText);
+    expect(from).toBeGreaterThanOrEqual(0);
+    return applyEditorFormatAt(doc, from, from + selectedText.length, format);
+  };
+
+  it('wraps inline context-menu actions with the Markdown syntax Prism renders', () => {
+    expect(applyEditorFormat('hello Prism', 'Prism', 'bold').doc).toBe('hello **Prism**');
+    expect(applyEditorFormat('hello Prism', 'Prism', 'italic').doc).toBe('hello *Prism*');
+    expect(applyEditorFormat('hello Prism', 'Prism', 'underline').doc).toBe('hello <u>Prism</u>');
+    expect(applyEditorFormat('hello Prism', 'Prism', 'strikethrough').doc).toBe('hello ~~Prism~~');
+  });
+
+  it('inserts an editable formatting range when there is no selected text', () => {
+    const doc = 'hello ';
+    const result = __editorPaneTesting.getEditorFormatResult(doc, doc.length, doc.length, 'bold');
+    const nextDoc = `${doc.slice(0, result.from)}${result.insert}${doc.slice(result.to)}`;
+
+    expect(nextDoc).toBe('hello ****');
+    expect(result.selectionFrom).toBe('hello **'.length);
+    expect(result.selectionTo).toBe(result.selectionFrom);
+  });
+
+  it('toggles existing inline wrappers off when selecting the inner text', () => {
+    expect(applyEditorFormat('hello **Prism**', 'Prism', 'bold').doc).toBe('hello Prism');
+    expect(applyEditorFormat('hello *Prism*', 'Prism', 'italic').doc).toBe('hello Prism');
+    expect(applyEditorFormat('hello <u>Prism</u>', 'Prism', 'underline').doc).toBe('hello Prism');
+    expect(applyEditorFormat('hello ~~Prism~~', 'Prism', 'strikethrough').doc).toBe('hello Prism');
+  });
+
+  it('toggles existing inline wrappers off when selecting the full formatted text', () => {
+    expect(applyEditorFormat('hello **Prism**', '**Prism**', 'bold').doc).toBe('hello Prism');
+    expect(applyEditorFormat('hello *Prism*', '*Prism*', 'italic').doc).toBe('hello Prism');
+    expect(applyEditorFormat('hello <u>Prism</u>', '<u>Prism</u>', 'underline').doc).toBe('hello Prism');
+    expect(applyEditorFormat('hello ~~Prism~~', '~~Prism~~', 'strikethrough').doc).toBe('hello Prism');
+  });
+
+  it('preserves surrounding whitespace outside the inserted formatting markers', () => {
+    const doc = 'hello  Prism  today';
+    const from = 'hello '.length;
+    const to = from + ' Prism '.length;
+
+    expect(applyEditorFormatAt(doc, from, to, 'bold').doc).toBe('hello  **Prism**  today');
+  });
+
+  it('does not confuse italic markers with bold markers', () => {
+    expect(applyEditorFormat('hello **Prism**', 'Prism', 'italic').doc).toBe('hello ***Prism***');
+    expect(applyEditorFormat('hello ***Prism***', 'Prism', 'italic').doc).toBe('hello **Prism**');
+    expect(applyEditorFormat('hello *Prism*', 'Prism', 'bold').doc).toBe('hello ***Prism***');
+    expect(applyEditorFormat('hello ***Prism***', 'Prism', 'bold').doc).toBe('hello *Prism*');
+  });
+});

@@ -1571,12 +1571,13 @@ body.dark .modal-overlay { background: rgba(0, 0, 0, 0.6); }
 }
 
 /* 上下文菜单（给 ContextMenu.tsx 用的全局类名） */
-.custom-context-menu {
+.custom-context-menu,
+.custom-context-submenu {
   position: fixed;
   z-index: 4000;
   min-width: 220px;
   max-height: calc(100vh - 16px);
-  overflow-y: auto;
+  overflow: visible;
   background: var(--c-canvas);
   border: 1px solid var(--c-fog);
   border-radius: var(--r-card);
@@ -1584,6 +1585,40 @@ body.dark .modal-overlay { background: rgba(0, 0, 0, 0.6); }
   padding: 6px;
   animation: prism-fade-in 120ms var(--ease-out);
 }
+
+.custom-context-menu .menu-item-wrap {
+  position: relative;
+}
+
+.custom-context-menu .custom-context-submenu {
+  position: absolute;
+  top: -6px;
+  left: calc(100% - 2px);
+  min-width: 236px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(-4px);
+  transition:
+    opacity 120ms var(--ease-out),
+    transform 120ms var(--ease-out),
+    visibility 120ms var(--ease-out);
+}
+
+.custom-context-menu.submenu-left .custom-context-submenu {
+  left: auto;
+  right: calc(100% - 2px);
+  transform: translateX(4px);
+}
+
+.custom-context-menu .menu-item-wrap:hover > .custom-context-submenu,
+.custom-context-menu .menu-item-wrap:focus-within > .custom-context-submenu {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
 .custom-context-menu .menu-item {
   display: flex;
   align-items: center;
@@ -1596,6 +1631,19 @@ body.dark .modal-overlay { background: rgba(0, 0, 0, 0.6); }
   user-select: none;
 }
 .custom-context-menu .menu-item:hover { background: var(--c-chalk); }
+.custom-context-menu .menu-item.has-submenu {
+  padding-right: 8px;
+}
+.custom-context-menu .menu-item.disabled,
+.custom-context-menu .menu-item.disabled:hover {
+  background: transparent;
+  color: var(--c-ash);
+  cursor: default;
+}
+.custom-context-menu .menu-item.disabled .menu-icon-slot,
+.custom-context-menu .menu-item.disabled .menu-shortcut {
+  color: var(--c-ash);
+}
 .custom-context-menu .menu-item.danger { color: #c0392b; }
 .custom-context-menu .menu-item.danger:hover { background: rgba(192, 57, 43, 0.08); }
 body.dark .custom-context-menu .menu-item.danger { color: #ff6b5e; }
@@ -1617,16 +1665,24 @@ body.dark .custom-context-menu .menu-item.danger { color: #ff6b5e; }
   color: var(--c-graphite);
   margin-left: auto;
 }
+.custom-context-menu .menu-submenu-arrow {
+  color: var(--c-ash);
+  font-size: 13px;
+  line-height: 1;
+  margin-left: 10px;
+}
 .custom-context-menu .menu-separator {
   height: 1px;
   background: var(--c-fog);
   margin: 4px 6px;
 }
 .custom-context-menu .check-mark {
-  width: 10px; height: 10px;
+  width: 9px;
+  height: 5px;
   display: inline-block;
-  background: var(--c-void);
-  border-radius: 50%;
+  border-left: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg) translate(1px, -1px);
 }
 
 /* highlight.js one-light 映射到单色调（OpenAI 风几乎无色彩） */
@@ -4354,7 +4410,8 @@ html[data-content-theme='miaoyan'] .modal-overlay {
 html[data-content-theme='miaoyan'] .cmdk,
 html[data-content-theme='miaoyan'] .sp,
 html[data-content-theme='miaoyan'] .modal,
-html[data-content-theme='miaoyan'] .custom-context-menu {
+html[data-content-theme='miaoyan'] .custom-context-menu,
+html[data-content-theme='miaoyan'] .custom-context-submenu {
   background: var(--miaoyan-main-bg);
   border: 1px solid var(--miaoyan-divider);
   border-radius: 8px;
@@ -4393,6 +4450,42 @@ html[data-content-theme='miaoyan'] .kbd,
 html[data-content-theme='miaoyan'] .cmdk-shortcut,
 html[data-content-theme='miaoyan'] .custom-context-menu .menu-shortcut {
   font-family: var(--miaoyan-code-font);
+}
+
+html:is([data-content-theme='inkstone'], [data-content-theme='slate'], [data-content-theme='mono'], [data-content-theme='nocturne']) .custom-context-menu,
+html:is([data-content-theme='inkstone'], [data-content-theme='slate'], [data-content-theme='mono'], [data-content-theme='nocturne']) .custom-context-submenu {
+  background: var(--theme-main-bg);
+  border-color: var(--theme-divider);
+  color: var(--theme-text);
+  font-family: var(--theme-font);
+}
+
+html:is([data-content-theme='inkstone'], [data-content-theme='slate'], [data-content-theme='mono'], [data-content-theme='nocturne']) .custom-context-menu .menu-item {
+  color: var(--theme-text);
+}
+
+html:is([data-content-theme='inkstone'], [data-content-theme='slate'], [data-content-theme='mono'], [data-content-theme='nocturne']) .custom-context-menu .menu-item:hover {
+  background: var(--theme-selection);
+}
+
+html:is([data-content-theme='inkstone'], [data-content-theme='slate'], [data-content-theme='mono'], [data-content-theme='nocturne']) .custom-context-menu .menu-item.disabled,
+html:is([data-content-theme='inkstone'], [data-content-theme='slate'], [data-content-theme='mono'], [data-content-theme='nocturne']) .custom-context-menu .menu-item.disabled:hover {
+  color: var(--theme-tertiary-text);
+  background: transparent;
+}
+
+html:is([data-content-theme='inkstone'], [data-content-theme='slate'], [data-content-theme='mono'], [data-content-theme='nocturne']) .custom-context-menu .menu-shortcut {
+  color: var(--theme-secondary-text);
+  font-family: var(--theme-code-font);
+}
+
+html:is([data-content-theme='inkstone'], [data-content-theme='slate'], [data-content-theme='mono'], [data-content-theme='nocturne']) .custom-context-menu .menu-submenu-arrow,
+html:is([data-content-theme='inkstone'], [data-content-theme='slate'], [data-content-theme='mono'], [data-content-theme='nocturne']) .custom-context-menu .menu-separator {
+  color: var(--theme-secondary-text);
+}
+
+html:is([data-content-theme='inkstone'], [data-content-theme='slate'], [data-content-theme='mono'], [data-content-theme='nocturne']) .custom-context-menu .menu-separator {
+  background: var(--theme-divider);
 }
 
 html[data-content-theme='miaoyan'] .prism-export-save-field,

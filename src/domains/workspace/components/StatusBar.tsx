@@ -3,68 +3,55 @@ import styles from './StatusBar.module.css';
 import { useWorkspaceStore } from '../../workspace/store';
 import { useDocumentStore } from '../../document/store';
 
-const IconSource = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor">
-    <path d="M6 4L2 8l4 4M10 4l4 4-4 4" />
-  </svg>
-);
-const IconSplit = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor">
-    <rect x="2" y="2" width="12" height="12" rx="1" />
-    <path d="M8 2v12" />
-  </svg>
-);
-const IconPreview = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor">
-    <rect x="2" y="2" width="12" height="12" rx="1" />
-    <path d="M5 6h6M5 9h6M5 12h4" />
-  </svg>
-);
 const IconFocus = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor">
-    <circle cx="8" cy="8" r="6" />
-    <circle cx="8" cy="8" r="2" fill="currentColor" />
+  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false">
+    <path d="M10 2.85a7.15 7.15 0 1 1 0 14.3 7.15 7.15 0 0 1 0-14.3Zm0 1.36a5.79 5.79 0 1 0 0 11.58 5.79 5.79 0 0 0 0-11.58Zm0 2.82a2.97 2.97 0 1 1 0 5.94 2.97 2.97 0 0 1 0-5.94Zm0 1.32a1.65 1.65 0 1 0 0 3.3 1.65 1.65 0 0 0 0-3.3Z" />
   </svg>
 );
+
 const IconExport = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor">
-    <path d="M8 10V2M8 2L5 5M8 2l3 3M3 10v3a1 1 0 001 1h8a1 1 0 001-1v-3" />
+  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false">
+    <path d="M10 2.7c.2 0 .37.07.5.2l3.15 3.15a.7.7 0 0 1-.99.99l-1.96-1.96v7.07a.7.7 0 1 1-1.4 0V5.08L7.34 7.04a.7.7 0 0 1-.99-.99L9.5 2.9c.13-.13.3-.2.5-.2ZM4.1 11.1c.39 0 .7.31.7.7v2.25c0 .58.47 1.05 1.05 1.05h8.3c.58 0 1.05-.47 1.05-1.05V11.8a.7.7 0 1 1 1.4 0v2.25a2.45 2.45 0 0 1-2.45 2.45h-8.3a2.45 2.45 0 0 1-2.45-2.45V11.8c0-.39.31-.7.7-.7Z" />
   </svg>
 );
+
 const IconCollapse = () => (
-  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <path d="M7.5 3l-3 3 3 3" />
+  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false">
+    <path d="M6.08 3.72c.4 0 .72.32.72.72v11.12a.72.72 0 0 1-1.44 0V4.44c0-.4.32-.72.72-.72Zm8.34 2.02c.28.28.28.74 0 1.02L11.18 10l3.24 3.24a.72.72 0 0 1-1.02 1.02L9.65 10.5a.72.72 0 0 1 0-1.02l3.75-3.74c.28-.28.74-.28 1.02 0Z" />
   </svg>
 );
+
 const IconExpand = () => (
-  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <path d="M4.5 3l3 3-3 3" />
+  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false">
+    <path d="M13.92 3.72c-.4 0-.72.32-.72.72v11.12a.72.72 0 1 0 1.44 0V4.44c0-.4-.32-.72-.72-.72ZM5.58 5.74a.72.72 0 0 0 0 1.02L8.82 10l-3.24 3.24a.72.72 0 0 0 1.02 1.02l3.75-3.76a.72.72 0 0 0 0-1.02L6.6 5.74a.72.72 0 0 0-1.02 0Z" />
   </svg>
 );
+
 const IconPlus = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor">
-    <path d="M8 3v10M3 8h10" />
+  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false">
+    <path d="M9.32 3.35a.68.68 0 0 1 1.36 0v5.97h5.97a.68.68 0 1 1 0 1.36h-5.97v5.97a.68.68 0 1 1-1.36 0v-5.97H3.35a.68.68 0 1 1 0-1.36h5.97V3.35Z" />
   </svg>
 );
+
 const IconTree = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor">
-    <path d="M3 4h2M3 8h2M3 12h2M7 4h6M7 8h6M7 12h4" />
+  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false">
+    <path d="M5.2 3.35h3.1c.58 0 1.05.47 1.05 1.05v3.1c0 .58-.47 1.05-1.05 1.05H5.2A1.05 1.05 0 0 1 4.15 7.5V4.4c0-.58.47-1.05 1.05-1.05Zm6.5 0h3.1c.58 0 1.05.47 1.05 1.05v3.1c0 .58-.47 1.05-1.05 1.05h-3.1a1.05 1.05 0 0 1-1.05-1.05V4.4c0-.58.47-1.05 1.05-1.05Zm-6.5 8.1h3.1c.58 0 1.05.47 1.05 1.05v3.1c0 .58-.47 1.05-1.05 1.05H5.2a1.05 1.05 0 0 1-1.05-1.05v-3.1c0-.58.47-1.05 1.05-1.05Zm6.5 0h3.1c.58 0 1.05.47 1.05 1.05v3.1c0 .58-.47 1.05-1.05 1.05h-3.1a1.05 1.05 0 0 1-1.05-1.05v-3.1c0-.58.47-1.05 1.05-1.05Z" />
   </svg>
 );
+
 const IconList = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor">
-    <path d="M3 4h10M3 8h10M3 12h10" />
+  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false">
+    <path d="M4.2 4.65c0-.39.31-.7.7-.7h10.2a.7.7 0 0 1 0 1.4H4.9a.7.7 0 0 1-.7-.7Zm0 3.55c0-.39.31-.7.7-.7h10.2a.7.7 0 0 1 0 1.4H4.9a.7.7 0 0 1-.7-.7Zm0 3.55c0-.39.31-.7.7-.7h10.2a.7.7 0 1 1 0 1.4H4.9a.7.7 0 0 1-.7-.7Zm0 3.55c0-.39.31-.7.7-.7h7.2a.7.7 0 1 1 0 1.4H4.9a.7.7 0 0 1-.7-.7Z" />
   </svg>
 );
+
 interface StatusBarProps {
-  viewMode: 'edit' | 'split' | 'preview';
   wordCount: number;
   cursor: { line: number; column: number };
   sidebarVisible: boolean;
   isSidebarHovered: boolean;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
-  onViewModeChange?: (mode: 'edit' | 'split' | 'preview') => void;
   onExportHtml?: () => void;
   onToggleFocusMode?: () => void;
   onToggleSidebar?: () => void;
@@ -74,14 +61,12 @@ interface StatusBarProps {
 }
 
 export function StatusBar({
-  viewMode,
   wordCount,
   cursor,
   sidebarVisible,
   isSidebarHovered,
   onMouseEnter,
   onMouseLeave,
-  onViewModeChange,
   onExportHtml,
   onToggleFocusMode,
   onToggleSidebar,
@@ -109,12 +94,6 @@ export function StatusBar({
     }
     setSaveStatus('saved');
   }, [currentDocument?.isDirty, currentDocument?.lastSavedAt]);
-
-  const modes = [
-    { key: 'edit', label: '源码', icon: <IconSource /> },
-    { key: 'split', label: '分栏', icon: <IconSplit /> },
-    { key: 'preview', label: '预览', icon: <IconPreview /> },
-  ] as const;
 
   return (
     <div className={styles.statusbar}>
@@ -154,19 +133,6 @@ export function StatusBar({
           >
             {sidebarVisible ? <IconCollapse /> : <IconExpand />}
           </button>
-          <div className={styles.sep} />
-          <div className={styles.modeGroup}>
-            {modes.map((m) => (
-              <button
-                key={m.key}
-                className={`${styles.modeBtn} ${viewMode === m.key ? styles.active + ' is-active' : ''}`}
-                onClick={() => onViewModeChange?.(m.key)}
-                title={m.label}
-              >
-                {m.icon}
-              </button>
-            ))}
-          </div>
         </div>
 
         <div className={styles.center}>

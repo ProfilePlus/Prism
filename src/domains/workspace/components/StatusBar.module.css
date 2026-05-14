@@ -89,11 +89,10 @@
 }
 
 .btn svg {
-  width: 13px;
-  height: 13px;
-  stroke-width: 1.5;
-  fill: none;
-  stroke: currentColor;
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  stroke: none;
 }
 
 .iconBtn {
@@ -176,11 +175,10 @@
 }
 
 .modeBtn svg {
-  width: 11px;
-  height: 11px;
-  stroke-width: 1.5;
-  fill: none;
-  stroke: currentColor;
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  stroke: none;
 }
 
 /* 保存状态 */
@@ -281,9 +279,10 @@
 
 :global(html[data-content-theme='miaoyan']) .btn svg,
 :global(html[data-content-theme='miaoyan']) .modeBtn svg {
-  width: 12px;
-  height: 12px;
-  stroke-width: 1.5;
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  stroke: none;
 }
 
 :global(html[data-content-theme='miaoyan']) .folder {
@@ -465,9 +464,10 @@
 :global(html[data-content-theme='mono']) .modeBtn svg,
 :global(html[data-content-theme='nocturne']) .btn svg,
 :global(html[data-content-theme='nocturne']) .modeBtn svg {
-  width: 12px;
-  height: 12px;
-  stroke-width: 1.5;
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  stroke: none;
 }
 
 :global(html[data-content-theme='inkstone']) .folder,

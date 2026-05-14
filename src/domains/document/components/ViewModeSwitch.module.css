@@ -1,0 +1,90 @@
+.container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  align-self: stretch;
+  height: 100%;
+  margin-left: 14px;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.btn {
+  width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: transparent;
+  color: var(--c-ash);
+  cursor: pointer;
+  padding: 0;
+  transition: color 120ms ease;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.btn:hover {
+  color: var(--c-void);
+}
+
+.btn.active {
+  color: var(--c-void);
+}
+
+.btn svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+  stroke: none;
+  transform: translateY(0.5px);
+}
+
+:global(html[data-content-theme='miaoyan']) .container {
+  gap: 8px;
+  margin-left: 16px;
+  transform: translateY(16px);
+  z-index: 2;
+}
+
+:global(html[data-content-theme='miaoyan']) .btn {
+  width: 23px;
+  height: 23px;
+  color: var(--miaoyan-secondary-text);
+}
+
+:global(html[data-content-theme='miaoyan']) .btn:hover {
+  color: var(--miaoyan-text);
+}
+
+:global(html[data-content-theme='miaoyan']) .btn.active {
+  color: var(--miaoyan-accent);
+}
+
+:global(html[data-content-theme='miaoyan']) .btn svg {
+  width: 18px;
+  height: 18px;
+  transform: translateY(1px);
+}
+
+:global(html[data-content-theme='inkstone']) .btn,
+:global(html[data-content-theme='slate']) .btn,
+:global(html[data-content-theme='mono']) .btn,
+:global(html[data-content-theme='nocturne']) .btn {
+  color: var(--theme-secondary-text);
+}
+
+:global(html[data-content-theme='inkstone']) .btn:hover,
+:global(html[data-content-theme='slate']) .btn:hover,
+:global(html[data-content-theme='mono']) .btn:hover,
+:global(html[data-content-theme='nocturne']) .btn:hover {
+  color: var(--theme-text);
+}
+
+:global(html[data-content-theme='inkstone']) .btn.active,
+:global(html[data-content-theme='slate']) .btn.active,
+:global(html[data-content-theme='mono']) .btn.active,
+:global(html[data-content-theme='nocturne']) .btn.active {
+  color: var(--theme-accent);
+}

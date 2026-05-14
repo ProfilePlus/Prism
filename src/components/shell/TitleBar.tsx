@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { ViewModeSwitch } from '../../domains/document/components/ViewModeSwitch';
 import styles from './TitleBar.module.css';
 
 interface TitleBarProps {
@@ -54,6 +55,7 @@ export function TitleBar({ docName, isDirty = false }: TitleBarProps) {
           {isDirty && <span className={styles.editedLabel}>已编辑</span>}
         </div>
       </div>
+      <ViewModeSwitch />
       {!IS_MACOS && (
         <div className={styles.controls}>
           <button className={styles.btn} onClick={handleMinimize} title="最小化" aria-label="最小化">

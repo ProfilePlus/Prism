@@ -1,0 +1,1060 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Prism Menu Architecture Prototype</title>
+  <style>
+    :root {
+      --bg: #f4f3f0;
+      --paper: #fbfaf7;
+      --panel: #f7f6f2;
+      --line: #dedbd3;
+      --line-strong: #cac5ba;
+      --ink: #2e2c29;
+      --muted: #746f66;
+      --faint: #a39b8e;
+      --accent: #0f8f84;
+      --accent-soft: rgba(15, 143, 132, 0.12);
+      --danger: #bd3f32;
+      --shadow: 0 18px 48px rgba(42, 37, 30, 0.16), 0 2px 8px rgba(42, 37, 30, 0.08);
+      --radius: 8px;
+      --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", sans-serif;
+      --mono: "SF Mono", Menlo, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      min-height: 100%;
+      background: radial-gradient(circle at 12% 8%, rgba(15, 143, 132, 0.07), transparent 26%), var(--bg);
+      color: var(--ink);
+      font-family: var(--font);
+      letter-spacing: 0;
+    }
+
+    button, input { font: inherit; }
+
+    .page {
+      width: min(1440px, calc(100vw - 36px));
+      margin: 22px auto;
+      display: grid;
+      grid-template-columns: minmax(820px, 1fr) 360px;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .frame {
+      min-height: calc(100vh - 44px);
+      overflow: hidden;
+      background: var(--paper);
+      border: 1px solid var(--line-strong);
+      border-radius: 14px;
+      box-shadow: 0 24px 64px rgba(42, 37, 30, 0.14);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .titlebar {
+      height: 52px;
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      padding: 0 18px;
+      background: #fbfaf7;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .traffic {
+      display: flex;
+      gap: 7px;
+      margin-right: 4px;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 1px solid rgba(0,0,0,0.08);
+    }
+
+    .dot.red { background: #ff5f57; }
+    .dot.yellow { background: #febc2e; }
+    .dot.green { background: #28c840; }
+
+    .doc-title {
+      min-width: 0;
+      display: flex;
+      align-items: baseline;
+      gap: 7px;
+      font-size: 13px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .doc-title strong {
+      color: var(--ink);
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .view-switch {
+      display: inline-flex;
+      height: 30px;
+      padding: 3px;
+      gap: 2px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f1efea;
+    }
+
+    .view-btn {
+      width: 31px;
+      height: 24px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+    }
+
+    .view-btn.active {
+      color: var(--accent);
+      background: var(--paper);
+      box-shadow: 0 1px 3px rgba(42, 37, 30, 0.12);
+    }
+
+    .view-btn svg { width: 17px; height: 17px; }
+
+    .menubar {
+      height: 32px;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 0 14px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfaf7;
+      position: relative;
+      z-index: 20;
+    }
+
+    .menu-trigger {
+      height: 24px;
+      border: 0;
+      border-radius: 6px;
+      padding: 0 10px;
+      background: transparent;
+      color: var(--ink);
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .menu-trigger:hover,
+    .menu-trigger.active {
+      background: #ece9e2;
+    }
+
+    .workspace {
+      min-height: 600px;
+      flex: 1;
+      display: grid;
+      grid-template-columns: 264px minmax(0, 1fr);
+      overflow: hidden;
+    }
+
+    .sidebar {
+      min-width: 0;
+      background: #f2f0ea;
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .side-tabs {
+      display: flex;
+      padding: 12px 14px 8px;
+      gap: 8px;
+    }
+
+    .side-tab {
+      flex: 1;
+      height: 30px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .side-tab.active {
+      background: var(--paper);
+      color: var(--accent);
+      box-shadow: 0 1px 4px rgba(42, 37, 30, 0.09);
+      font-weight: 600;
+    }
+
+    .file-list {
+      padding: 4px 10px 12px;
+      overflow: auto;
+      flex: 1;
+    }
+
+    .file-row,
+    .folder-row {
+      min-height: 32px;
+      border-radius: 7px;
+      padding: 7px 9px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--ink);
+      cursor: default;
+      font-size: 13px;
+    }
+
+    .file-row:hover,
+    .folder-row:hover,
+    .file-row.active {
+      background: rgba(255,255,255,0.64);
+    }
+
+    .file-row.active {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .caret { color: var(--faint); width: 12px; }
+    .file-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--line-strong);
+      flex: 0 0 auto;
+    }
+
+    .main {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--paper);
+      overflow: hidden;
+    }
+
+    .surface {
+      min-height: 0;
+      flex: 1;
+      display: grid;
+      overflow: hidden;
+    }
+
+    .surface[data-mode="edit"] { grid-template-columns: 1fr; }
+    .surface[data-mode="preview"] { grid-template-columns: 1fr; }
+    .surface[data-mode="split"] { grid-template-columns: 1fr 1fr; }
+
+    .editor,
+    .preview {
+      min-width: 0;
+      overflow: auto;
+      padding: 42px 54px;
+    }
+
+    .editor {
+      background: #fbfaf7;
+      font-family: "TsangerJinKai02-W04", "Kaiti SC", "Songti SC", serif;
+      font-size: 17px;
+      line-height: 1.75;
+      color: #262522;
+      border-right: 1px solid var(--line);
+    }
+
+    .preview {
+      background: #f8f7f3;
+      font-size: 16px;
+      line-height: 1.76;
+    }
+
+    .surface[data-mode="edit"] .preview,
+    .surface[data-mode="preview"] .editor { display: none; }
+
+    .doc {
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    .doc h1 {
+      font-size: 28px;
+      margin: 0 0 20px;
+      line-height: 1.25;
+    }
+
+    .doc p { margin: 0 0 16px; }
+    .doc code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: rgba(15,143,132,0.08);
+      color: #00695f;
+      border-radius: 5px;
+      padding: 1px 5px;
+    }
+
+    .statusbar {
+      height: 34px;
+      border-top: 1px solid var(--line);
+      background: #fbfaf7;
+      display: grid;
+      grid-template-columns: 264px 1fr;
+      align-items: stretch;
+      font-size: 12px;
+    }
+
+    .status-side {
+      border-right: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: 32px 1fr 32px;
+      align-items: center;
+      gap: 4px;
+      padding: 0 8px;
+      min-width: 0;
+    }
+
+    .status-main {
+      display: grid;
+      grid-template-columns: 42px 1fr auto;
+      align-items: center;
+      padding: 0 10px;
+      min-width: 0;
+    }
+
+    .status-center {
+      justify-self: center;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      min-width: 0;
+    }
+
+    .status-actions {
+      justify-self: end;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .icon-btn {
+      width: 25px;
+      height: 25px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+    }
+
+    .icon-btn:hover,
+    .icon-btn.active {
+      background: #ece9e2;
+      color: var(--accent);
+    }
+
+    .icon-btn svg { width: 16px; height: 16px; }
+
+    .workspace-name {
+      min-width: 0;
+      height: 25px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--ink);
+      padding: 0 8px;
+      text-align: left;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .workspace-name:hover {
+      background: #ece9e2;
+    }
+
+    .sep {
+      width: 1px;
+      height: 13px;
+      background: var(--line);
+    }
+
+    .dropdown,
+    .context-menu {
+      position: fixed;
+      z-index: 100;
+      min-width: 246px;
+      max-width: 340px;
+      padding: 6px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: rgba(251, 250, 247, 0.98);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      font-size: 13px;
+    }
+
+    .menu-row {
+      height: 28px;
+      border-radius: 6px;
+      display: grid;
+      grid-template-columns: 18px 1fr auto;
+      align-items: center;
+      gap: 9px;
+      padding: 0 8px;
+      color: var(--ink);
+      cursor: pointer;
+      position: relative;
+      white-space: nowrap;
+    }
+
+    .menu-row:hover,
+    .menu-row.is-open {
+      background: #ece9e2;
+    }
+
+    .menu-row.disabled {
+      color: var(--faint);
+      cursor: default;
+    }
+
+    .menu-row.disabled:hover {
+      background: transparent;
+    }
+
+    .menu-row.danger { color: var(--danger); }
+    .menu-row .mark {
+      display: grid;
+      place-items: center;
+      color: var(--accent);
+      font-size: 12px;
+    }
+
+    .shortcut {
+      color: var(--faint);
+      font-family: var(--mono);
+      font-size: 11px;
+      margin-left: 16px;
+    }
+
+    .arrow {
+      color: var(--faint);
+      padding-left: 18px;
+    }
+
+    .divider {
+      height: 1px;
+      margin: 5px 7px;
+      background: var(--line);
+    }
+
+    .submenu {
+      position: absolute;
+      left: calc(100% - 4px);
+      top: -6px;
+      min-width: 230px;
+      padding: 6px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: rgba(251, 250, 247, 0.99);
+      box-shadow: var(--shadow);
+      display: none;
+    }
+
+    .menu-row:hover > .submenu,
+    .menu-row.is-open > .submenu {
+      display: block;
+    }
+
+    .drawer {
+      min-height: calc(100vh - 44px);
+      border: 1px solid var(--line-strong);
+      border-radius: 14px;
+      background: rgba(251,250,247,0.86);
+      box-shadow: 0 18px 48px rgba(42, 37, 30, 0.09);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .drawer-head {
+      padding: 18px 18px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .drawer-head h1 {
+      margin: 0 0 8px;
+      font-size: 18px;
+      line-height: 1.3;
+    }
+
+    .drawer-head p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .drawer-body {
+      padding: 14px;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.45);
+      padding: 12px;
+    }
+
+    .card h2 {
+      margin: 0 0 9px;
+      font-size: 13px;
+      line-height: 1.3;
+    }
+
+    .card p,
+    .card li {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.58;
+    }
+
+    .card ul {
+      margin: 0;
+      padding-left: 17px;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 10px;
+    }
+
+    .pill {
+      height: 25px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0 9px;
+      background: #fbfaf7;
+      color: var(--muted);
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .pill.active {
+      border-color: rgba(15, 143, 132, 0.32);
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .matrix {
+      display: grid;
+      grid-template-columns: 88px 1fr;
+      gap: 7px 10px;
+      font-size: 12px;
+    }
+
+    .matrix strong { color: var(--ink); font-weight: 600; }
+    .matrix span { color: var(--muted); line-height: 1.45; }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 28px;
+      transform: translateX(-50%) translateY(12px);
+      opacity: 0;
+      pointer-events: none;
+      background: #292622;
+      color: #fbfaf7;
+      border-radius: 999px;
+      padding: 9px 14px;
+      box-shadow: var(--shadow);
+      font-size: 13px;
+      transition: opacity 160ms ease, transform 160ms ease;
+      z-index: 140;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .hint-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .hotspot {
+      position: absolute;
+      border: 1px dashed rgba(15, 143, 132, 0.34);
+      background: rgba(15, 143, 132, 0.045);
+      border-radius: 8px;
+    }
+
+    @media (max-width: 1100px) {
+      .page {
+        grid-template-columns: 1fr;
+      }
+      .drawer {
+        min-height: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <main class="frame" id="appFrame">
+      <div class="titlebar">
+        <div class="brand">
+          <div class="traffic">
+            <span class="dot red"></span>
+            <span class="dot yellow"></span>
+            <span class="dot green"></span>
+          </div>
+          <div class="doc-title">
+            <strong>Prism 菜单重构提案.md</strong>
+            <span>—</span>
+            <span>Prism</span>
+          </div>
+        </div>
+        <div class="view-switch" aria-label="视图模式">
+          <button class="view-btn active" data-mode-btn="edit" title="编辑">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M5.7 3.2h7.1c1.08 0 1.76.12 2.28.39.46.24.82.6 1.06 1.06.27.52.39 1.2.39 2.28v2.5h-1.38V6.94c0-.78-.05-1.19-.18-1.45a1.18 1.18 0 0 0-.52-.52c-.26-.13-.67-.18-1.45-.18H5.72c-.78 0-1.19.05-1.45.18-.23.12-.4.29-.52.52-.13.26-.18.67-.18 1.45v6.12c0 .78.05 1.19.18 1.45.12.23.29.4.52.52.26.13.67.18 1.45.18h3.2v1.38H5.7c-1.08 0-1.76-.12-2.28-.39a2.58 2.58 0 0 1-1.06-1.06c-.27-.52-.39-1.2-.39-2.28V6.93c0-1.08.12-1.76.39-2.28.24-.46.6-.82 1.06-1.06.52-.27 1.2-.39 2.28-.39Zm.5 3.3h6.2v1.24H6.2V6.5Zm0 3.05h4.72v1.24H6.2V9.55Zm8.3 1.5 1.5 1.5-3.46 3.46-2.17.46.46-2.17 3.67-3.25Z"/></svg>
+          </button>
+          <button class="view-btn" data-mode-btn="split" title="分栏">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M4.85 3.05h10.3c1.12 0 1.78.12 2.3.39.43.23.78.58 1.01 1.01.27.52.39 1.18.39 2.3v6.5c0 1.12-.12 1.78-.39 2.3-.23.43-.58.78-1.01 1.01-.52.27-1.18.39-2.3.39H4.85c-1.12 0-1.78-.12-2.3-.39a2.42 2.42 0 0 1-1.01-1.01c-.27-.52-.39-1.18-.39-2.3v-6.5c0-1.12.12-1.78.39-2.3.23-.43.58-.78 1.01-1.01.52-.27 1.18-.39 2.3-.39Zm4.45 1.42H4.9c-.76 0-1.13.05-1.4.19-.2.1-.34.24-.44.44-.14.27-.19.64-.19 1.4v7c0 .76.05 1.13.19 1.4.1.2.24.34.44.44.27.14.64.19 1.4.19h4.4V4.47Zm1.4 11.06h4.4c.76 0 1.13-.05 1.4-.19.2-.1.34-.24.44-.44.14-.27.19-.64.19-1.4v-7c0-.76-.05-1.13-.19-1.4a.96.96 0 0 0-.44-.44c-.27-.14-.64-.19-1.4-.19h-4.4v11.06Z"/></svg>
+          </button>
+          <button class="view-btn" data-mode-btn="preview" title="预览">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 3.1c3.25 0 5.75 2.02 7.25 4.78a4.42 4.42 0 0 1 0 4.24c-1.5 2.76-4 4.78-7.25 4.78s-5.75-2.02-7.25-4.78a4.42 4.42 0 0 1 0-4.24C4.25 5.12 6.75 3.1 10 3.1Zm0 1.42c-2.66 0-4.7 1.62-5.99 4.02a3.04 3.04 0 0 0 0 2.92c1.29 2.4 3.33 4.02 5.99 4.02s4.7-1.62 5.99-4.02a3.04 3.04 0 0 0 0-2.92c-1.29-2.4-3.33-4.02-5.99-4.02Zm0 2.34a3.14 3.14 0 1 1 0 6.28 3.14 3.14 0 0 1 0-6.28Zm0 1.38a1.76 1.76 0 1 0 0 3.52 1.76 1.76 0 0 0 0-3.52Z"/></svg>
+          </button>
+        </div>
+        <div></div>
+      </div>
+
+      <nav class="menubar" id="menubar"></nav>
+
+      <section class="workspace">
+        <aside class="sidebar">
+          <div class="side-tabs">
+            <button class="side-tab active">文件</button>
+            <button class="side-tab">大纲</button>
+          </div>
+          <div class="file-list" id="fileList">
+            <div class="folder-row" data-context="folder"><span class="caret">›</span><strong>docs</strong></div>
+            <div class="file-row active" data-context="file"><span class="file-dot"></span><span>Prism 菜单重构提案.md</span></div>
+            <div class="file-row" data-context="file"><span class="file-dot"></span><span>README.md</span></div>
+            <div class="file-row" data-context="file"><span class="file-dot"></span><span>快捷键设计.md</span></div>
+            <div class="folder-row" data-context="folder"><span class="caret">›</span><strong>assets</strong></div>
+          </div>
+        </aside>
+        <section class="main">
+          <div class="surface" id="surface" data-mode="edit">
+            <article class="editor" id="editorPane">
+              <div class="doc">
+                <h1># Prism 菜单重构提案</h1>
+                <p>核心原则：顶部菜单负责完整命令，右键菜单负责对象上下文，状态栏只保留状态和高频动作。</p>
+                <p>选中文本后，编辑区右键只显示真实可用的基础格式：<strong>粗体</strong>、<em>斜体</em>、<u>下划线</u>、<s>删除线</s>。</p>
+                <p>预览区右键不混入编辑动作，专注于复制、定位和导出。</p>
+              </div>
+            </article>
+            <article class="preview" id="previewPane">
+              <div class="doc">
+                <h1>Prism 菜单重构提案</h1>
+                <p>核心原则：顶部菜单负责完整命令，右键菜单负责对象上下文，状态栏只保留状态和高频动作。</p>
+                <p>选中文本后，编辑区右键只显示真实可用的基础格式：<strong>粗体</strong>、<em>斜体</em>、<u>下划线</u>、<s>删除线</s>。</p>
+                <p>预览区右键不混入编辑动作，专注于复制、定位和导出。</p>
+                <p><code>Command+B</code>、<code>Command+I</code>、<code>Command+U</code> 是编辑区的稳定快捷操作。</p>
+              </div>
+            </article>
+          </div>
+        </section>
+      </section>
+
+      <footer class="statusbar">
+        <div class="status-side">
+          <button class="icon-btn" data-action="new-file" title="新建文件">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.3 3.4h1.4v5.9h5.9v1.4h-5.9v5.9H9.3v-5.9H3.4V9.3h5.9V3.4Z"/></svg>
+          </button>
+          <button class="workspace-name" id="workspaceMenuBtn">Prism</button>
+          <button class="icon-btn active" id="treeModeBtn" title="文档树">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M5 3.7h3.2v3.2H5V3.7Zm6.8 0H15v3.2h-3.2V3.7ZM5 13.1h3.2v3.2H5v-3.2Zm6.8 0H15v3.2h-3.2v-3.2ZM6.6 8.2h1.2v1.2h4.1V8.2h1.2v2.4H7.8v1.2H6.6V8.2Z"/></svg>
+          </button>
+        </div>
+        <div class="status-main">
+          <button class="icon-btn" id="sidebarBtn" title="收起侧边栏">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.1 3.7h1.4v12.6H6.1V3.7Zm8 2.2 1 1-3.1 3.1 3.1 3.1-1 1-4.1-4.1 4.1-4.1Z"/></svg>
+          </button>
+          <div class="status-center">
+            <span>已保存</span><span class="sep"></span><span>423 词</span><span class="sep"></span><span>LN 18</span><span>COL 6</span>
+          </div>
+          <div class="status-actions">
+            <button class="icon-btn" id="focusBtn" title="专注模式">
+              <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 2.8a7.2 7.2 0 1 1 0 14.4 7.2 7.2 0 0 1 0-14.4Zm0 1.4a5.8 5.8 0 1 0 0 11.6 5.8 5.8 0 0 0 0-11.6Zm0 2.8a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z"/></svg>
+            </button>
+            <button class="icon-btn" id="exportBtn" title="导出">
+              <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.3 3h1.4v7.2l2.3-2.3 1 1-4 4-4-4 1-1 2.3 2.3V3Zm-5 9h1.4v2.4c0 .7.5 1.2 1.2 1.2h6.2c.7 0 1.2-.5 1.2-1.2V12h1.4v2.4a2.6 2.6 0 0 1-2.6 2.6H6.9a2.6 2.6 0 0 1-2.6-2.6V12Z"/></svg>
+            </button>
+          </div>
+        </div>
+      </footer>
+    </main>
+
+    <aside class="drawer">
+      <div class="drawer-head">
+        <h1>Prism 菜单信息架构</h1>
+        <p>目标是让每个入口只承担一种责任：全局命令、视图切换、对象操作、文本操作、阅读操作彼此分离。</p>
+      </div>
+      <div class="drawer-body">
+        <div class="card">
+          <h2>重构原则</h2>
+          <ul>
+            <li>不展示未实现的功能，不用“即将推出”污染主菜单。</li>
+            <li>顶部菜单完整但低频，标题栏和状态栏只放高频动作。</li>
+            <li>右键菜单跟随对象变化，不做通用功能垃圾桶。</li>
+            <li>编辑区和预览区的右键菜单职责完全不同。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h2>入口职责</h2>
+          <div class="matrix">
+            <strong>顶部菜单</strong><span>完整命令树、键盘用户、低频但确定可用的能力。</span>
+            <strong>标题栏</strong><span>编辑、分栏、预览三种主视图。</span>
+            <strong>状态栏</strong><span>保存状态、字数行列、侧边栏、专注、导出入口。</span>
+            <strong>文件树</strong><span>文件、目录、工作区对象操作。</span>
+            <strong>编辑区</strong><span>剪贴板和基础行内格式。</span>
+            <strong>预览区</strong><span>复制、源码定位、导出、链接操作。</span>
+          </div>
+        </div>
+        <div class="card">
+          <h2>快速查看</h2>
+          <div class="pill-row" id="quickPills"></div>
+        </div>
+        <div class="card">
+          <h2 id="selectedTitle">当前方案</h2>
+          <p id="selectedCopy">点击顶部菜单、状态栏按钮或在编辑区/预览区/文件树区域右键，可以查看每个入口的最终菜单结构。</p>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const menuModel = {
+      "文件": [
+        ["新建文稿", "⌘N"], ["新建窗口", "⇧⌘N"], "sep",
+        ["打开文件…", "⌘O"], ["打开文件夹…"], ["打开最近", "", [
+          ["Prism 菜单重构提案.md"], ["README.md"], "sep", ["清除最近记录"]
+        ]],
+        "sep",
+        ["保存", "⌘S"], ["另存为…", "⇧⌘S"], ["在访达中显示"], "sep",
+        ["导出", "", [
+          ["导出为 PDF…"], ["导出为 Word (.docx)…"], ["导出为 HTML…"], ["导出为 PNG 图像…"]
+        ]],
+        "sep",
+        ["关闭文稿", "⌘W"]
+      ],
+      "编辑": [
+        ["撤销", "⌘Z"], ["重做", "⇧⌘Z"], "sep",
+        ["剪切", "⌘X"], ["复制", "⌘C"], ["粘贴", "⌘V"], ["粘贴并匹配样式", "⌥⇧⌘V"], "sep",
+        ["全选", "⌘A"], "sep",
+        ["查找…", "⌘F"], ["替换…", "⌘H"], "sep",
+        ["复制为", "", [["纯文本"], ["Markdown"], ["HTML"]]]
+      ],
+      "插入": [
+        ["链接", "⌘K"], ["图片…"], ["表格"], "sep",
+        ["代码块", "⇧⌘K"], ["公式块", "⇧⌘M"], ["引用", "⇧⌘Q"], "sep",
+        ["有序列表", "⇧⌘["], ["无序列表", "⇧⌘]"], ["任务列表", "⇧⌘X"], "sep",
+        ["水平分割线"], ["脚注"], ["YAML Front Matter"]
+      ],
+      "格式": [
+        ["粗体", "⌘B"], ["斜体", "⌘I"], ["下划线", "⌘U"], ["删除线", "⌥⇧5"], ["行内代码", "⇧⌘`"], "sep",
+        ["段落样式", "", [
+          ["正文", "⌘0"], ["一级标题", "⌘1"], ["二级标题", "⌘2"], ["三级标题", "⌘3"], ["四级标题", "⌘4"], ["五级标题", "⌘5"], ["六级标题", "⌘6"]
+        ]],
+        ["标题级别", "", [["提升标题级别", "⌘="], ["降低标题级别", "⌘-"]]],
+        ["列表缩进", "", [["增加缩进", "⌘]"], ["减少缩进", "⌘["]]],
+        "sep",
+        ["清除格式", "⌘\\"]
+      ],
+      "视图": [
+        ["编辑模式", "⌘1", null, "checked"], ["分栏模式", "⌘2"], ["预览模式", "⌘3"], "sep",
+        ["显示侧边栏", "⇧⌘L", null, "checked"], ["侧边栏", "", [["文件"], ["大纲"]]], "sep",
+        ["显示搜索", "⇧⌘F"], ["专注模式", "F8"], ["打字机模式", "F9"], ["显示状态栏", "", null, "checked"], "sep",
+        ["实际大小", "⇧⌘9"], ["放大", "⇧⌘="], ["缩小", "⇧⌘-"], "sep",
+        ["开发者工具", "⇧F12"]
+      ],
+      "主题": [
+        ["MiaoYan", "", null, "checked"], ["Inkstone Light"], ["Slate Manual"], ["Mono Lab"], ["Nocturne Dark"]
+      ],
+      "窗口": [
+        ["最小化", "⌘M"], ["切换全屏", "⌃⌘F"], ["保持窗口在最前端"], "sep", ["新建窗口", "⇧⌘N"]
+      ],
+      "帮助": [
+        ["Markdown 参考"], ["键盘快捷键"], "sep", ["GitHub 仓库"], ["反馈问题"], "sep", ["关于 Prism"]
+      ]
+    };
+
+    const contextModels = {
+      editor: [
+        ["剪切", "⌘X"], ["复制", "⌘C"], ["粘贴", "⌘V"], ["粘贴并匹配样式", "⌥⇧⌘V"], "sep",
+        ["粗体", "⌘B"], ["斜体", "⌘I"], ["下划线", "⌘U"], ["删除线", "⌥⇧5"], "sep",
+        ["复制为", "", [["纯文本"], ["Markdown"], ["HTML"]]]
+      ],
+      preview: [
+        ["复制", "⌘C"], ["全选", "⌘A"], "sep",
+        ["复制为", "", [["纯文本"], ["Markdown"], ["HTML"]]], ["在编辑器中定位源码"], "sep",
+        ["导出", "", [["PDF…"], ["Word (.docx)…"], ["HTML…"], ["PNG 图像…"]]]
+      ],
+      file: [
+        ["打开"], ["在新窗口中打开"], "sep",
+        ["重命名", "F2"], ["创建副本"], ["删除", "", null, "danger"], "sep",
+        ["复制文件路径"], ["在访达中显示"]
+      ],
+      folder: [
+        ["在新窗口中打开"], "sep",
+        ["新建文件"], ["新建文件夹"], ["搜索此文件夹"], "sep",
+        ["重命名", "F2"], ["删除", "", null, "danger"], "sep",
+        ["复制文件夹路径"], ["在访达中显示"]
+      ],
+      workspace: [
+        ["新建文件"], ["新建文件夹"], ["搜索工作区"], "sep",
+        ["显示为文档树", "", null, "checked"], ["显示为文档列表"], "sep",
+        ["排序方式", "", [["名称", "", null, "checked"], ["修改时间"], ["创建时间"], ["大小"]]], "sep",
+        ["刷新"], ["复制工作区路径"], ["在访达中显示"]
+      ],
+      export: [
+        ["导出为 PDF…"], ["导出为 Word (.docx)…"], ["导出为 HTML…"], ["导出为 PNG 图像…"]
+      ],
+      statusWorkspace: [
+        ["在新窗口中打开"], "sep",
+        ["新建文件"], ["新建文件夹"], ["搜索工作区"], "sep",
+        ["文档树", "", null, "checked"], ["文档列表"], "sep",
+        ["刷新"], ["复制工作区路径"], ["在访达中显示"]
+      ]
+    };
+
+    const explanations = {
+      top: "顶部菜单保留完整命令树，但只放真实可用能力。占位功能不出现。",
+      editor: "编辑区右键只处理当前文本编辑上下文，不放文件、视图或系统级动作。",
+      preview: "预览区右键服务阅读和复制，不混入粗体、斜体这类编辑动作。",
+      file: "文件右键围绕单个文件对象：打开、改名、复制、删除、定位。",
+      folder: "目录右键围绕容器对象：新建、搜索、改名、删除、定位。",
+      workspace: "工作区菜单处理全局文件树视图、排序、刷新和路径。",
+      export: "导出必须是统一子菜单，不再只露出 HTML。",
+      status: "状态栏只显示状态和高频入口，复杂动作全部进入子菜单。"
+    };
+
+    const menuBar = document.getElementById("menubar");
+    const surface = document.getElementById("surface");
+    const toast = document.getElementById("toast");
+    const selectedTitle = document.getElementById("selectedTitle");
+    const selectedCopy = document.getElementById("selectedCopy");
+    let openMenu = null;
+
+    function showToast(text) {
+      toast.textContent = text;
+      toast.classList.add("show");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove("show"), 1300);
+    }
+
+    function setExplanation(title, key) {
+      selectedTitle.textContent = title;
+      selectedCopy.textContent = explanations[key] || explanations.top;
+    }
+
+    function closeMenus() {
+      if (openMenu) openMenu.remove();
+      openMenu = null;
+      document.querySelectorAll(".menu-trigger.active").forEach((el) => el.classList.remove("active"));
+    }
+
+    function renderItems(items) {
+      const frag = document.createDocumentFragment();
+      items.forEach((item) => {
+        if (item === "sep") {
+          const div = document.createElement("div");
+          div.className = "divider";
+          frag.appendChild(div);
+          return;
+        }
+        const [label, shortcut = "", children = null, state = ""] = item;
+        const row = document.createElement("div");
+        row.className = "menu-row" + (state === "danger" ? " danger" : "");
+        row.innerHTML = `
+          <span class="mark">${state === "checked" ? "✓" : ""}</span>
+          <span>${label}</span>
+          <span>${children ? '<span class="arrow">›</span>' : `<span class="shortcut">${shortcut}</span>`}</span>
+        `;
+        if (children) {
+          const submenu = document.createElement("div");
+          submenu.className = "submenu";
+          submenu.appendChild(renderItems(children));
+          row.appendChild(submenu);
+        }
+        row.addEventListener("click", (event) => {
+          event.stopPropagation();
+          if (!children) {
+            showToast(label);
+            closeMenus();
+          }
+        });
+        frag.appendChild(row);
+      });
+      return frag;
+    }
+
+    function openDropdown(items, rect, title, key) {
+      closeMenus();
+      const menu = document.createElement("div");
+      menu.className = "dropdown";
+      menu.style.left = `${Math.min(rect.left, window.innerWidth - 280)}px`;
+      menu.style.top = `${rect.bottom + 4}px`;
+      menu.appendChild(renderItems(items));
+      document.body.appendChild(menu);
+      openMenu = menu;
+      setExplanation(title, key);
+      return menu;
+    }
+
+    function openContext(items, x, y, title, key) {
+      closeMenus();
+      const menu = document.createElement("div");
+      menu.className = "context-menu";
+      menu.style.left = `${Math.min(x, window.innerWidth - 300)}px`;
+      menu.style.top = `${Math.min(y, window.innerHeight - 360)}px`;
+      menu.appendChild(renderItems(items));
+      document.body.appendChild(menu);
+      openMenu = menu;
+      setExplanation(title, key);
+    }
+
+    Object.keys(menuModel).forEach((name) => {
+      const button = document.createElement("button");
+      button.className = "menu-trigger";
+      button.textContent = name;
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const wasActive = button.classList.contains("active");
+        closeMenus();
+        if (wasActive) return;
+        button.classList.add("active");
+        openDropdown(menuModel[name], button.getBoundingClientRect(), `顶部菜单：${name}`, "top");
+      });
+      menuBar.appendChild(button);
+    });
+
+    document.querySelectorAll("[data-mode-btn]").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll("[data-mode-btn]").forEach((btn) => btn.classList.remove("active"));
+        button.classList.add("active");
+        surface.dataset.mode = button.dataset.modeBtn;
+        setExplanation(`标题栏视图：${button.title}`, "status");
+      });
+    });
+
+    document.getElementById("editorPane").addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      openContext(contextModels.editor, event.clientX, event.clientY, "编辑区右键菜单", "editor");
+    });
+
+    document.getElementById("previewPane").addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      openContext(contextModels.preview, event.clientX, event.clientY, "预览区右键菜单", "preview");
+    });
+
+    document.getElementById("fileList").addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      const row = event.target.closest("[data-context]");
+      if (!row) {
+        openContext(contextModels.workspace, event.clientX, event.clientY, "文件树空白处菜单", "workspace");
+        return;
+      }
+      const type = row.dataset.context;
+      openContext(contextModels[type], event.clientX, event.clientY, type === "file" ? "文件右键菜单" : "目录右键菜单", type);
+    });
+
+    document.getElementById("workspaceMenuBtn").addEventListener("click", (event) => {
+      event.stopPropagation();
+      const rect = event.currentTarget.getBoundingClientRect();
+      openContext(contextModels.statusWorkspace, rect.left, rect.top - 272, "状态栏工作区菜单", "workspace");
+    });
+
+    document.getElementById("exportBtn").addEventListener("click", (event) => {
+      event.stopPropagation();
+      const rect = event.currentTarget.getBoundingClientRect();
+      openContext(contextModels.export, rect.left - 214, rect.top - 138, "状态栏导出菜单", "export");
+    });
+
+    document.getElementById("treeModeBtn").addEventListener("click", () => {
+      showToast("切换文档树 / 文档列表");
+      setExplanation("状态栏：文件树显示模式", "status");
+    });
+    document.getElementById("focusBtn").addEventListener("click", () => {
+      showToast("专注模式");
+      setExplanation("状态栏：专注模式", "status");
+    });
+    document.getElementById("sidebarBtn").addEventListener("click", () => {
+      showToast("收起 / 展开侧边栏");
+      setExplanation("状态栏：侧边栏开关", "status");
+    });
+
+    const pills = [
+      ["顶部菜单", () => {
+        const first = document.querySelector(".menu-trigger");
+        first.click();
+      }],
+      ["编辑区右键", () => openContext(contextModels.editor, 470, 350, "编辑区右键菜单", "editor")],
+      ["预览区右键", () => {
+        surface.dataset.mode = "preview";
+        document.querySelectorAll("[data-mode-btn]").forEach((btn) => btn.classList.toggle("active", btn.dataset.modeBtn === "preview"));
+        openContext(contextModels.preview, 520, 350, "预览区右键菜单", "preview");
+      }],
+      ["文件右键", () => openContext(contextModels.file, 190, 260, "文件右键菜单", "file")],
+      ["工作区菜单", () => openContext(contextModels.workspace, 170, 520, "工作区菜单", "workspace")],
+      ["导出菜单", () => openContext(contextModels.export, 760, 610, "状态栏导出菜单", "export")]
+    ];
+
+    const quickPills = document.getElementById("quickPills");
+    pills.forEach(([label, handler]) => {
+      const pill = document.createElement("button");
+      pill.className = "pill";
+      pill.textContent = label;
+      pill.addEventListener("click", handler);
+      quickPills.appendChild(pill);
+    });
+
+    document.addEventListener("click", closeMenus);
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeMenus();
+    });
+  </script>
+</body>
+</html>

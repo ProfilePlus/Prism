@@ -51,7 +51,7 @@ function buildEditorSelectionDecorations(view: EditorView): DecorationSet {
 
 import { markdown } from '@codemirror/lang-markdown';
 import { oneDark } from '@codemirror/theme-one-dark';
-import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands';
+import { history, historyKeymap, defaultKeymap, indentWithTab, undo, redo } from '@codemirror/commands';
 import { indentOnInput, bracketMatching, foldGutter, foldKeymap, syntaxTree } from '@codemirror/language';
 import { ViewPlugin } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
@@ -61,8 +61,8 @@ import hljs from 'highlight.js';
 import { useSettingsStore } from '../../settings/store';
 import type { ContentTheme } from '../../settings/types';
 import { useWorkspaceStore } from '../../workspace/store';
-import { FloatingToolbar } from './FloatingToolbar';
 import type { SearchAction, SearchParams } from './SearchPanel';
+import { ContextMenu, ContextMenuItem } from '../../../components/shell/ContextMenu';
 
 const editorLineNumbersCompartment = new Compartment();
 const editorDarkThemeCompartment = new Compartment();
@@ -125,6 +125,7 @@ function ensureSearchHighlighterEnabled(view: EditorView) {
 }
 
 export interface EditorPaneHandle {
+  focus: () => void;
   jumpToLine: (line: number) => void;
   setScrollRatio: (ratio: number) => void;
   scrollToLine: (line: number) => void;
@@ -141,6 +142,24 @@ interface EditorPaneProps {
   onTopLineChange?: (line: number) => void;
   onScroll?: () => void;
 }
+
+type EditorFormat =
+  | 'bold'
+  | 'italic'
+  | 'code'
+  | 'link'
+  | 'quote'
+  | 'underline'
+  | 'strikethrough'
+  | 'highlight';
+
+type EditorFormatResult = {
+  from: number;
+  to: number;
+  insert: string;
+  selectionFrom: number;
+  selectionTo: number;
+};
 
 // Compatibility themes use semantic Markdown decorations; each theme owns the
 // final colors in CSS so the parser layer stays visual-theme agnostic.
@@ -442,9 +461,254 @@ function getCursorPosition(view: EditorView) {
   };
 }
 
+type InlineFormatWrapper = {
+  prefix: string;
+  suffix: string;
+  markerChar?: '*' | '~';
+  markerLength?: number;
+};
+
+const INLINE_FORMAT_WRAPPERS: Partial<Record<EditorFormat, InlineFormatWrapper>> = {
+  bold: { prefix: '**', suffix: '**' },
+  italic: { prefix: '*', suffix: '*' },
+  code: { prefix: '`', suffix: '`' },
+  underline: { prefix: '<u>', suffix: '</u>' },
+  strikethrough: { prefix: '~~', suffix: '~~' },
+  highlight: { prefix: '==', suffix: '==' },
+};
+
+const PRECISION_INLINE_FORMAT_WRAPPERS: Partial<Record<EditorFormat, InlineFormatWrapper>> = {
+  bold: { prefix: '**', suffix: '**', markerChar: '*', markerLength: 2 },
+  italic: { prefix: '*', suffix: '*', markerChar: '*', markerLength: 1 },
+  underline: { prefix: '<u>', suffix: '</u>' },
+  strikethrough: { prefix: '~~', suffix: '~~', markerChar: '~', markerLength: 2 },
+};
+
+function countRunBackward(text: string, pos: number, char: string) {
+  let count = 0;
+  for (let index = pos - 1; index >= 0 && text[index] === char; index -= 1) {
+    count += 1;
+  }
+  return count;
+}
+
+function countRunForward(text: string, pos: number, char: string) {
+  let count = 0;
+  for (let index = pos; index < text.length && text[index] === char; index += 1) {
+    count += 1;
+  }
+  return count;
+}
+
+function getSelectionCore(doc: string, from: number, to: number) {
+  let coreFrom = from;
+  let coreTo = to;
+
+  while (coreFrom < coreTo && /\s/.test(doc[coreFrom])) coreFrom += 1;
+  while (coreTo > coreFrom && /\s/.test(doc[coreTo - 1])) coreTo -= 1;
+
+  return {
+    coreFrom,
+    coreTo,
+    core: doc.slice(coreFrom, coreTo),
+  };
+}
+
+function hasSelectedWrapper(core: string, wrapper: InlineFormatWrapper) {
+  if (
+    !core.startsWith(wrapper.prefix) ||
+    !core.endsWith(wrapper.suffix) ||
+    core.length < wrapper.prefix.length + wrapper.suffix.length
+  ) {
+    return false;
+  }
+
+  if (wrapper.markerChar && wrapper.markerLength) {
+    const startRun = countRunForward(core, 0, wrapper.markerChar);
+    const endRun = countRunBackward(core, core.length, wrapper.markerChar);
+    if (wrapper.markerChar === '*' && wrapper.markerLength === 1) {
+      return (startRun === 1 && endRun === 1) || (startRun >= 3 && endRun >= 3);
+    }
+    return startRun >= wrapper.markerLength && endRun >= wrapper.markerLength;
+  }
+
+  return true;
+}
+
+function hasSurroundingWrapper(doc: string, coreFrom: number, coreTo: number, wrapper: InlineFormatWrapper) {
+  if (
+    coreFrom < wrapper.prefix.length ||
+    doc.slice(coreFrom - wrapper.prefix.length, coreFrom) !== wrapper.prefix ||
+    doc.slice(coreTo, coreTo + wrapper.suffix.length) !== wrapper.suffix
+  ) {
+    return false;
+  }
+
+  if (wrapper.markerChar && wrapper.markerLength) {
+    const beforeRun = countRunBackward(doc, coreFrom, wrapper.markerChar);
+    const afterRun = countRunForward(doc, coreTo, wrapper.markerChar);
+    if (wrapper.markerChar === '*' && wrapper.markerLength === 1) {
+      return (beforeRun === 1 && afterRun === 1) || (beforeRun >= 3 && afterRun >= 3);
+    }
+    return beforeRun >= wrapper.markerLength && afterRun >= wrapper.markerLength;
+  }
+
+  return true;
+}
+
+function getPrecisionInlineFormatResult(
+  doc: string,
+  from: number,
+  to: number,
+  wrapper: InlineFormatWrapper,
+): EditorFormatResult {
+  if (from === to) {
+    const insert = `${wrapper.prefix}${wrapper.suffix}`;
+    const selection = from + wrapper.prefix.length;
+    return { from, to, insert, selectionFrom: selection, selectionTo: selection };
+  }
+
+  const { coreFrom, coreTo, core } = getSelectionCore(doc, from, to);
+
+  if (coreFrom === coreTo) {
+    const insert = `${wrapper.prefix}${wrapper.suffix}`;
+    const selection = coreFrom + wrapper.prefix.length;
+    return { from: coreFrom, to: coreTo, insert, selectionFrom: selection, selectionTo: selection };
+  }
+
+  if (hasSelectedWrapper(core, wrapper)) {
+    const insert = core.slice(wrapper.prefix.length, core.length - wrapper.suffix.length);
+    return {
+      from: coreFrom,
+      to: coreTo,
+      insert,
+      selectionFrom: coreFrom,
+      selectionTo: coreFrom + insert.length,
+    };
+  }
+
+  if (hasSurroundingWrapper(doc, coreFrom, coreTo, wrapper)) {
+    const unwrapFrom = coreFrom - wrapper.prefix.length;
+    const unwrapTo = coreTo + wrapper.suffix.length;
+    return {
+      from: unwrapFrom,
+      to: unwrapTo,
+      insert: core,
+      selectionFrom: unwrapFrom,
+      selectionTo: unwrapFrom + core.length,
+    };
+  }
+
+  const insert = `${wrapper.prefix}${core}${wrapper.suffix}`;
+  const selectionFrom = coreFrom + wrapper.prefix.length;
+  return {
+    from: coreFrom,
+    to: coreTo,
+    insert,
+    selectionFrom,
+    selectionTo: selectionFrom + core.length,
+  };
+}
+
+function getEditorInlineFormatResult(
+  doc: string,
+  from: number,
+  to: number,
+  format: Exclude<EditorFormat, 'quote'>,
+): EditorFormatResult {
+  const selectedText = doc.slice(from, to);
+
+  if (format === 'link') {
+    const fullLink = selectedText.match(/^\[([^\]]+)\]\(([^)]*)\)$/);
+    if (fullLink) {
+      const insert = fullLink[1];
+      return { from, to, insert, selectionFrom: from, selectionTo: from + insert.length };
+    }
+
+    const insert = `[${selectedText}](url)`;
+    const urlStart = from + selectedText.length + 3;
+    return { from, to, insert, selectionFrom: urlStart, selectionTo: urlStart + 3 };
+  }
+
+  const precisionWrapper = PRECISION_INLINE_FORMAT_WRAPPERS[format];
+  if (precisionWrapper) {
+    return getPrecisionInlineFormatResult(doc, from, to, precisionWrapper);
+  }
+
+  const wrapper = INLINE_FORMAT_WRAPPERS[format];
+  if (!wrapper) {
+    return { from, to, insert: selectedText, selectionFrom: from, selectionTo: to };
+  }
+
+  if (
+    selectedText.startsWith(wrapper.prefix) &&
+    selectedText.endsWith(wrapper.suffix) &&
+    selectedText.length >= wrapper.prefix.length + wrapper.suffix.length
+  ) {
+    const insert = selectedText.slice(wrapper.prefix.length, selectedText.length - wrapper.suffix.length);
+    return { from, to, insert, selectionFrom: from, selectionTo: from + insert.length };
+  }
+
+  const surroundingPrefix = doc.slice(Math.max(0, from - wrapper.prefix.length), from);
+  const surroundingSuffix = doc.slice(to, to + wrapper.suffix.length);
+  if (surroundingPrefix === wrapper.prefix && surroundingSuffix === wrapper.suffix) {
+    const unwrapFrom = from - wrapper.prefix.length;
+    const unwrapTo = to + wrapper.suffix.length;
+    return {
+      from: unwrapFrom,
+      to: unwrapTo,
+      insert: selectedText,
+      selectionFrom: unwrapFrom,
+      selectionTo: unwrapFrom + selectedText.length,
+    };
+  }
+
+  const insert = `${wrapper.prefix}${selectedText}${wrapper.suffix}`;
+  const selectionFrom = from + wrapper.prefix.length;
+  return {
+    from,
+    to,
+    insert,
+    selectionFrom,
+    selectionTo: selectionFrom + selectedText.length,
+  };
+}
+
+function getLineRangeForSelection(doc: string, from: number, to: number) {
+  const lineStart = doc.lastIndexOf('\n', Math.max(0, from - 1)) + 1;
+  const endProbe = to > from && doc[to - 1] === '\n' ? to - 1 : to;
+  const nextBreak = doc.indexOf('\n', endProbe);
+  const lineEnd = nextBreak === -1 ? doc.length : nextBreak;
+  return { lineStart, lineEnd };
+}
+
+function getEditorQuoteFormatResult(doc: string, from: number, to: number): EditorFormatResult {
+  const { lineStart, lineEnd } = getLineRangeForSelection(doc, from, to);
+  const selectedLines = doc.slice(lineStart, lineEnd);
+  const lines = selectedLines.split('\n');
+  const shouldUnquote = lines.every((line) => line.length === 0 || /^>\s?/.test(line));
+  const insert = lines
+    .map((line) => (shouldUnquote ? line.replace(/^>\s?/, '') : `> ${line}`))
+    .join('\n');
+
+  return {
+    from: lineStart,
+    to: lineEnd,
+    insert,
+    selectionFrom: lineStart,
+    selectionTo: lineStart + insert.length,
+  };
+}
+
+function getEditorFormatResult(doc: string, from: number, to: number, format: EditorFormat) {
+  if (format === 'quote') return getEditorQuoteFormatResult(doc, from, to);
+  return getEditorInlineFormatResult(doc, from, to, format);
+}
+
 export const __editorPaneTesting = {
   getMiaoyanCodeLanguage,
   getMiaoyanCodeHighlightRanges,
+  getEditorFormatResult,
   shouldHighlightCompatibilityCodeTheme: (theme: ContentTheme) => COMPATIBILITY_CODE_HIGHLIGHT_THEMES.has(theme),
   MIAOYAN_CODE_BLOCK_HIGHLIGHT_LIMIT,
 };
@@ -470,11 +734,11 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     // 关键标记：用于拦截因同步内容触发的 onChange
     const isUpdatingFromPropsRef = useRef(false);
 
-    const [toolbarState, setToolbarState] = useState({
-      visible: false,
-      x: 0,
-      y: 0,
-    });
+    const [editorContextMenu, setEditorContextMenu] = useState<{
+      x: number;
+      y: number;
+      hasSelection: boolean;
+    } | null>(null);
 
     useEffect(() => {
       onChangeRef.current = onChange;
@@ -501,6 +765,12 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     }, [typewriterMode]);
 
     useImperativeHandle(ref, () => ({
+      focus: () => {
+        const view = viewRef.current;
+        if (!view) return;
+        view.requestMeasure();
+        view.focus();
+      },
       jumpToLine: (lineNumber: number) => {
         const view = viewRef.current;
         if (!view) return;
@@ -615,63 +885,84 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     }));
 
     const handleFormat = useCallback(
-      (
-        format:
-          | 'bold'
-          | 'italic'
-          | 'code'
-          | 'link'
-          | 'quote'
-          | 'underline'
-          | 'strikethrough'
-          | 'highlight',
-      ) => {
+      (format: EditorFormat) => {
         const view = viewRef.current;
         if (!view) return;
 
         const selection = view.state.selection.main;
-        if (selection.from === selection.to) {
-          setToolbarState({ visible: false, x: 0, y: 0 });
-          return;
-        }
-
-        const selectedText = view.state.doc.sliceString(selection.from, selection.to);
-
-        let wrappedText = selectedText;
-        if (format === 'bold') {
-          wrappedText = `**${selectedText}**`;
-        } else if (format === 'italic') {
-          wrappedText = `*${selectedText}*`;
-        } else if (format === 'code') {
-          wrappedText = `\`${selectedText}\``;
-        } else if (format === 'link') {
-          wrappedText = `[${selectedText}](url)`;
-        } else if (format === 'quote') {
-          wrappedText = selectedText
-            .split('\n')
-            .map((line) => `> ${line}`)
-            .join('\n');
-        } else if (format === 'underline') {
-          wrappedText = `<u>${selectedText}</u>`;
-        } else if (format === 'strikethrough') {
-          wrappedText = `~~${selectedText}~~`;
-        } else if (format === 'highlight') {
-          wrappedText = `<mark>${selectedText}</mark>`;
-        }
+        const result = getEditorFormatResult(
+          view.state.doc.toString(),
+          selection.from,
+          selection.to,
+          format,
+        );
 
         view.dispatch({
           changes: {
-            from: selection.from,
-            to: selection.to,
-            insert: wrappedText,
+            from: result.from,
+            to: result.to,
+            insert: result.insert,
           },
+          selection: { anchor: result.selectionFrom, head: result.selectionTo },
         });
 
-        setToolbarState({ visible: false, x: 0, y: 0 });
         view.focus();
       },
       [],
     );
+
+    const getEditorContextMenuItems = useCallback((hasSelection: boolean): ContextMenuItem[] => [
+      { label: '剪切', action: 'cut', shortcut: '⌘X', disabled: !hasSelection },
+      { label: '拷贝', action: 'copy', shortcut: '⌘C', disabled: !hasSelection },
+      { label: '粘贴', action: 'paste', shortcut: '⌘V' },
+      { label: '粘贴并匹配样式', action: 'pastePlain', shortcut: '⌥⇧⌘V' },
+      { type: 'separator' },
+      { label: '粗体', action: 'format:bold', shortcut: '⌘B' },
+      { label: '斜体', action: 'format:italic', shortcut: '⌘I' },
+      { label: '下划线', action: 'format:underline', shortcut: '⌘U' },
+      { label: '删除线', action: 'format:strikethrough', shortcut: '⌥⇧5' },
+    ], []);
+
+    const handleEditorContextMenuAction = useCallback(async (action: string) => {
+      const view = viewRef.current;
+      if (!view) return;
+
+      if (action.startsWith('format:')) {
+        handleFormat(action.slice('format:'.length) as EditorFormat);
+        return;
+      }
+
+      const selection = view.state.selection.main;
+      const selectedText = selection.from === selection.to
+        ? ''
+        : view.state.doc.sliceString(selection.from, selection.to);
+
+      switch (action) {
+        case 'cut':
+          if (!selectedText) break;
+          await navigator.clipboard.writeText(selectedText);
+          view.dispatch({
+            changes: { from: selection.from, to: selection.to, insert: '' },
+            selection: { anchor: selection.from },
+          });
+          break;
+        case 'copy':
+          if (selectedText) await navigator.clipboard.writeText(selectedText);
+          break;
+        case 'paste':
+        case 'pastePlain': {
+          const text = await navigator.clipboard.readText();
+          if (!text) break;
+          view.dispatch({
+            changes: { from: selection.from, to: selection.to, insert: text },
+            selection: { anchor: selection.from + text.length },
+          });
+          break;
+        }
+      }
+
+      view.focus();
+    }, [handleFormat]);
 
     // 监听菜单格式化事件
     useEffect(() => {
@@ -788,10 +1079,10 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
 
         switch (command) {
           case 'undo':
-            import('@codemirror/commands').then(m => m.undo(view));
+            undo(view);
             break;
           case 'redo':
-            import('@codemirror/commands').then(m => m.redo(view));
+            redo(view);
             break;
           case 'cut':
             document.execCommand('cut');
@@ -958,10 +1249,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
               if (typewriterModeRef.current && update.selectionSet) {
                 update.view.dispatch({ effects: EditorView.scrollIntoView(update.state.selection.main.head, { y: 'center' }) });
               }
-              const selection = update.state.selection.main;
-              if (selection.from === selection.to) {
-                setToolbarState((prev) => (prev.visible ? { ...prev, visible: false } : prev));
-              }
             }
           }),
         ],
@@ -974,18 +1261,31 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
 
       viewRef.current = view;
 
-      const handleMouseUp = () => {
+      const handleContextMenu = (event: MouseEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
         const selection = view.state.selection.main;
-        if (selection.from !== selection.to) {
-          const coordsFrom = view.coordsAtPos(selection.from);
-          const coordsTo = view.coordsAtPos(selection.to);
-          if (coordsFrom && coordsTo) {
-            setToolbarState({ visible: true, x: (coordsFrom.left + coordsTo.left) / 2, y: Math.min(coordsFrom.top, coordsTo.top) });
-          }
+        const rightClickedInsideSelection =
+          pos !== null &&
+          selection.from !== selection.to &&
+          pos >= selection.from &&
+          pos <= selection.to;
+
+        if (pos !== null && !rightClickedInsideSelection) {
+          view.dispatch({ selection: { anchor: pos } });
         }
+
+        const nextSelection = view.state.selection.main;
+        setEditorContextMenu({
+          x: event.clientX,
+          y: event.clientY,
+          hasSelection: nextSelection.from !== nextSelection.to,
+        });
       };
 
-      view.dom.addEventListener('mouseup', handleMouseUp);
+      view.dom.addEventListener('contextmenu', handleContextMenu);
       const handleScroll = () => {
         const scroller = view.scrollDOM;
         const maxScroll = scroller.scrollHeight - scroller.clientHeight;
@@ -1008,7 +1308,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       view.scrollDOM.addEventListener('scroll', handleScroll);
 
       return () => {
-        view.dom.removeEventListener('mouseup', handleMouseUp);
+        view.dom.removeEventListener('contextmenu', handleContextMenu);
         view.scrollDOM.removeEventListener('scroll', handleScroll);
         view.destroy();
         viewRef.current = null;
@@ -1042,8 +1342,19 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
 
     return (
       <>
-        <div ref={editorRef} style={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} />
-        <FloatingToolbar visible={toolbarState.visible} x={toolbarState.x} y={toolbarState.y} onFormat={handleFormat} />
+        <div
+          ref={editorRef}
+          style={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+        />
+        {editorContextMenu && (
+          <ContextMenu
+            x={editorContextMenu.x}
+            y={editorContextMenu.y}
+            items={getEditorContextMenuItems(editorContextMenu.hasSelection)}
+            onAction={handleEditorContextMenuAction}
+            onClose={() => setEditorContextMenu(null)}
+          />
+        )}
       </>
     );
   },
