@@ -22,6 +22,7 @@ describe('normalizeSettings', () => {
     expect(settings.defaultViewMode).toBe(DEFAULT_SETTINGS.defaultViewMode);
     expect(settings.exportDefaults).toEqual(DEFAULT_SETTINGS.exportDefaults);
     expect(settings.shortcutStyle).toBe(DEFAULT_SETTINGS.shortcutStyle);
+    expect(settings.wordWrap).toBe(DEFAULT_SETTINGS.wordWrap);
   });
 
   it('rejects invalid persisted values and keeps valid nested export defaults', () => {
@@ -34,6 +35,7 @@ describe('normalizeSettings', () => {
       defaultViewMode: 'reader',
       shortcutStyle: 'linux',
       showLineNumbers: 'yes',
+      wordWrap: 'no',
       exportDefaults: {
         format: 'docx',
         pngScale: 3,
@@ -49,6 +51,7 @@ describe('normalizeSettings', () => {
     expect(settings.defaultViewMode).toBe(DEFAULT_SETTINGS.defaultViewMode);
     expect(settings.shortcutStyle).toBe(DEFAULT_SETTINGS.shortcutStyle);
     expect(settings.showLineNumbers).toBe(DEFAULT_SETTINGS.showLineNumbers);
+    expect(settings.wordWrap).toBe(DEFAULT_SETTINGS.wordWrap);
     expect(settings.exportDefaults).toEqual({
       ...DEFAULT_SETTINGS.exportDefaults,
       format: 'docx',
@@ -87,6 +90,7 @@ describe('normalizeSettings', () => {
         { path: '/tmp/b.md', name: 'b.md', lastOpened: 2 },
       ],
       restoreLastSession: false,
+      wordWrap: false,
       lastSession: {
         filePath: '/tmp/b.md',
         folderPath: '/tmp',
@@ -112,6 +116,7 @@ describe('normalizeSettings', () => {
     expect(settings.previewFontSource).toEqual({ kind: 'custom', value: 'font-1' });
     expect(settings.recentFiles.map((file) => file.name)).toEqual(['b.md', 'a.md']);
     expect(settings.restoreLastSession).toBe(false);
+    expect(settings.wordWrap).toBe(false);
     expect(settings.lastSession?.viewMode).toBe('split');
   });
 });

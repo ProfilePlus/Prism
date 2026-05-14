@@ -808,6 +808,14 @@ export const commandRegistry = [
     run: (context) => context.workspaceStore.toggleTypewriterMode(),
   }),
   command({
+    id: 'wordWrap',
+    label: '自动换行',
+    category: '视图',
+    keywords: ['wrap', 'line wrap'],
+    checked: (context) => context.settingsStore.wordWrap,
+    run: (context) => context.settingsStore.setWordWrap(!context.settingsStore.wordWrap),
+  }),
+  command({
     id: 'statusBar',
     label: '显示状态栏',
     category: '视图',

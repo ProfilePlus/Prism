@@ -104,6 +104,7 @@ interface SettingsStore extends SettingsState {
   setAutoSaveInterval: (interval: number) => void;
   setAutoSaveStrategy: (strategy: AutoSaveStrategy) => void;
   setShowLineNumbers: (show: boolean) => void;
+  setWordWrap: (wordWrap: boolean) => void;
   addRecentFile: (path: string, name: string) => void;
   clearRecentFiles: () => void;
   setRecentFilesLimit: (limit: number) => void;
@@ -305,6 +306,11 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     get().saveSettings();
   },
 
+  setWordWrap: (wordWrap) => {
+    set({ wordWrap });
+    get().saveSettings();
+  },
+
   addRecentFile: (path, name) => {
     set((state) => {
       const recentFiles = normalizeRecentFiles([
@@ -418,6 +424,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         autoSaveInterval,
         autoSaveStrategy,
         showLineNumbers,
+        wordWrap,
         customFonts,
         editorFontSource,
         previewFontSource,
@@ -443,6 +450,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
           autoSaveInterval,
           autoSaveStrategy,
           showLineNumbers,
+          wordWrap,
           customFonts,
           editorFontSource,
           previewFontSource,

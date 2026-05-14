@@ -276,6 +276,7 @@ export function normalizeSettings(saved: Partial<SettingsState>): SettingsState 
       ? saved.autoSaveStrategy
       : inferAutoSaveStrategy(autoSaveInterval),
     showLineNumbers: booleanOrDefault(saved.showLineNumbers, DEFAULT_SETTINGS.showLineNumbers),
+    wordWrap: booleanOrDefault(saved.wordWrap, DEFAULT_SETTINGS.wordWrap),
     customFonts: normalizeCustomFonts(saved.customFonts),
     editorFontSource: migrateEditorFontSource(saved),
     previewFontSource: migratePreviewFontSource(saved),

@@ -37,6 +37,7 @@ import { addLineFlash, editorSelectionPlugin, lineFlashField, removeLineFlash } 
 import { scrollPrimarySelectionToCenter } from '../extensions/typewriter';
 
 const editorLineNumbersCompartment = new Compartment();
+const editorLineWrappingCompartment = new Compartment();
 const editorDarkThemeCompartment = new Compartment();
 const editorContentThemeCompartment = new Compartment();
 const editorTypographyCompartment = new Compartment();
@@ -64,6 +65,10 @@ function shouldUseDarkEditor(contentTheme: string, theme: string) {
 
 function getLineNumberExtensions(showLineNumbers: boolean) {
   return showLineNumbers ? [lineNumbers(), highlightActiveLineGutter(), foldGutter()] : [];
+}
+
+function getLineWrappingExtensions(wordWrap: boolean) {
+  return wordWrap ? [EditorView.lineWrapping] : [];
 }
 
 function getDarkThemeExtensions(isEditorDark: boolean) {
@@ -154,6 +159,7 @@ export const __editorPaneTesting = {
   getEditorFormatResult,
   getEditorTypographyStyle,
   getLineNumberExtensions,
+  getLineWrappingExtensions,
   shouldHighlightCompatibilityCodeTheme,
   MIAOYAN_CODE_BLOCK_HIGHLIGHT_LIMIT,
 };
@@ -173,6 +179,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     const contentTheme = useSettingsStore((s) => s.contentTheme);
     const isEditorDark = useSettingsStore((s) => shouldUseDarkEditor(s.contentTheme, s.theme));
     const showLineNumbers = useSettingsStore((s) => s.showLineNumbers);
+    const wordWrap = useSettingsStore((s) => s.wordWrap);
     const editorFontSize = useSettingsStore((s) => s.fontSize);
     const editorFontFamily = useSettingsStore((s) => s.editorFontFamily);
     const editorFontSource = useSettingsStore((s) => s.editorFontSource);
@@ -601,6 +608,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             createPanel: createHiddenSearchPanel,
             scrollToMatch: (range) => EditorView.scrollIntoView(range, { y: 'center' }),
           }),
+          editorLineWrappingCompartment.of(getLineWrappingExtensions(wordWrap)),
           EditorState.allowMultipleSelections.of(true),
           indentOnInput(),
           editorContentThemeCompartment.of(getContentThemeExtension(contentTheme)),
@@ -624,7 +632,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             ...foldKeymap,
             indentWithTab,
           ]),
-          EditorView.lineWrapping,
           markdown(),
           editorDarkThemeCompartment.of(getDarkThemeExtensions(isEditorDark)),
           EditorView.theme({
@@ -759,6 +766,14 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         effects: editorLineNumbersCompartment.reconfigure(getLineNumberExtensions(showLineNumbers)),
       });
     }, [showLineNumbers]);
+
+    useEffect(() => {
+      const view = viewRef.current;
+      if (!view) return;
+      view.dispatch({
+        effects: editorLineWrappingCompartment.reconfigure(getLineWrappingExtensions(wordWrap)),
+      });
+    }, [wordWrap]);
 
     useEffect(() => {
       const view = viewRef.current;

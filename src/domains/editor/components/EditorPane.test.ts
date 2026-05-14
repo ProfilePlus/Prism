@@ -87,6 +87,11 @@ describe('EditorPane settings integration helpers', () => {
     expect(__editorPaneTesting.getLineNumberExtensions(false)).toHaveLength(0);
     expect(__editorPaneTesting.getLineNumberExtensions(true).length).toBeGreaterThan(0);
   });
+
+  it('only installs line wrapping when automatic wrapping is enabled', () => {
+    expect(__editorPaneTesting.getLineWrappingExtensions(false)).toHaveLength(0);
+    expect(__editorPaneTesting.getLineWrappingExtensions(true).length).toBeGreaterThan(0);
+  });
 });
 
 describe('EditorPane context menu formatting', () => {

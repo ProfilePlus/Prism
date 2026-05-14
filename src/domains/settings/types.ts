@@ -74,6 +74,7 @@ export interface SettingsState {
   autoSaveInterval: number;
   autoSaveStrategy: AutoSaveStrategy;
   showLineNumbers: boolean;
+  wordWrap: boolean;
   customFonts: CustomFont[];
   editorFontSource: FontSource;
   previewFontSource: FontSource;
@@ -115,6 +116,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   autoSaveInterval: 2000,
   autoSaveStrategy: 'balanced',
   showLineNumbers: false,
+  wordWrap: true,
   customFonts: [],
   editorFontSource: { kind: 'theme', value: '' },
   previewFontSource: { kind: 'theme', value: '' },

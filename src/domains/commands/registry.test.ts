@@ -50,6 +50,7 @@ function createCommandContext(overrides: Partial<CommandContext> = {}): CommandC
       setAutoSaveInterval: vi.fn(),
       setAutoSaveStrategy: vi.fn(),
       setShowLineNumbers: vi.fn(),
+      setWordWrap: vi.fn(),
       addRecentFile: vi.fn(),
       clearRecentFiles: vi.fn(),
       setRecentFilesLimit: vi.fn(),
@@ -120,6 +121,24 @@ describe('command registry', () => {
     expect(Object.keys(sections)).not.toContain('Prism');
     expect(fileActions).toContain('preferences');
     expect(helpActions).toEqual(expect.arrayContaining(['commandPalette', 'showShortcuts', 'about']));
+  });
+
+  it('places automatic line wrapping in the View menu and toggles the persisted editor setting', async () => {
+    const setWordWrap = vi.fn();
+    const context = createCommandContext({
+      settingsStore: {
+        ...createCommandContext().settingsStore,
+        wordWrap: true,
+        setWordWrap,
+      },
+    });
+    const viewActions = getMenuSections(context)['视图']
+      .flatMap((item) => item.type === 'separator' ? [] : [item.action]);
+
+    expect(viewActions).toEqual(expect.arrayContaining(['typewriterMode', 'wordWrap', 'statusBar']));
+
+    await runCommand('wordWrap', context);
+    expect(setWordWrap).toHaveBeenCalledWith(false);
   });
 
   it('builds recent document menu items from settings', () => {

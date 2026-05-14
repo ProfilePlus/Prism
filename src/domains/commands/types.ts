@@ -75,6 +75,7 @@ export type CommandId =
   | 'showOutline'
   | 'focusMode'
   | 'typewriterMode'
+  | 'wordWrap'
   | 'statusBar'
   | 'actualSize'
   | 'zoomIn'

@@ -136,6 +136,7 @@ function App() {
   const shortcutStyle = useSettingsStore((s) => s.shortcutStyle);
   const autoSaveInterval = useSettingsStore((s) => s.autoSaveInterval);
   const autoSaveEnabled = useSettingsStore((s) => s.autoSaveEnabled);
+  const wordWrap = useSettingsStore((s) => s.wordWrap);
   const exportDefaults = useSettingsStore((s) => s.exportDefaults);
   const recentFiles = useSettingsStore((s) => s.recentFiles);
   const workspace = useWorkspaceStore();
@@ -413,6 +414,7 @@ function App() {
     workspace.isAlwaysOnTop,
     contentTheme,
     shortcutStyle,
+    wordWrap,
     exportDefaults,
     recentFiles,
   ]);

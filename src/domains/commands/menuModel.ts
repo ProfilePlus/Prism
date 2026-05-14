@@ -148,6 +148,7 @@ const menuModel: MenuModel = {
     { type: 'separator' },
     { command: 'focusMode' },
     { command: 'typewriterMode' },
+    { command: 'wordWrap' },
     { command: 'statusBar' },
     { type: 'separator' },
     { command: 'actualSize' },
