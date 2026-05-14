@@ -15,6 +15,13 @@ type MenuModelItem =
 type MenuModel = Record<string, MenuModelItem[]>;
 
 const menuModel: MenuModel = {
+  'Prism': [
+    { command: 'preferences' },
+    { command: 'commandPalette' },
+    { command: 'showShortcuts' },
+    { type: 'separator' },
+    { command: 'about' },
+  ],
   '文件': [
     { command: 'new' },
     { command: 'newWindow' },
@@ -150,15 +157,9 @@ const menuModel: MenuModel = {
     { command: 'newWindow' },
   ],
   '帮助': [
-    { command: 'preferences' },
-    { command: 'commandPalette' },
     { command: 'mdReference' },
-    { command: 'showShortcuts' },
-    { type: 'separator' },
     { command: 'github' },
     { command: 'feedback' },
-    { type: 'separator' },
-    { command: 'about' },
   ],
 };
 

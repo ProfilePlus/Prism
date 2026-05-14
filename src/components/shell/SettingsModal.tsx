@@ -37,9 +37,9 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
   return (
     <>
       <div className="modal-overlay" onClick={onClose} />
-      <div className="modal" role="dialog" aria-label="偏好设置">
+      <div className="modal" role="dialog" aria-label="设置中心">
         <div className="modal-header">
-          <div className="modal-title">偏好设置</div>
+          <div className="modal-title">设置中心</div>
           <button className="modal-close" onClick={onClose} aria-label="关闭">×</button>
         </div>
         <div className="modal-body">
