@@ -5,7 +5,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { invoke } from '@tauri-apps/api/core';
 import { loadFolderTree } from '../domains/workspace/lib/loadFolderTree';
-import { openUrl } from '@tauri-apps/plugin-opener';
+import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
 import { openPrismWindow } from './openWindow';
 import { addRecentFile } from './recentFiles';
 import { exportDocument, getExportFormatLabel, type ExportFormat } from './exportDocument';
@@ -37,6 +37,10 @@ export async function executeMenuAction(
         return await handleExport('docx', context);
       case 'exportPng':
         return await handleExport('png', context);
+      case 'openCurrentLocation':
+        return await handleOpenCurrentLocation(context);
+      case 'closeDocument':
+        return await handleCloseDocument(context);
 
       // ═══ 视图切换 ═══
       case 'sourceMode':
@@ -79,6 +83,7 @@ export async function executeMenuAction(
       case 'copyHtml':
       case 'copyPlain':
       case 'pastePlain':
+      case 'selectAll':
       case 'clearFormat':
       case 'comment':
         return handleEditorCommand(action);
@@ -100,10 +105,24 @@ export async function executeMenuAction(
       case 'h5':
       case 'h6':
         return handleHeading(action as any, context);
+      case 'heading1':
+        return handleHeading('h1', context);
+      case 'heading2':
+        return handleHeading('h2', context);
+      case 'heading3':
+        return handleHeading('h3', context);
+      case 'heading4':
+        return handleHeading('h4', context);
+      case 'heading5':
+        return handleHeading('h5', context);
+      case 'heading6':
+        return handleHeading('h6', context);
       case 'quote':
+      case 'blockquote':
       case 'codeBlock':
       case 'orderedList':
       case 'unorderedList':
+      case 'bulletList':
       case 'taskList':
       case 'hr':
       case 'paragraph':
@@ -116,9 +135,15 @@ export async function executeMenuAction(
       case 'footnote':
       case 'toc':
       case 'yaml':
-        return handleBlockFormat(action as any, context);
+        return handleBlockFormat((action === 'blockquote'
+          ? 'quote'
+          : action === 'bulletList'
+            ? 'unorderedList'
+            : action) as any, context);
 
       // ═══ 窗口控制 ═══
+      case 'minimize':
+        return await handleMinimize();
       case 'fullscreen':
         return await handleFullscreen(context);
       case 'actualSize':
@@ -142,6 +167,7 @@ export async function executeMenuAction(
       case 'whatsNew':
       case 'quickStart':
       case 'mdReference':
+      case 'docs':
       case 'pandoc':
       case 'customThemes':
       case 'useImages':
@@ -151,6 +177,7 @@ export async function executeMenuAction(
       case 'changelog':
       case 'privacy':
       case 'website':
+      case 'github':
       case 'feedback':
         return handleHelpLink(action);
       case 'checkUpdate':
@@ -166,14 +193,6 @@ export async function executeMenuAction(
       // ═══ 剩余文件菜单 ═══
       case 'newWindow':
         return await openPrismWindow({});
-      case 'quickOpen':
-        return await handleOpen(context);
-      case 'saveAll':
-        return await handleSave(context);
-      case 'import':
-        return await handleOpen(context);
-      case 'moveTo':
-        return await handleSaveAs(context);
       case 'properties':
         if (context.documentStore.currentDocument) {
           context.showToast?.(`路径: ${context.documentStore.currentDocument.path || '(未保存)'}`);
@@ -186,19 +205,6 @@ export async function executeMenuAction(
         return;
 
       // ═══ 剩余编辑菜单 ═══
-      case 'pasteImage':
-        context.showToast?.('请直接将图片粘贴到编辑器');
-        return;
-      case 'spellCheck':
-        context.showToast?.('拼写检查功能即将推出');
-        return;
-      case 'findBlock':
-        context.showToast?.('查找对应模块功能即将推出');
-        return;
-      case 'emoji':
-        context.showToast?.('请使用 Win+. 打开系统表情面板');
-        return;
-
       default:
         console.log(`[Menu] Unimplemented: ${action}`);
         context.showToast?.(`功能 "${action}" 即将推出`);
@@ -401,6 +407,46 @@ async function handleExport(format: ExportFormat, context: MenuActionContext): P
   }
 }
 
+async function handleOpenCurrentLocation(context: MenuActionContext): Promise<void> {
+  const docPath = context.documentStore.currentDocument?.path;
+  if (docPath) {
+    await revealItemInDir(docPath);
+    return;
+  }
+
+  const rootPath = context.workspaceStore.rootPath;
+  if (rootPath) {
+    await openPath(rootPath);
+    return;
+  }
+
+  context.showToast?.('当前没有可显示的位置');
+}
+
+async function handleCloseDocument(context: MenuActionContext): Promise<void> {
+  const doc = context.documentStore.currentDocument;
+  if (!doc) return;
+
+  if (doc.isDirty) {
+    let targetPath = doc.path;
+    if (!targetPath) {
+      if (!context.requestSavePath) {
+        context.showToast?.('保存面板未就绪');
+        return;
+      }
+      const chosen = await context.requestSavePath({
+        filename: doc.name,
+        documentPath: doc.path,
+      });
+      if (!chosen) return;
+      targetPath = chosen;
+    }
+    await writeTextFile(targetPath, doc.content);
+  }
+
+  context.documentStore.closeDocument();
+}
+
 // ══════════════════════════════════════════════════════════
 // 视图
 // ══════════════════════════════════════════════════════════
@@ -499,6 +545,10 @@ async function handleFullscreen(context: MenuActionContext): Promise<void> {
   context.workspaceStore.setFullscreen(!isFull);
 }
 
+async function handleMinimize(): Promise<void> {
+  await getCurrentWindow().minimize();
+}
+
 async function handleAlwaysOnTop(context: MenuActionContext): Promise<void> {
   const win = getCurrentWindow();
   const isOnTop = await win.isAlwaysOnTop?.();
@@ -543,6 +593,7 @@ async function handleHelpLink(action: string): Promise<void> {
     whatsNew: 'https://github.com/prism-editor/prism/releases',
     quickStart: 'https://github.com/prism-editor/prism/wiki/quick-start',
     mdReference: 'https://www.markdownguide.org/basic-syntax/',
+    docs: 'https://www.markdownguide.org/basic-syntax/',
     pandoc: 'https://pandoc.org/installing.html',
     customThemes: 'https://github.com/prism-editor/prism/wiki/themes',
     useImages: 'https://github.com/prism-editor/prism/wiki/images',
@@ -551,8 +602,9 @@ async function handleHelpLink(action: string): Promise<void> {
     thanks: 'https://github.com/prism-editor/prism/blob/main/THANKS.md',
     changelog: 'https://github.com/prism-editor/prism/blob/main/CHANGELOG.md',
     privacy: 'https://github.com/prism-editor/prism/blob/main/PRIVACY.md',
-    website: 'https://github.com/prism-editor/prism',
-    feedback: 'https://github.com/prism-editor/prism/issues',
+    website: 'https://github.com/AlexPlum405/Prism',
+    github: 'https://github.com/AlexPlum405/Prism',
+    feedback: 'https://github.com/AlexPlum405/Prism/issues',
   };
   const url = urls[action];
   if (url) {

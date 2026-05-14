@@ -63,6 +63,7 @@ import type { ContentTheme } from '../../settings/types';
 import { useWorkspaceStore } from '../../workspace/store';
 import type { SearchAction, SearchParams } from './SearchPanel';
 import { ContextMenu, ContextMenuItem } from '../../../components/shell/ContextMenu';
+import { markdownToHtml } from '../../../lib/markdownToHtml';
 
 const editorLineNumbersCompartment = new Compartment();
 const editorDarkThemeCompartment = new Compartment();
@@ -913,14 +914,23 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
 
     const getEditorContextMenuItems = useCallback((hasSelection: boolean): ContextMenuItem[] => [
       { label: '剪切', action: 'cut', shortcut: '⌘X', disabled: !hasSelection },
-      { label: '拷贝', action: 'copy', shortcut: '⌘C', disabled: !hasSelection },
+      { label: '复制', action: 'copy', shortcut: '⌘C', disabled: !hasSelection },
       { label: '粘贴', action: 'paste', shortcut: '⌘V' },
-      { label: '粘贴并匹配样式', action: 'pastePlain', shortcut: '⌥⇧⌘V' },
+      { label: '粘贴并匹配样式', action: 'pastePlain', shortcut: '⇧⌘V' },
       { type: 'separator' },
       { label: '粗体', action: 'format:bold', shortcut: '⌘B' },
       { label: '斜体', action: 'format:italic', shortcut: '⌘I' },
       { label: '下划线', action: 'format:underline', shortcut: '⌘U' },
       { label: '删除线', action: 'format:strikethrough', shortcut: '⌥⇧5' },
+      { type: 'separator' },
+      {
+        label: '复制为',
+        children: [
+          { label: '纯文本', action: 'copyPlain', disabled: !hasSelection },
+          { label: 'Markdown', action: 'copyMd', disabled: !hasSelection },
+          { label: 'HTML', action: 'copyHtml', disabled: !hasSelection },
+        ],
+      },
     ], []);
 
     const handleEditorContextMenuAction = useCallback(async (action: string) => {
@@ -948,6 +958,13 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           break;
         case 'copy':
           if (selectedText) await navigator.clipboard.writeText(selectedText);
+          break;
+        case 'copyPlain':
+        case 'copyMd':
+          if (selectedText) await navigator.clipboard.writeText(selectedText);
+          break;
+        case 'copyHtml':
+          if (selectedText) await navigator.clipboard.writeText(markdownToHtml(selectedText));
           break;
         case 'paste':
         case 'pastePlain': {
@@ -1098,9 +1115,12 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           case 'copyHtml': {
             const sel2 = view.state.selection.main;
             const text2 = view.state.doc.sliceString(sel2.from, sel2.to);
-            if (text2) navigator.clipboard.writeText(text2);
+            if (text2) navigator.clipboard.writeText(markdownToHtml(text2));
             break;
           }
+          case 'selectAll':
+            view.dispatch({ selection: { anchor: 0, head: view.state.doc.length } });
+            break;
           case 'paste':
           case 'pastePlain':
             navigator.clipboard.readText().then(text => {

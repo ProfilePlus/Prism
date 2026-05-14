@@ -52,7 +52,7 @@ interface StatusBarProps {
   isSidebarHovered: boolean;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
-  onExportHtml?: () => void;
+  onExportMenu?: (e: React.MouseEvent) => void;
   onToggleFocusMode?: () => void;
   onToggleSidebar?: () => void;
   onFolderContextMenu?: (e: React.MouseEvent) => void;
@@ -67,7 +67,7 @@ export function StatusBar({
   isSidebarHovered,
   onMouseEnter,
   onMouseLeave,
-  onExportHtml,
+  onExportMenu,
   onToggleFocusMode,
   onToggleSidebar,
   onFolderContextMenu,
@@ -160,7 +160,12 @@ export function StatusBar({
           >
             <IconFocus />
           </button>
-          <button className={`${styles.btn} ${styles.iconBtn}`} onClick={onExportHtml} title="导出 HTML">
+          <button
+            className={`${styles.btn} ${styles.iconBtn}`}
+            onClick={onExportMenu}
+            onContextMenu={onExportMenu}
+            title="导出"
+          >
             <IconExport />
           </button>
         </div>

@@ -20,7 +20,7 @@ import { TitleBar } from './components/shell/TitleBar';
 import { MenuBar } from './components/shell/MenuBar';
 import { executeMenuAction } from './lib/menuActions';
 import { executeFileAction, FileActionInput } from './lib/fileActions';
-import { ContextMenu } from './components/shell/ContextMenu';
+import { ContextMenu, type ContextMenuItem } from './components/shell/ContextMenu';
 import { ShortcutPanel } from './components/shell/ShortcutPanel';
 import { CommandPalette } from './components/shell/CommandPalette';
 import { AboutModal } from './components/shell/AboutModal';
@@ -110,7 +110,12 @@ function App() {
   const toastTimerRef = useRef<number | null>(null);
   const [cursor, setCursor] = useState({ line: 1, column: 1 });
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
-  const [globalContextMenu, setGlobalContextMenu] = useState<{ x: number, y: number, items: any[] } | null>(null);
+  const [globalContextMenu, setGlobalContextMenu] = useState<{
+    x: number;
+    y: number;
+    items: ContextMenuItem[];
+    kind: 'file' | 'menu';
+  } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [exportProgress, setExportProgress] = useState<string | null>(null);
   const [saveDialog, setSaveDialog] = useState<SaveDialogState | null>(null);
@@ -356,6 +361,15 @@ function App() {
   }, [requestExportPath, requestMarkdownSavePath, showToast]);
 
   useEffect(() => {
+    const handler = (event: Event) => {
+      const action = (event as CustomEvent<{ action?: string }>).detail?.action;
+      if (action) handleMenuAction(action);
+    };
+    window.addEventListener('prism-menu-action', handler);
+    return () => window.removeEventListener('prism-menu-action', handler);
+  }, [handleMenuAction]);
+
+  useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<FileActionInput>).detail;
       handleFileAction(detail);
@@ -390,14 +404,15 @@ function App() {
     let action: string | null = null;
     if (ctrl && !shift && !alt) {
       action = ({
-        KeyN: 'new', KeyO: 'open', KeyP: 'quickOpen', Comma: 'preferences',
+        KeyN: 'new', KeyO: 'open', KeyW: 'closeDocument', KeyM: 'minimize', Comma: 'preferences',
         Digit1: 'h1', Digit2: 'h2', Digit3: 'h3', Digit4: 'h4', Digit5: 'h5', Digit6: 'h6', Digit0: 'paragraph',
         Equal: 'increaseHeading', Minus: 'decreaseHeading', Slash: 'sourceMode',
         KeyB: 'bold', KeyI: 'italic', KeyU: 'underline', KeyK: 'link', Backslash: 'clearFormat',
       } as Record<string, string>)[code] ?? null;
     } else if (ctrl && shift && !alt) {
       action = ({
-        KeyN: 'newWindow', KeyS: 'saveAs', KeyC: 'copyMd', KeyV: 'pastePlain', KeyL: 'toggleSidebar',
+        KeyN: 'newWindow', KeyO: 'openFolder', KeyS: 'saveAs', KeyZ: 'redo',
+        KeyC: 'copyMd', KeyV: 'pastePlain', KeyL: 'toggleSidebar',
         Digit1: 'showOutline', Digit2: 'showDocs', Digit3: 'showFiles', Digit9: 'actualSize',
         KeyF: 'showSearch', KeyM: 'mathBlock', KeyK: 'codeBlock', KeyQ: 'quote',
         BracketLeft: 'orderedList', BracketRight: 'unorderedList', KeyX: 'taskList', Backquote: 'inlineCode',
@@ -423,23 +438,41 @@ function App() {
 
   const handleFolderContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    const items = [
+    const items: ContextMenuItem[] = [
       { label: '在新窗口中打开', action: 'openNewWindow' },
       { type: 'separator' },
       { label: '新建文件', action: 'newFile' },
       { label: '新建文件夹', action: 'newFolder' },
       { type: 'separator' },
-      { label: '搜索', action: 'searchInFolder' },
-      { type: 'separator' },
-      { label: '文档列表', action: 'viewList', checked: workspace.fileTreeMode === 'list' },
       { label: '文档树', action: 'viewTree', checked: workspace.fileTreeMode === 'tree' },
+      { label: '文档列表', action: 'viewList', checked: workspace.fileTreeMode === 'list' },
+      {
+        label: '排序方式',
+        children: [
+          { label: '名称', action: 'sortByName', checked: workspace.fileSortMode === 'name' },
+          { label: '修改时间', action: 'sortByModified', checked: workspace.fileSortMode === 'modified' },
+          { label: '创建时间', action: 'sortByCreated', checked: workspace.fileSortMode === 'created' },
+          { label: '大小', action: 'sortBySize', checked: workspace.fileSortMode === 'size' },
+        ],
+      },
       { type: 'separator' },
       { label: '刷新', action: 'refreshFolder' },
       { type: 'separator' },
-      { label: '复制文件路径', action: 'copyRootPath' },
-      { label: '打开文件位置', action: 'openRootLocation' },
+      { label: '复制工作区路径', action: 'copyRootPath' },
+      { label: '在访达中显示', action: 'openRootLocation' },
     ];
-    setGlobalContextMenu({ x: e.clientX, y: e.clientY, items });
+    setGlobalContextMenu({ x: e.clientX, y: e.clientY, items, kind: 'file' });
+  };
+
+  const handleExportContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const items: ContextMenuItem[] = [
+      { label: '导出为 PDF', action: 'exportPdf' },
+      { label: '导出为 Word (.docx)', action: 'exportDocx' },
+      { label: '导出为 HTML', action: 'exportHtml' },
+      { label: '导出为 PNG 图像', action: 'exportPng' },
+    ];
+    setGlobalContextMenu({ x: e.clientX, y: e.clientY, items, kind: 'menu' });
   };
 
   const titleDocName = currentDocument?.name ?? '未命名';
@@ -484,7 +517,7 @@ function App() {
             isSidebarHovered={isSidebarHovered}
             onMouseEnter={() => setIsSidebarHovered(true)}
             onMouseLeave={() => setIsSidebarHovered(false)}
-            onExportHtml={() => handleMenuAction('exportHtml')}
+            onExportMenu={handleExportContextMenu}
             onToggleFocusMode={() => workspace.toggleFocusMode()}
             onToggleSidebar={() => workspace.toggleSidebar()}
             onFolderContextMenu={handleFolderContextMenu}
@@ -499,7 +532,13 @@ function App() {
           x={globalContextMenu.x}
           y={globalContextMenu.y}
           items={globalContextMenu.items}
-          onAction={handleFileAction}
+          onAction={(action) => {
+            if (globalContextMenu.kind === 'file') {
+              handleFileAction(action);
+            } else {
+              handleMenuAction(action);
+            }
+          }}
           onClose={() => setGlobalContextMenu(null)}
         />
       )}

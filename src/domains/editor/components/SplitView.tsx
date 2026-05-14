@@ -2,6 +2,9 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import { EditorPane, EditorPaneHandle } from './EditorPane';
 import { PreviewPane } from './PreviewPane';
 import { buildSearchPattern, countMatches, SearchAction, SearchMode, SearchPanel, SearchParams } from './SearchPanel';
+import { ContextMenu, type ContextMenuItem } from '../../../components/shell/ContextMenu';
+import { useDocumentStore } from '../../document/store';
+import { markdownToHtml } from '../../../lib/markdownToHtml';
 
 interface SplitViewProps {
   content: string;
@@ -21,6 +24,27 @@ const DEFAULT_SEARCH_PARAMS: SearchParams = {
 function normalizeSelectionSeed(text: string) {
   const seed = text.replace(/\u00a0/g, ' ');
   return seed.trim().length > 0 ? seed : '';
+}
+
+async function copyText(text: string) {
+  if (!text) return;
+  await navigator.clipboard.writeText(text);
+}
+
+function getSerializedSelectionHtml(preview: HTMLElement | null) {
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed || !preview || !selection.anchorNode) return '';
+  if (!preview.contains(selection.anchorNode)) return '';
+
+  const container = document.createElement('div');
+  for (let index = 0; index < selection.rangeCount; index += 1) {
+    container.appendChild(selection.getRangeAt(index).cloneContents());
+  }
+  return container.innerHTML;
+}
+
+function dispatchMenuAction(action: string) {
+  window.dispatchEvent(new CustomEvent('prism-menu-action', { detail: { action } }));
 }
 
 // 借鉴 VSCode markdown preview scroll-sync 算法
@@ -282,6 +306,12 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
     const [searchMatchCount, setSearchMatchCount] = useState(0);
     const [searchCurrentMatch, setSearchCurrentMatch] = useState(0);
     const [searchActivationKey, setSearchActivationKey] = useState(0);
+    const [previewContextMenu, setPreviewContextMenu] = useState<{
+      x: number;
+      y: number;
+      hasSelection: boolean;
+      line: number | null;
+    } | null>(null);
     const searchParamsRef = useRef(searchParams);
     const searchCurrentMatchRef = useRef(searchCurrentMatch);
     const contentRef = useRef(content);
@@ -337,13 +367,107 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
       return () => cancelAnimationFrame(frame);
     }, [viewMode]);
 
-    const getPreviewSelectedText = useCallback(() => {
+    const getPreviewRawSelectedText = useCallback(() => {
       const selection = window.getSelection();
       const preview = previewContainerRef.current?.querySelector<HTMLElement>('#write');
       if (!selection || selection.isCollapsed || !preview || !selection.anchorNode) return '';
       if (!preview.contains(selection.anchorNode)) return '';
-      return normalizeSelectionSeed(selection.toString());
+      return selection.toString();
     }, []);
+
+    const getPreviewSelectedText = useCallback(() => {
+      return normalizeSelectionSeed(getPreviewRawSelectedText());
+    }, [getPreviewRawSelectedText]);
+
+    const getPreviewContextMenuItems = useCallback((hasSelection: boolean, line: number | null): ContextMenuItem[] => [
+      { label: '复制', action: 'copy', shortcut: '⌘C', disabled: !hasSelection },
+      { label: '全选', action: 'selectAll', shortcut: '⌘A' },
+      { type: 'separator' },
+      {
+        label: '复制为',
+        children: [
+          { label: '纯文本', action: 'copyPlain' },
+          { label: 'Markdown', action: 'copyMd' },
+          { label: 'HTML', action: 'copyHtml' },
+        ],
+      },
+      { label: '在编辑器中定位源码', action: 'locateSource', disabled: line === null },
+      { type: 'separator' },
+      {
+        label: '导出',
+        children: [
+          { label: '导出为 PDF', action: 'exportPdf' },
+          { label: '导出为 Word (.docx)', action: 'exportDocx' },
+          { label: '导出为 HTML', action: 'exportHtml' },
+          { label: '导出为 PNG 图像', action: 'exportPng' },
+        ],
+      },
+    ], []);
+
+    const handlePreviewContextMenu = useCallback((event: React.MouseEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const target = event.target instanceof Element ? event.target : null;
+      const lineElement = target?.closest<HTMLElement>('[data-line]');
+      const rawLine = lineElement?.getAttribute('data-line');
+      const line = rawLine ? Number(rawLine) : NaN;
+
+      setPreviewContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        hasSelection: Boolean(normalizeSelectionSeed(getPreviewRawSelectedText())),
+        line: Number.isFinite(line) ? line : null,
+      });
+    }, [getPreviewRawSelectedText]);
+
+    const handlePreviewContextMenuAction = useCallback(async (action: string) => {
+      const preview = previewContainerRef.current?.querySelector<HTMLElement>('#write') ?? null;
+      const selectedText = getPreviewRawSelectedText();
+
+      switch (action) {
+        case 'copy':
+          await copyText(selectedText);
+          break;
+        case 'selectAll':
+          if (preview) {
+            const range = document.createRange();
+            range.selectNodeContents(preview);
+            const selection = window.getSelection();
+            selection?.removeAllRanges();
+            selection?.addRange(range);
+          }
+          break;
+        case 'copyPlain':
+          await copyText(selectedText || preview?.innerText || '');
+          break;
+        case 'copyMd':
+          await copyText(contentRef.current);
+          break;
+        case 'copyHtml':
+          await copyText(
+            getSerializedSelectionHtml(preview)
+            || preview?.innerHTML
+            || markdownToHtml(contentRef.current),
+          );
+          break;
+        case 'locateSource': {
+          const line = previewContextMenu?.line;
+          if (line === null || line === undefined) break;
+          if (viewModeRef.current === 'preview') {
+            useDocumentStore.getState().setViewMode('split');
+          }
+          requestAnimationFrame(() => editorRef.current?.jumpToLine(line));
+          break;
+        }
+        case 'exportPdf':
+        case 'exportDocx':
+        case 'exportHtml':
+        case 'exportPng':
+          dispatchMenuAction(action);
+          break;
+      }
+    }, [getPreviewRawSelectedText, previewContextMenu?.line]);
 
     const getSearchSeed = useCallback(() => {
       if (viewModeRef.current !== 'preview') {
@@ -563,6 +687,7 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
           <div
             ref={previewContainerRef}
             onScroll={handlePreviewScroll}
+            onContextMenu={handlePreviewContextMenu}
             style={{
               flex: 1,
               minWidth: 0,
@@ -592,6 +717,16 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
           onSearch={handleSearch}
           onModeChange={setSearchMode}
         />
+
+        {previewContextMenu && (
+          <ContextMenu
+            x={previewContextMenu.x}
+            y={previewContextMenu.y}
+            items={getPreviewContextMenuItems(previewContextMenu.hasSelection, previewContextMenu.line)}
+            onAction={handlePreviewContextMenuAction}
+            onClose={() => setPreviewContextMenu(null)}
+          />
+        )}
       </div>
     );
   },
