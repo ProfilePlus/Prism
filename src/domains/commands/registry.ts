@@ -7,7 +7,7 @@ import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
 import { loadFolderTree } from '../workspace/lib/loadFolderTree';
 import { openPrismWindow } from '../../lib/openWindow';
 import { addRecentFile } from '../../lib/recentFiles';
-import { exportDocument, getExportFormatLabel, type ExportFormat } from '../../lib/exportDocument';
+import { exportDocument, getExportFormatLabel, type ExportFormat } from '../export';
 import type {
   CommandContext,
   CommandDefinition,

@@ -1,7 +1,7 @@
 import type { useDocumentStore } from '../document/store';
 import type { useSettingsStore } from '../settings/store';
 import type { useWorkspaceStore } from '../workspace/store';
-import type { ExportFormat } from '../../lib/exportDocument';
+import type { ExportFormat } from '../export';
 
 export type CommandCategory =
   | '文件'

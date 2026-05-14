@@ -8,102 +8,19 @@ import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
-import { markdownToHtml } from './markdownToHtml';
-import type { ContentTheme } from '../domains/settings/types';
-
-export type ExportFormat = 'html' | 'pdf' | 'docx' | 'png';
-
-export interface ExportDocumentInput {
-  content: string;
-  filename: string;
-  contentTheme: ContentTheme;
-  onProgress?: (message: string) => void;
-}
-
-const writeClassByTheme: Record<ContentTheme, string> = {
-  miaoyan: 'markdown-body heti',
-  inkstone: 'markdown-body heti inkstone-write',
-  slate: 'markdown-body heti slate-write',
-  mono: 'markdown-body heti mono-write',
-  nocturne: 'markdown-body heti nocturne-write',
-};
-
-const exportNameByFormat: Record<ExportFormat, string> = {
-  html: 'HTML',
-  pdf: 'PDF',
-  docx: 'Word',
-  png: 'PNG 图像',
-};
-
-const docxThemeByContentTheme: Record<ContentTheme, {
-  font: string;
-  codeFont: string;
-  text: string;
-  muted: string;
-  accent: string;
-  fill: string;
-  border: string;
-}> = {
-  miaoyan: {
-    font: 'Kaiti SC',
-    codeFont: 'Menlo',
-    text: '282828',
-    muted: '6F6F6F',
-    accent: '1C5D33',
-    fill: 'F7F7F7',
-    border: 'DDDDDD',
-  },
-  inkstone: {
-    font: 'Kaiti SC',
-    codeFont: 'Menlo',
-    text: '24231F',
-    muted: '6B6355',
-    accent: '466F57',
-    fill: 'F0EADF',
-    border: 'D7CEBD',
-  },
-  slate: {
-    font: 'Arial',
-    codeFont: 'Menlo',
-    text: '222829',
-    muted: '4E5A5C',
-    accent: '587A85',
-    fill: 'E4E9E9',
-    border: 'CBD4D5',
-  },
-  mono: {
-    font: 'Menlo',
-    codeFont: 'Menlo',
-    text: '171817',
-    muted: '4D564C',
-    accent: '3B6F48',
-    fill: 'E7EBE4',
-    border: 'D4D8D0',
-  },
-  nocturne: {
-    font: 'Georgia',
-    codeFont: 'Menlo',
-    text: '2B2A27',
-    muted: '5E574C',
-    accent: '6F7F62',
-    fill: 'EEE9DE',
-    border: 'D7CBB8',
-  },
-};
+import { markdownToHtml } from '../../lib/markdownToHtml';
+import type { ContentTheme } from '../settings/types';
+import type { ExportDocumentInput } from './types';
+import {
+  docxThemeByContentTheme,
+  mermaidFontByTheme,
+  writeClassByTheme,
+  type DocxTheme,
+} from './exportSettings';
 
 type DocxModule = typeof import('docx');
-type DocxTheme = (typeof docxThemeByContentTheme)[ContentTheme];
 type DocxBlock = DocxParagraph | DocxTable;
 type DocxInline = DocxTextRun | InstanceType<DocxModule['ImageRun']>;
-
-const mermaidFontByTheme: Record<ContentTheme, string> = {
-  miaoyan:
-    "'TsangerJinKai02 W04', 'TsangerJinKai02', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', Arial, sans-serif",
-  inkstone: "'TsangerJinKai02-W04', 'Kaiti SC', 'STKaiti', 'Songti SC', serif",
-  slate: "'IBM Plex Sans', 'PingFang SC', -apple-system, BlinkMacSystemFont, sans-serif",
-  mono: "'JetBrains Mono', 'SF Mono', Menlo, 'PingFang SC', monospace",
-  nocturne: "'Newsreader', 'Source Serif 4', 'Songti SC', Georgia, serif",
-};
 
 function stripMarkdownExtension(filename: string) {
   return filename.replace(/\.(md|markdown|txt)$/i, '') || 'Untitled';
@@ -606,7 +523,7 @@ async function getExportOutputPath(outputPath?: string) {
   return null;
 }
 
-async function exportHtml(input: ExportDocumentInput, outputPath?: string) {
+export async function exportHtml(input: ExportDocumentInput, outputPath?: string) {
   const targetPath = await getExportOutputPath(outputPath);
   if (!targetPath) return false;
 
@@ -620,7 +537,7 @@ async function exportHtml(input: ExportDocumentInput, outputPath?: string) {
   return true;
 }
 
-async function exportPdf(input: ExportDocumentInput, outputPath?: string) {
+export async function exportPdf(input: ExportDocumentInput, outputPath?: string) {
   const targetPath = await getExportOutputPath(outputPath);
   if (!targetPath) return false;
 
@@ -692,7 +609,7 @@ async function createRenderedPng(input: ExportDocumentInput, options: { scale?: 
   }
 }
 
-async function exportPng(input: ExportDocumentInput, outputPath?: string) {
+export async function exportPng(input: ExportDocumentInput, outputPath?: string) {
   const targetPath = await getExportOutputPath(outputPath);
   if (!targetPath) return false;
 
@@ -1061,7 +978,7 @@ async function mdastToDocxBlocks(
   return blocks;
 }
 
-async function exportDocx(input: ExportDocumentInput, outputPath?: string) {
+export async function exportDocx(input: ExportDocumentInput, outputPath?: string) {
   const docx = await import('docx');
   const targetPath = await getExportOutputPath(outputPath);
   if (!targetPath) return false;
@@ -1124,27 +1041,4 @@ async function exportDocx(input: ExportDocumentInput, outputPath?: string) {
   const blob = await Packer.toBlob(document);
   await writeFile(targetPath, new Uint8Array(await blob.arrayBuffer()));
   return true;
-}
-
-export async function exportDocument(
-  input: ExportDocumentInput,
-  format: ExportFormat,
-  outputPath?: string,
-) {
-  switch (format) {
-    case 'html':
-      return exportHtml(input, outputPath);
-    case 'pdf':
-      return exportPdf(input, outputPath);
-    case 'docx':
-      return exportDocx(input, outputPath);
-    case 'png':
-      return exportPng(input, outputPath);
-    default:
-      throw new Error(`不支持的导出格式: ${format}`);
-  }
-}
-
-export function getExportFormatLabel(format: ExportFormat) {
-  return exportNameByFormat[format];
 }
