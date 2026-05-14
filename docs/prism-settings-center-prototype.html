@@ -1,0 +1,1271 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="miaoyan">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prism 设置中心主题化 Demo</title>
+  <style>
+    @font-face {
+      font-family: "TsangerJinKai02-W04";
+      src: url("../src/assets/fonts/TsangerJinKai02-W04.ttf") format("truetype");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: "JetBrains Mono";
+      src: url("../src/assets/fonts/JetBrainsMono-Regular.woff2") format("woff2");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: "IBM Plex Sans";
+      src: url("../src/assets/fonts/IBMPlexSans-Variable.woff2") format("woff2-variations");
+      font-weight: 100 700;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: "Newsreader";
+      src: url("../src/assets/fonts/Newsreader-Variable.woff2") format("woff2-variations");
+      font-weight: 200 800;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    :root {
+      --ui-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      --mono-font: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+      --writing-font: "TsangerJinKai02-W04", "Kaiti SC", "PingFang SC", serif;
+      --editor-font: var(--writing-font);
+      --preview-font: var(--writing-font);
+      --radius: 8px;
+      --shadow-menu: 0 9px 22px rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.12);
+      --shadow-window: 0 22px 72px rgba(27, 24, 18, 0.16);
+    }
+
+    html[data-theme="miaoyan"] {
+      --theme-name: "Miaoyan";
+      --theme-bg: #ffffff;
+      --theme-panel: #ffffff;
+      --theme-panel-2: #f7f7f7;
+      --theme-menu: #eeeeee;
+      --theme-text: #262626;
+      --theme-muted: #777777;
+      --theme-soft: #a1a1a1;
+      --theme-line: #dddddd;
+      --theme-line-strong: #cfcfcf;
+      --theme-accent: #1c5d33;
+      --theme-accent-text: #ffffff;
+      --theme-selection: #d9d9d9;
+      --theme-code-bg: #f7f7f7;
+      --theme-danger: #b54034;
+      --theme-font: "TsangerJinKai02-W04", "Kaiti SC", "PingFang SC", serif;
+      --theme-code-font: "Menlo", "JetBrains Mono", monospace;
+    }
+
+    html[data-theme="inkstone"] {
+      --theme-name: "Inkstone Light";
+      --theme-bg: #fcfbf7;
+      --theme-panel: #fffdf8;
+      --theme-panel-2: #f2eee4;
+      --theme-menu: #f2eee4;
+      --theme-text: #24231f;
+      --theme-muted: #817868;
+      --theme-soft: #a79782;
+      --theme-line: #d7cebd;
+      --theme-line-strong: #c7bba7;
+      --theme-accent: #466f57;
+      --theme-accent-text: #fcfbf7;
+      --theme-selection: #ded8cb;
+      --theme-code-bg: #f2eee4;
+      --theme-danger: #8f4638;
+      --theme-font: "TsangerJinKai02-W04", "Kaiti SC", "Songti SC", serif;
+      --theme-code-font: "Menlo", "JetBrains Mono", monospace;
+    }
+
+    html[data-theme="slate"] {
+      --theme-name: "Slate Manual";
+      --theme-bg: #f7f8f8;
+      --theme-panel: #fbfcfc;
+      --theme-panel-2: #edf1f1;
+      --theme-menu: #e4e9e9;
+      --theme-text: #222829;
+      --theme-muted: #6e7778;
+      --theme-soft: #8a9799;
+      --theme-line: #cbd4d5;
+      --theme-line-strong: #b9c7c9;
+      --theme-accent: #587a85;
+      --theme-accent-text: #f7f8f8;
+      --theme-selection: #d8dddd;
+      --theme-code-bg: #edf1f1;
+      --theme-danger: #4f6d7a;
+      --theme-font: "IBM Plex Sans", "PingFang SC", sans-serif;
+      --theme-code-font: "Menlo", "JetBrains Mono", monospace;
+    }
+
+    html[data-theme="mono"] {
+      --theme-name: "Mono Lab";
+      --theme-bg: #fafafa;
+      --theme-panel: #ffffff;
+      --theme-panel-2: #eeeeee;
+      --theme-menu: #f2f2f2;
+      --theme-text: #111111;
+      --theme-muted: #5f5f5f;
+      --theme-soft: #8c8c8c;
+      --theme-line: #d8d8d8;
+      --theme-line-strong: #c8c8c8;
+      --theme-accent: #111111;
+      --theme-accent-text: #ffffff;
+      --theme-selection: #dcdcdc;
+      --theme-code-bg: #f1f1f1;
+      --theme-danger: #7d3c98;
+      --theme-font: "IBM Plex Sans", "PingFang SC", sans-serif;
+      --theme-code-font: "JetBrains Mono", monospace;
+    }
+
+    html[data-theme="nocturne"] {
+      color-scheme: dark;
+      --theme-name: "Nocturne Dark";
+      --theme-bg: #161718;
+      --theme-panel: #202123;
+      --theme-panel-2: #282a2c;
+      --theme-menu: #242527;
+      --theme-text: #e5ded2;
+      --theme-muted: #b8c4c2;
+      --theme-soft: #7f8987;
+      --theme-line: #343638;
+      --theme-line-strong: #4b4e50;
+      --theme-accent: #b9955c;
+      --theme-accent-text: #161718;
+      --theme-selection: #343638;
+      --theme-code-bg: #242527;
+      --theme-danger: #c7776f;
+      --theme-font: "Newsreader", "PingFang SC", serif;
+      --theme-code-font: "JetBrains Mono", monospace;
+      --shadow-window: 0 28px 90px rgba(0, 0, 0, 0.48);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--theme-bg);
+      color: var(--theme-text);
+      font-family: var(--theme-font);
+      letter-spacing: 0;
+      transition: background 160ms ease, color 160ms ease;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .page {
+      width: min(1320px, calc(100vw - 40px));
+      margin: 0 auto;
+      padding: 24px 0 38px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: end;
+      margin-bottom: 16px;
+    }
+
+    .titleBlock h1 {
+      margin: 0 0 6px;
+      font-size: 22px;
+      line-height: 1.25;
+      font-weight: 500;
+      letter-spacing: 0;
+    }
+
+    .titleBlock p {
+      max-width: 780px;
+      margin: 0;
+      color: var(--theme-muted);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .themeTabs {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px;
+      border: 1px solid var(--theme-line);
+      border-radius: 8px;
+      background: var(--theme-panel);
+      box-shadow: var(--shadow-menu);
+      white-space: nowrap;
+    }
+
+    .themeTab {
+      height: 28px;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 5px;
+      background: transparent;
+      color: var(--theme-muted);
+      font-size: 12px;
+    }
+
+    .themeTab.active {
+      background: var(--theme-accent);
+      color: var(--theme-accent-text);
+    }
+
+    .appShell {
+      border: 1px solid var(--theme-line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--theme-panel);
+      box-shadow: var(--shadow-window);
+    }
+
+    .titlebar {
+      display: grid;
+      grid-template-columns: 76px minmax(0, 1fr) 220px;
+      align-items: center;
+      height: 42px;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--theme-line);
+      background: var(--theme-bg);
+    }
+
+    .lights {
+      display: flex;
+      gap: 8px;
+    }
+
+    .light {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .red { background: #ed6a5e; }
+    .yellow { background: #f4bf4f; }
+    .green { background: #61c554; }
+
+    .windowTitle {
+      color: var(--theme-muted);
+      text-align: center;
+      font-family: var(--ui-font);
+      font-size: 12px;
+    }
+
+    .themeBadge {
+      justify-self: end;
+      color: var(--theme-muted);
+      font-family: var(--ui-font);
+      font-size: 12px;
+    }
+
+    .menubar {
+      display: flex;
+      align-items: center;
+      height: 32px;
+      padding: 0 10px;
+      border-bottom: 1px solid var(--theme-line);
+      background: var(--theme-menu);
+      font-family: var(--ui-font);
+      gap: 2px;
+    }
+
+    .menuItem {
+      position: relative;
+      padding: 5px 10px;
+      border-radius: 5px;
+      color: var(--theme-text);
+      font-size: 13px;
+    }
+
+    .menuItem.active {
+      background: var(--theme-selection);
+    }
+
+    .dropdownMock {
+      position: absolute;
+      top: 31px;
+      left: 0;
+      width: 214px;
+      padding: 7px;
+      border: 1px solid var(--theme-line);
+      border-radius: 7px;
+      background: var(--theme-panel);
+      box-shadow: var(--shadow-menu);
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    .dropdownRow {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 29px;
+      padding: 0 8px;
+      border-radius: 5px;
+      color: var(--theme-text);
+      font-size: 13px;
+    }
+
+    .dropdownRow.strong {
+      background: var(--theme-accent);
+      color: var(--theme-accent-text);
+    }
+
+    .shortcut {
+      color: var(--theme-muted);
+      font-family: var(--mono-font);
+      font-size: 11px;
+    }
+
+    .dropdownRow.strong .shortcut {
+      color: color-mix(in srgb, var(--theme-accent-text) 72%, transparent);
+    }
+
+    .dropdownLine {
+      height: 1px;
+      margin: 5px 4px;
+      background: var(--theme-line);
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+      min-height: 760px;
+    }
+
+    .sidebar {
+      border-right: 1px solid var(--theme-line);
+      background: var(--theme-bg);
+      padding: 13px 10px;
+    }
+
+    .sidebarTitle {
+      padding: 0 8px 10px;
+      color: var(--theme-muted);
+      font-family: var(--ui-font);
+      font-size: 11px;
+    }
+
+    .navBtn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 34px;
+      margin-bottom: 3px;
+      padding: 0 9px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--theme-text);
+      text-align: left;
+      font-family: var(--ui-font);
+      font-size: 13px;
+    }
+
+    .navBtn span:first-child {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .navBtn small {
+      color: var(--theme-soft);
+      font-family: var(--mono-font);
+      font-size: 10px;
+    }
+
+    .navBtn.active,
+    .navBtn:hover {
+      background: var(--theme-selection);
+    }
+
+    .content {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      min-width: 0;
+      background: var(--theme-panel);
+    }
+
+    .panelHeader {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 22px 28px 17px;
+      border-bottom: 1px solid var(--theme-line);
+      background: var(--theme-panel);
+    }
+
+    .panelHeader h2 {
+      margin: 0 0 6px;
+      font-size: 18px;
+      font-weight: 500;
+      line-height: 1.25;
+    }
+
+    .panelHeader p {
+      max-width: 660px;
+      margin: 0;
+      color: var(--theme-muted);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .statusPill {
+      align-self: start;
+      display: inline-flex;
+      align-items: center;
+      height: 26px;
+      padding: 0 10px;
+      border: 1px solid var(--theme-line);
+      border-radius: 999px;
+      color: var(--theme-muted);
+      background: var(--theme-bg);
+      font-family: var(--ui-font);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .panelBody {
+      padding: 22px 28px 28px;
+      overflow: auto;
+    }
+
+    .section {
+      display: none;
+    }
+
+    .section.active {
+      display: block;
+    }
+
+    .group {
+      margin-bottom: 18px;
+      border: 1px solid var(--theme-line);
+      border-radius: var(--radius);
+      background: var(--theme-panel);
+      overflow: hidden;
+    }
+
+    .groupHead {
+      padding: 13px 15px;
+      border-bottom: 1px solid var(--theme-line);
+      background: var(--theme-bg);
+    }
+
+    .groupHead h3 {
+      margin: 0 0 5px;
+      color: var(--theme-text);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .groupHead p {
+      margin: 0;
+      color: var(--theme-muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: center;
+      min-height: 60px;
+      padding: 11px 15px;
+      border-bottom: 1px solid var(--theme-line);
+    }
+
+    .row:last-child {
+      border-bottom: 0;
+    }
+
+    .label {
+      margin-bottom: 3px;
+      color: var(--theme-text);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .hint {
+      color: var(--theme-muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .control {
+      min-width: 240px;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .seg {
+      display: inline-flex;
+      padding: 3px;
+      border: 1px solid var(--theme-line);
+      border-radius: 7px;
+      background: var(--theme-bg);
+      gap: 2px;
+    }
+
+    .seg button {
+      height: 28px;
+      min-width: 56px;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 5px;
+      background: transparent;
+      color: var(--theme-muted);
+      font-family: var(--ui-font);
+      font-size: 12px;
+    }
+
+    .seg button.active {
+      background: var(--theme-accent);
+      color: var(--theme-accent-text);
+    }
+
+    select,
+    .inputMock {
+      height: 32px;
+      min-width: 204px;
+      padding: 0 10px;
+      border: 1px solid var(--theme-line);
+      border-radius: 6px;
+      background: var(--theme-bg);
+      color: var(--theme-text);
+      font-family: var(--ui-font);
+      font-size: 13px;
+      outline: none;
+    }
+
+    .importButton {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 32px;
+      padding: 0 12px;
+      border: 1px solid var(--theme-accent);
+      border-radius: 6px;
+      background: var(--theme-accent);
+      color: var(--theme-accent-text);
+      font-family: var(--ui-font);
+      font-size: 13px;
+      overflow: hidden;
+    }
+
+    .importButton input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .fontStatus {
+      min-width: 220px;
+      color: var(--theme-muted);
+      font-family: var(--ui-font);
+      font-size: 12px;
+      line-height: 1.45;
+      text-align: right;
+    }
+
+    .stepper {
+      display: inline-flex;
+      align-items: center;
+      height: 32px;
+      border: 1px solid var(--theme-line);
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--theme-bg);
+    }
+
+    .stepper button {
+      width: 32px;
+      height: 30px;
+      border: 0;
+      background: transparent;
+      color: var(--theme-text);
+    }
+
+    .stepper span {
+      min-width: 58px;
+      border-left: 1px solid var(--theme-line);
+      border-right: 1px solid var(--theme-line);
+      color: var(--theme-text);
+      text-align: center;
+      font-family: var(--ui-font);
+      font-size: 13px;
+    }
+
+    .toggle {
+      width: 38px;
+      height: 22px;
+      padding: 3px;
+      border-radius: 999px;
+      background: var(--theme-line-strong);
+    }
+
+    .toggle::after {
+      content: "";
+      display: block;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--theme-panel);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+      transition: transform 140ms ease;
+    }
+
+    .toggle.on {
+      background: var(--theme-accent);
+    }
+
+    .toggle.on::after {
+      transform: translateX(16px);
+    }
+
+    .themeGrid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      padding: 15px;
+    }
+
+    .themeCard {
+      min-height: 126px;
+      padding: 10px;
+      border: 1px solid var(--theme-line);
+      border-radius: 7px;
+      background: var(--theme-panel);
+      color: var(--theme-text);
+      text-align: left;
+    }
+
+    .themeCard.active {
+      border-color: var(--theme-accent);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-accent) 22%, transparent);
+    }
+
+    .swatch {
+      height: 58px;
+      margin-bottom: 9px;
+      border: 1px solid rgba(0,0,0,0.12);
+      border-radius: 5px;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+    }
+
+    .swatch span {
+      display: block;
+    }
+
+    .themeName {
+      margin-bottom: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .themeMeta {
+      color: var(--theme-muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .previewGrid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .sample {
+      min-height: 260px;
+      padding: 18px;
+      border: 1px solid var(--theme-line);
+      border-radius: var(--radius);
+      background: var(--theme-bg);
+      overflow: hidden;
+    }
+
+    .sample h4 {
+      margin: 0 0 10px;
+      color: var(--theme-muted);
+      font-family: var(--ui-font);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .editorSample {
+      font-family: var(--editor-font);
+      font-size: 16px;
+      line-height: 1.74;
+      color: var(--theme-text);
+      white-space: pre-wrap;
+    }
+
+    .previewSample {
+      font-family: var(--preview-font);
+      font-size: 16px;
+      line-height: 1.74;
+      color: var(--theme-text);
+    }
+
+    .previewSample h2 {
+      margin: 0 0 10px;
+      font-size: 24px;
+      font-weight: 500;
+    }
+
+    .previewSample p {
+      margin: 0 0 12px;
+    }
+
+    .previewSample code,
+    .editorSample code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: var(--theme-code-bg);
+      font-family: var(--theme-code-font);
+      font-size: 0.9em;
+    }
+
+    .callout {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border: 1px solid var(--theme-line);
+      border-left: 3px solid var(--theme-accent);
+      border-radius: 6px;
+      background: var(--theme-panel-2);
+      color: var(--theme-muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .applyState {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--theme-muted);
+      font-family: var(--ui-font);
+      font-size: 12px;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--theme-accent);
+    }
+
+    @media (max-width: 1040px) {
+      .topbar,
+      .workspace,
+      .previewGrid {
+        grid-template-columns: 1fr;
+      }
+
+      .themeTabs {
+        overflow-x: auto;
+        max-width: calc(100vw - 40px);
+      }
+
+      .titlebar {
+        grid-template-columns: 76px 1fr;
+      }
+
+      .themeBadge {
+        display: none;
+      }
+
+      .sidebar {
+        border-right: 0;
+        border-bottom: 1px solid var(--theme-line);
+      }
+
+      .themeGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .row {
+        grid-template-columns: 1fr;
+      }
+
+      .control {
+        justify-content: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="topbar">
+      <div class="titleBlock">
+        <h1>Prism 设置中心 · 主题化方案</h1>
+        <p>这个 demo 的设置中心直接吃 Prism 内容主题 token。切换主题时，弹窗、菜单、线条、文字、强调色和写作预览会一起变化。</p>
+      </div>
+      <div class="themeTabs" aria-label="主题切换">
+        <button class="themeTab active" data-theme="miaoyan">Miaoyan</button>
+        <button class="themeTab" data-theme="inkstone">Inkstone</button>
+        <button class="themeTab" data-theme="slate">Slate</button>
+        <button class="themeTab" data-theme="mono">Mono</button>
+        <button class="themeTab" data-theme="nocturne">Nocturne</button>
+      </div>
+    </div>
+
+    <section class="appShell">
+      <div class="titlebar">
+        <div class="lights">
+          <span class="light red"></span>
+          <span class="light yellow"></span>
+          <span class="light green"></span>
+        </div>
+        <div class="windowTitle">设置中心</div>
+        <div class="themeBadge">当前主题：<span id="themeName">Miaoyan</span></div>
+      </div>
+
+      <div class="menubar">
+        <div class="menuItem active">文件
+          <div class="dropdownMock">
+            <div class="dropdownRow"><span>新建文档</span><span class="shortcut">⌘N</span></div>
+            <div class="dropdownRow"><span>打开...</span><span class="shortcut">⌘O</span></div>
+            <div class="dropdownLine"></div>
+            <div class="dropdownRow"><span>保存</span><span class="shortcut">⌘S</span></div>
+            <div class="dropdownRow"><span>导出</span><span>›</span></div>
+            <div class="dropdownLine"></div>
+            <div class="dropdownRow strong"><span>设置中心</span><span class="shortcut">⌘,</span></div>
+            <div class="dropdownLine"></div>
+            <div class="dropdownRow"><span>关闭文稿</span><span class="shortcut">⌘W</span></div>
+          </div>
+        </div>
+        <div class="menuItem">编辑</div>
+        <div class="menuItem">插入</div>
+        <div class="menuItem">格式</div>
+        <div class="menuItem">视图</div>
+        <div class="menuItem">主题</div>
+        <div class="menuItem">窗口</div>
+        <div class="menuItem">帮助</div>
+      </div>
+
+      <div class="workspace">
+        <aside class="sidebar">
+          <div class="sidebarTitle">设置中心</div>
+          <button class="navBtn active" data-tab="general"><span>通用</span><small>01</small></button>
+          <button class="navBtn" data-tab="writing"><span>写作</span><small>02</small></button>
+          <button class="navBtn" data-tab="theme"><span>主题</span><small>03</small></button>
+          <button class="navBtn" data-tab="export"><span>导出</span><small>04</small></button>
+          <button class="navBtn" data-tab="files"><span>文件</span><small>05</small></button>
+          <button class="navBtn" data-tab="shortcuts"><span>快捷键</span><small>06</small></button>
+          <button class="navBtn" data-tab="advanced"><span>高级</span><small>07</small></button>
+        </aside>
+
+        <section class="content">
+          <header class="panelHeader">
+            <div>
+              <h2 id="panelHeading">通用</h2>
+              <p id="panelCopy">只放当前已经产品化、且能真实影响应用行为的长期偏好。视图动作、半成品外观能力不放进设置中心。</p>
+            </div>
+            <span class="statusPill">本机配置 · config.json</span>
+          </header>
+
+          <div class="panelBody">
+            <section class="section active" id="general">
+              <div class="group">
+                <div class="groupHead">
+                  <h3>启动与默认行为</h3>
+                  <p>第一版只保留真实已实现的默认视图。恢复窗口、语言切换暂不进入正式设置。</p>
+                </div>
+                <div class="row">
+                  <div>
+                    <div class="label">默认视图</div>
+                    <div class="hint">新建文档和打开文档时默认进入哪个视图。</div>
+                  </div>
+                  <div class="control">
+                    <div class="seg">
+                      <button class="active">编辑</button>
+                      <button>分栏</button>
+                      <button>预览</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="section" id="writing">
+              <div class="group">
+                <div class="groupHead">
+                  <h3>字体</h3>
+                  <p>支持导入已下载的 TTF / OTF / WOFF / WOFF2 字体，并立即应用到编辑器、预览或两者。</p>
+                </div>
+                <div class="row">
+                  <div>
+                    <div class="label">字体来源</div>
+                    <div class="hint">内置字体用于默认体验；导入字体用于用户自己的写作审美。</div>
+                  </div>
+                  <div class="control">
+                    <select id="fontSelect">
+                      <option value="theme">跟随当前主题</option>
+                      <option value="TsangerJinKai02-W04">霞鹜文楷</option>
+                      <option value="IBM Plex Sans">IBM Plex Sans</option>
+                      <option value="Newsreader">Newsreader</option>
+                      <option value="JetBrains Mono">JetBrains Mono</option>
+                      <option value="system">系统字体</option>
+                    </select>
+                    <label class="importButton">
+                      导入已下载字体
+                      <input id="fontFile" type="file" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" />
+                    </label>
+                  </div>
+                </div>
+                <div class="row">
+                  <div>
+                    <div class="label">应用范围</div>
+                    <div class="hint">正式实现时应分别写入 editorFontFamily / previewFontFamily，导出可单独决定是否跟随。</div>
+                  </div>
+                  <div class="control">
+                    <div class="seg" id="fontScope">
+                      <button data-scope="editor">编辑器</button>
+                      <button data-scope="preview">预览</button>
+                      <button class="active" data-scope="both">两者</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="row">
+                  <div>
+                    <div class="label">导入状态</div>
+                    <div class="hint">浏览器 demo 使用 FontFace API；生产版应把字体复制到 appData 字体目录并登记元数据。</div>
+                  </div>
+                  <div class="control">
+                    <div id="fontStatus" class="fontStatus">尚未导入自定义字体</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="group">
+                <div class="groupHead">
+                  <h3>排版</h3>
+                  <p>保留已实现项：编辑器字号、行高、行号，预览字号和预览字体。</p>
+                </div>
+                <div class="row">
+                  <div>
+                    <div class="label">编辑器字号</div>
+                    <div class="hint">当前正式版已实现，demo 用步进器表达更精确的控制。</div>
+                  </div>
+                  <div class="control">
+                    <div class="stepper"><button data-size="editor" data-delta="-1">-</button><span id="editorSize">16 px</span><button data-size="editor" data-delta="1">+</button></div>
+                  </div>
+                </div>
+                <div class="row">
+                  <div>
+                    <div class="label">显示行号</div>
+                    <div class="hint">源码编辑用户需要，默认关闭保持写作感。</div>
+                  </div>
+                  <div class="control"><div class="toggle" role="switch" aria-label="显示行号"></div></div>
+                </div>
+              </div>
+
+              <div class="previewGrid">
+                <div class="sample">
+                  <h4>编辑器预览</h4>
+                  <div class="editorSample" id="editorSample"># Prism 设置中心
+
+导入字体后，这里的文字会即时变化。
+
+- 当前行高接近妙言主题
+- inline code: `font-family`
+- 搜索、导出和主题应吃同一套 token</div>
+                </div>
+                <div class="sample">
+                  <h4>预览排版</h4>
+                  <div class="previewSample" id="previewSample">
+                    <h2>Beautiful writing, plain Markdown</h2>
+                    <p>字体是写作产品最敏感的部分。Prism 应允许用户导入自己下载的字体，并选择应用到编辑器、预览或两者。</p>
+                    <p>代码仍使用 <code>JetBrains Mono</code> 或主题指定的等宽字体。</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="section" id="theme">
+              <div class="group">
+                <div class="groupHead">
+                  <h3>写作主题</h3>
+                  <p>主题不是单独配色卡，而是一套完整写作环境：编辑器、预览、搜索、导出、代码和 Mermaid 共同生效。</p>
+                </div>
+                <div class="themeGrid">
+                  <button class="themeCard active" data-theme="miaoyan">
+                    <div class="swatch"><span style="background:#ffffff"></span><span style="background:#1c5d33"></span></div>
+                    <div class="themeName">Miaoyan</div>
+                    <div class="themeMeta">中文写作优先，温润、留白、克制</div>
+                  </button>
+                  <button class="themeCard" data-theme="inkstone">
+                    <div class="swatch"><span style="background:#fcfbf7"></span><span style="background:#466f57"></span></div>
+                    <div class="themeName">Inkstone</div>
+                    <div class="themeMeta">纸张、墨石、低频朱砂点缀</div>
+                  </button>
+                  <button class="themeCard" data-theme="slate">
+                    <div class="swatch"><span style="background:#f7f8f8"></span><span style="background:#587a85"></span></div>
+                    <div class="themeName">Slate</div>
+                    <div class="themeMeta">蓝灰、石板、冷青</div>
+                  </button>
+                  <button class="themeCard" data-theme="mono">
+                    <div class="swatch"><span style="background:#fafafa"></span><span style="background:#111111"></span></div>
+                    <div class="themeName">Mono</div>
+                    <div class="themeMeta">黑白优先，语义色低频出现</div>
+                  </button>
+                  <button class="themeCard" data-theme="nocturne">
+                    <div class="swatch"><span style="background:#161718"></span><span style="background:#b9955c"></span></div>
+                    <div class="themeName">Nocturne</div>
+                    <div class="themeMeta">暗色写作，琥珀只做强调</div>
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section class="section" id="export">
+              <div class="group">
+                <div class="groupHead">
+                  <h3>导出</h3>
+                  <p>第一版只展示已实现或接近已实现的导出偏好，不把 PDF 纸张、边距等未完成项放进正式设置。</p>
+                </div>
+                <div class="row">
+                  <div>
+                    <div class="label">HTML 包含主题</div>
+                    <div class="hint">导出时内联当前主题样式，保证发给别人后可直接打开。</div>
+                  </div>
+                  <div class="control"><div class="toggle on" role="switch" aria-label="HTML 包含主题"></div></div>
+                </div>
+                <div class="row">
+                  <div>
+                    <div class="label">PNG 清晰度</div>
+                    <div class="hint">当前正式版已实现 pngScale。</div>
+                  </div>
+                  <div class="control">
+                    <div class="seg">
+                      <button>1x</button>
+                      <button class="active">2x</button>
+                      <button>3x</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="section" id="files">
+              <div class="group">
+                <div class="groupHead">
+                  <h3>文件与保存</h3>
+                  <p>当前正式版只有自动保存间隔。建议后续改成“自动保存开关 + 保存策略”，实现前不放入正式设置。</p>
+                </div>
+                <div class="callout">当前 demo 将这一页作为产品边界说明：未实现的“默认导出位置”“恢复上次窗口”“保存策略”不进入第一版设置中心。</div>
+              </div>
+            </section>
+
+            <section class="section" id="shortcuts">
+              <div class="group">
+                <div class="groupHead">
+                  <h3>快捷键</h3>
+                  <p>1.0.3 先保留跨平台快捷键文案风格，不做完整快捷键编辑器。</p>
+                </div>
+                <div class="row">
+                  <div>
+                    <div class="label">快捷键文案</div>
+                    <div class="hint">菜单、命令面板、快捷键面板中的显示方式。</div>
+                  </div>
+                  <div class="control">
+                    <div class="seg">
+                      <button class="active">跟随系统</button>
+                      <button>macOS</button>
+                      <button>Windows</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="section" id="advanced">
+              <div class="group">
+                <div class="groupHead">
+                  <h3>高级</h3>
+                  <p>字体导入正式落地时，高级区应增加“打开字体目录”和“移除导入字体”。</p>
+                </div>
+                <div class="row">
+                  <div>
+                    <div class="label">字体目录</div>
+                    <div class="hint">生产版建议保存在 appData/fonts，并在 config.json 中记录 family、filename、scope。</div>
+                  </div>
+                  <div class="control"><span class="inputMock">后续实现</span></div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <div class="callout">
+      字体导入实现建议：Tauri 用 dialog 选择字体文件，复制到 appData/fonts，使用 CSS FontFace 或动态 @font-face 注册；设置中保存 font id 和应用范围。不要只保存原始绝对路径，避免移动字体文件后失效。
+    </div>
+  </main>
+
+  <script>
+    const themeLabels = {
+      miaoyan: "Miaoyan",
+      inkstone: "Inkstone Light",
+      slate: "Slate Manual",
+      mono: "Mono Lab",
+      nocturne: "Nocturne Dark",
+    };
+
+    const panelCopy = {
+      general: ["通用", "只放当前已经产品化、且能真实影响应用行为的长期偏好。视图动作、半成品外观能力不放进设置中心。"],
+      writing: ["写作", "字体和排版直接影响 Prism 的核心写作体验。这里支持导入本地字体并即时应用到示例。"],
+      theme: ["主题", "主题使用 Prism compatibility mode 的思路：不是皮肤，而是一套完整写作环境协议。"],
+      export: ["导出", "只展示已实现或接近已实现的导出偏好，避免把未完成能力包装成设置项。"],
+      files: ["文件", "保存类设置应先完成业务能力，再进入设置中心。"],
+      shortcuts: ["快捷键", "跨平台快捷键文案已经可用，完整快捷键编辑器后置。"],
+      advanced: ["高级", "低频诊断项和字体目录管理放这里，不污染主设置。"],
+    };
+
+    const root = document.documentElement;
+    const themeName = document.getElementById("themeName");
+    const fontSelect = document.getElementById("fontSelect");
+    const fontFile = document.getElementById("fontFile");
+    const fontStatus = document.getElementById("fontStatus");
+    let fontScope = "both";
+    let editorSize = 16;
+
+    function applyTheme(theme) {
+      root.dataset.theme = theme;
+      themeName.textContent = themeLabels[theme];
+      document.querySelectorAll("[data-theme]").forEach((item) => {
+        if (item.classList.contains("themeTab") || item.classList.contains("themeCard")) {
+          item.classList.toggle("active", item.dataset.theme === theme);
+        }
+      });
+
+      if (fontSelect.value === "theme") {
+        applyFont("var(--theme-font)");
+      }
+    }
+
+    function resolveFont(value) {
+      if (value === "theme") return "var(--theme-font)";
+      if (value === "system") return "-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif";
+      return `"${value}", var(--theme-font)`;
+    }
+
+    function applyFont(fontFamily) {
+      if (fontScope === "editor" || fontScope === "both") {
+        root.style.setProperty("--editor-font", fontFamily);
+      }
+      if (fontScope === "preview" || fontScope === "both") {
+        root.style.setProperty("--preview-font", fontFamily);
+      }
+    }
+
+    function sanitizedFamilyName(fileName) {
+      return fileName
+        .replace(/\.(ttf|otf|woff2?|TTF|OTF|WOFF2?)$/, "")
+        .replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]+/g, " ")
+        .trim()
+        .slice(0, 40) || "Imported Font";
+    }
+
+    document.querySelectorAll(".themeTab, .themeCard").forEach((button) => {
+      button.addEventListener("click", () => applyTheme(button.dataset.theme));
+    });
+
+    document.querySelectorAll(".navBtn").forEach((button) => {
+      button.addEventListener("click", () => {
+        const tab = button.dataset.tab;
+        document.querySelectorAll(".navBtn").forEach((item) => item.classList.toggle("active", item === button));
+        document.querySelectorAll(".section").forEach((section) => section.classList.toggle("active", section.id === tab));
+        document.getElementById("panelHeading").textContent = panelCopy[tab][0];
+        document.getElementById("panelCopy").textContent = panelCopy[tab][1];
+      });
+    });
+
+    document.querySelectorAll(".seg button").forEach((button) => {
+      button.addEventListener("click", () => {
+        const parent = button.parentElement;
+        parent.querySelectorAll("button").forEach((item) => item.classList.toggle("active", item === button));
+        if (parent.id === "fontScope") {
+          fontScope = button.dataset.scope;
+          applyFont(resolveFont(fontSelect.value));
+        }
+      });
+    });
+
+    document.querySelectorAll(".toggle").forEach((toggle) => {
+      toggle.addEventListener("click", () => toggle.classList.toggle("on"));
+    });
+
+    fontSelect.addEventListener("change", () => {
+      applyFont(resolveFont(fontSelect.value));
+      if (fontSelect.value !== "theme") {
+        fontStatus.textContent = `已应用字体：${fontSelect.options[fontSelect.selectedIndex].text}`;
+      } else {
+        fontStatus.textContent = "跟随当前主题字体";
+      }
+    });
+
+    fontFile.addEventListener("change", async () => {
+      const file = fontFile.files && fontFile.files[0];
+      if (!file) return;
+
+      const family = sanitizedFamilyName(file.name);
+      const url = URL.createObjectURL(file);
+
+      try {
+        const face = new FontFace(family, `url(${url})`);
+        await face.load();
+        document.fonts.add(face);
+
+        const option = document.createElement("option");
+        option.value = family;
+        option.textContent = `${family}（已导入）`;
+        fontSelect.appendChild(option);
+        fontSelect.value = family;
+        applyFont(resolveFont(family));
+        fontStatus.textContent = `已导入并应用：${file.name}`;
+      } catch (error) {
+        fontStatus.textContent = `字体导入失败：${file.name}`;
+        console.error(error);
+      }
+    });
+
+    document.querySelectorAll("[data-size='editor']").forEach((button) => {
+      button.addEventListener("click", () => {
+        editorSize = Math.max(12, Math.min(24, editorSize + Number(button.dataset.delta)));
+        document.getElementById("editorSize").textContent = `${editorSize} px`;
+        document.getElementById("editorSample").style.fontSize = `${editorSize}px`;
+      });
+    });
+  </script>
+</body>
+</html>
