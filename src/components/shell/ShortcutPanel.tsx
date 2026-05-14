@@ -7,7 +7,7 @@ interface ShortcutItem {
   shortcuts: Array<{ keys: string; description: string }>;
 }
 
-const CATEGORY_ORDER = ['Prism', '文件', '编辑', '插入', '格式', '视图', '窗口', '帮助'];
+const CATEGORY_ORDER = ['文件', '编辑', '插入', '格式', '视图', '窗口', '帮助'];
 
 function getShortcutItems(shortcutStyle: ReturnType<typeof useSettingsStore.getState>['shortcutStyle']): ShortcutItem[] {
   return CATEGORY_ORDER.map((category) => ({

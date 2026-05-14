@@ -905,14 +905,14 @@ export const commandRegistry = [
   command({
     id: 'preferences',
     label: '设置中心',
-    category: 'Prism',
+    category: '文件',
     shortcuts: [{ code: 'Comma', mod: true }],
     run: (context) => context.openSettings?.(),
   }),
   command({
     id: 'commandPalette',
     label: '命令面板',
-    category: 'Prism',
+    category: '帮助',
     keywords: ['command', 'palette'],
     shortcuts: [{ code: 'KeyP', mod: true, shift: true }],
     run: (context) => context.openCommandPalette?.(),
@@ -926,7 +926,7 @@ export const commandRegistry = [
   command({
     id: 'showShortcuts',
     label: '键盘快捷键',
-    category: 'Prism',
+    category: '帮助',
     keywords: ['shortcut', 'keyboard'],
     run: (context) => context.openShortcuts?.(),
   }),
@@ -947,7 +947,7 @@ export const commandRegistry = [
   command({
     id: 'about',
     label: '关于 Prism',
-    category: 'Prism',
+    category: '帮助',
     keywords: ['about', 'info'],
     run: (context) => context.openAbout?.(),
   }),

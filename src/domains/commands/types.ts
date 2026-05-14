@@ -4,7 +4,6 @@ import type { useWorkspaceStore } from '../workspace/store';
 import type { ExportFormat } from '../export';
 
 export type CommandCategory =
-  | 'Prism'
   | '文件'
   | '编辑'
   | '插入'
