@@ -266,14 +266,14 @@ body.typewriter-mode .cm-editor {
    ============================================================ */
 html[data-content-theme='miaoyan'] .cm-editor .cm-content,
 html[data-content-theme='miaoyan'] .cm-editor .cm-scroller {
-  font-family: 'TsangerJinKai02-W04', 'TsangerJinKai02 W04', 'TsangerJinKai02', 'PingFangSC-Regular', -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif !important;
+  font-family: var(--prism-editor-font-family, 'TsangerJinKai02-W04', 'TsangerJinKai02 W04', 'TsangerJinKai02', 'PingFangSC-Regular', -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif) !important;
 }
 /* 妙言编辑器 compatibility mode：模拟 NSTextView 的容器、行高、字距和插入点 */
 html[data-content-theme='miaoyan'] .cm-editor {
   --miaoyan-editor-text: #262626;
   --miaoyan-editor-gutter: 24px;
-  --miaoyan-editor-font-size: 16px;
-  --miaoyan-editor-line-height: 23.8px;
+  --miaoyan-editor-font-size: var(--prism-editor-font-size, 16px);
+  --miaoyan-editor-line-height: var(--prism-editor-line-height, 23.8px);
   background: #FFFFFF !important;
   color: var(--miaoyan-editor-text) !important;
   font-size: var(--miaoyan-editor-font-size) !important;
@@ -427,13 +427,13 @@ html[data-content-theme='miaoyan'] .cm-editor .hljs-strong {
 /* Inkstone Light editor compatibility mode */
 html[data-content-theme='inkstone'] .cm-editor .cm-content,
 html[data-content-theme='inkstone'] .cm-editor .cm-scroller {
-  font-family: 'TsangerJinKai02-W04', 'TsangerJinKai02 W04', 'Kaiti SC', 'STKaiti', 'Songti SC', serif !important;
+  font-family: var(--prism-editor-font-family, 'TsangerJinKai02-W04', 'TsangerJinKai02 W04', 'Kaiti SC', 'STKaiti', 'Songti SC', serif) !important;
 }
 html[data-content-theme='inkstone'] .cm-editor {
   --inkstone-editor-text: #24231f;
   --inkstone-editor-gutter: 24px;
-  --inkstone-editor-font-size: 16px;
-  --inkstone-editor-line-height: 23.8px;
+  --inkstone-editor-font-size: var(--prism-editor-font-size, 16px);
+  --inkstone-editor-line-height: var(--prism-editor-line-height, 23.8px);
   background: #fcfbf7 !important;
   color: var(--inkstone-editor-text) !important;
   font-size: var(--inkstone-editor-font-size) !important;
@@ -572,13 +572,13 @@ html[data-content-theme='inkstone'] .cm-editor .hljs-strong {
 /* Slate Manual editor compatibility mode */
 html[data-content-theme='slate'] .cm-editor .cm-content,
 html[data-content-theme='slate'] .cm-editor .cm-scroller {
-  font-family: 'IBM Plex Sans', 'PingFang SC', 'Hiragino Sans GB', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  font-family: var(--prism-editor-font-family, 'IBM Plex Sans', 'PingFang SC', 'Hiragino Sans GB', -apple-system, BlinkMacSystemFont, sans-serif) !important;
 }
 html[data-content-theme='slate'] .cm-editor {
   --slate-editor-text: #222829;
   --slate-editor-gutter: 24px;
-  --slate-editor-font-size: 16px;
-  --slate-editor-line-height: 23.8px;
+  --slate-editor-font-size: var(--prism-editor-font-size, 16px);
+  --slate-editor-line-height: var(--prism-editor-line-height, 23.8px);
   background: #f7f8f8 !important;
   color: var(--slate-editor-text) !important;
   font-size: var(--slate-editor-font-size) !important;
@@ -717,13 +717,13 @@ html[data-content-theme='slate'] .cm-editor .hljs-strong {
 /* Mono Lab editor compatibility mode */
 html[data-content-theme='mono'] .cm-editor .cm-content,
 html[data-content-theme='mono'] .cm-editor .cm-scroller {
-  font-family: 'JetBrains Mono', SFMono-Regular, Menlo, 'PingFang SC', monospace !important;
+  font-family: var(--prism-editor-font-family, 'JetBrains Mono', SFMono-Regular, Menlo, 'PingFang SC', monospace) !important;
 }
 html[data-content-theme='mono'] .cm-editor {
   --mono-editor-text: #171817;
   --mono-editor-gutter: 24px;
-  --mono-editor-font-size: 16px;
-  --mono-editor-line-height: 23.8px;
+  --mono-editor-font-size: var(--prism-editor-font-size, 16px);
+  --mono-editor-line-height: var(--prism-editor-line-height, 23.8px);
   background: #fbfbfa !important;
   color: var(--mono-editor-text) !important;
   font-size: var(--mono-editor-font-size) !important;
@@ -862,13 +862,13 @@ html[data-content-theme='mono'] .cm-editor .hljs-strong {
 /* Nocturne Dark editor compatibility mode */
 html[data-content-theme='nocturne'] .cm-editor .cm-content,
 html[data-content-theme='nocturne'] .cm-editor .cm-scroller {
-  font-family: 'Newsreader', 'Source Serif 4', 'Songti SC', 'STSong', 'Iowan Old Style', Georgia, serif !important;
+  font-family: var(--prism-editor-font-family, 'Newsreader', 'Source Serif 4', 'Songti SC', 'STSong', 'Iowan Old Style', Georgia, serif) !important;
 }
 html[data-content-theme='nocturne'] .cm-editor {
   --nocturne-editor-text: #e5e1d7;
   --nocturne-editor-gutter: 24px;
-  --nocturne-editor-font-size: 16px;
-  --nocturne-editor-line-height: 23.8px;
+  --nocturne-editor-font-size: var(--prism-editor-font-size, 16px);
+  --nocturne-editor-line-height: var(--prism-editor-line-height, 23.8px);
   background: #171a18 !important;
   color: var(--nocturne-editor-text) !important;
   font-size: var(--nocturne-editor-font-size) !important;
@@ -1126,13 +1126,17 @@ html[data-content-theme='nocturne'] .preview-compat {
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   z-index: 2900;
-  animation: prism-fade-in 180ms var(--ease-out);
+  animation: prism-overlay-in 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 body.dark .cmdk-overlay,
 body.dark .sp-overlay,
 body.dark .modal-overlay { background: rgba(0, 0, 0, 0.6); }
 
 @keyframes prism-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes prism-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 
 /* CommandPalette */
 .cmdk {
@@ -1298,7 +1302,39 @@ body.dark .modal-overlay { background: rgba(0, 0, 0, 0.6); }
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: prism-cmdk-in 220ms var(--ease-spring);
+  transform-origin: 50% 48%;
+  will-change: transform, opacity;
+  animation: prism-modal-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.settings-modal {
+  animation: prism-settings-modal-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes prism-settings-modal-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 8px)) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes prism-modal-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 10px)) scale(0.985);
+  }
+  60% {
+    opacity: 1;
+    transform: translate(-50%, calc(-50% - 1px)) scale(1.002);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
 .modal-header {
   display: flex;

@@ -63,7 +63,7 @@ function shouldUseDarkEditor(contentTheme: string, theme: string) {
 }
 
 function getLineNumberExtensions(showLineNumbers: boolean) {
-  return showLineNumbers ? [lineNumbers(), highlightActiveLineGutter()] : [];
+  return showLineNumbers ? [lineNumbers(), highlightActiveLineGutter(), foldGutter()] : [];
 }
 
 function getDarkThemeExtensions(isEditorDark: boolean) {
@@ -74,15 +74,48 @@ function getContentThemeExtension(contentTheme: ContentTheme) {
   return contentThemeFacet.of(contentTheme);
 }
 
-function getTypographyExtension(fontSize: number, lineHeight: number, fontFamily: string) {
+function getEditorTypographyStyle(
+  fontSize: number,
+  lineHeight: number,
+  fontFamily: string,
+  useThemeFont = false,
+) {
+  const lineHeightPx = Math.round(fontSize * lineHeight * 100) / 100;
+  const variables: Record<string, string> = {
+    '--prism-editor-font-size': `${fontSize}px`,
+    '--prism-editor-line-height': `${lineHeightPx}px`,
+  };
+  if (!useThemeFont) {
+    variables['--prism-editor-font-family'] = fontFamily;
+  }
+
+  return {
+    fontFamily: useThemeFont ? undefined : fontFamily,
+    fontSize: `${fontSize}px`,
+    lineHeight: `${lineHeightPx}px`,
+    variables,
+  };
+}
+
+function getTypographyExtension(fontSize: number, lineHeight: number, fontFamily: string, useThemeFont: boolean) {
+  const typography = getEditorTypographyStyle(fontSize, lineHeight, fontFamily, useThemeFont);
+  const rootStyle: Record<string, string> = {
+    ...typography.variables,
+    fontSize: typography.fontSize,
+  };
+  const scrollerStyle: Record<string, string> = {
+    lineHeight: typography.lineHeight,
+  };
+  if (typography.fontFamily) {
+    rootStyle.fontFamily = typography.fontFamily;
+    scrollerStyle.fontFamily = typography.fontFamily;
+  }
+
   return EditorView.theme({
-    '&': {
-      fontSize: `${fontSize}px`,
-      fontFamily,
-    },
-    '.cm-scroller': {
-      fontFamily,
-      lineHeight: String(lineHeight),
+    '&': rootStyle,
+    '.cm-scroller': scrollerStyle,
+    '.cm-line': {
+      lineHeight: typography.lineHeight,
     },
   });
 }
@@ -119,6 +152,8 @@ export const __editorPaneTesting = {
   getMiaoyanCodeLanguage,
   getMiaoyanCodeHighlightRanges,
   getEditorFormatResult,
+  getEditorTypographyStyle,
+  getLineNumberExtensions,
   shouldHighlightCompatibilityCodeTheme,
   MIAOYAN_CODE_BLOCK_HIGHLIGHT_LIMIT,
 };
@@ -140,6 +175,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     const showLineNumbers = useSettingsStore((s) => s.showLineNumbers);
     const editorFontSize = useSettingsStore((s) => s.fontSize);
     const editorFontFamily = useSettingsStore((s) => s.editorFontFamily);
+    const editorFontSource = useSettingsStore((s) => s.editorFontSource);
     const editorLineHeight = useSettingsStore((s) => s.editorLineHeight);
     const shortcutStyle = useSettingsStore((s) => s.shortcutStyle);
     const typewriterMode = useWorkspaceStore((s) => s.typewriterMode);
@@ -568,7 +604,12 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           EditorState.allowMultipleSelections.of(true),
           indentOnInput(),
           editorContentThemeCompartment.of(getContentThemeExtension(contentTheme)),
-          editorTypographyCompartment.of(getTypographyExtension(editorFontSize, editorLineHeight, editorFontFamily)),
+          editorTypographyCompartment.of(getTypographyExtension(
+            editorFontSize,
+            editorLineHeight,
+            editorFontFamily,
+            editorFontSource.kind === 'theme',
+          )),
           compatibilityMarkdownPlugin,
           editorSelectionPlugin,
           bracketMatching(),
@@ -576,7 +617,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           rectangularSelection(),
           crosshairCursor(),
           highlightActiveLine(),
-          foldGutter(),
           keymap.of([
             ...closeBracketsKeymap,
             ...defaultKeymap,
@@ -592,7 +632,11 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             '.cm-scroller': { overflow: 'auto' },
             '.cm-content': { padding: '32px 48px', color: 'var(--text-primary)', maxWidth: '860px', margin: '0 auto' },
             '.cm-line-flash': { animation: 'cm-flash 2s cubic-bezier(0.16, 1, 0.3, 1)' },
-            '.cm-gutters': { display: 'none' },
+            '.cm-gutters': {
+              backgroundColor: 'transparent',
+              borderRight: '1px solid var(--theme-divider, var(--border-color))',
+              color: 'var(--text-secondary)',
+            },
             '.cm-activeLineGutter': { backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' },
             '.cm-activeLine': { backgroundColor: 'var(--c-chalk, var(--bg-hover))' },
             '.cm-cursor': { borderLeftColor: 'var(--accent)', borderLeftWidth: '2px' },
@@ -724,9 +768,10 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           editorFontSize,
           editorLineHeight,
           editorFontFamily,
+          editorFontSource.kind === 'theme',
         )),
       });
-    }, [editorFontFamily, editorFontSize, editorLineHeight]);
+    }, [editorFontFamily, editorFontSize, editorFontSource.kind, editorLineHeight]);
 
     return (
       <>

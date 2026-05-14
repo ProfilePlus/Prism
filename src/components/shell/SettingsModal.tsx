@@ -6,7 +6,6 @@ import type {
   ContentTheme,
   DefaultViewMode,
   DocxFontPolicy,
-  ExportDefaultFormat,
   ExportDefaultLocation,
   ExportTemplateId,
   FontSource,
@@ -38,6 +37,10 @@ function decodeFontSource(value: string): FontSource {
     return { kind, value: sourceValue };
   }
   return { kind: 'theme', value: '' };
+}
+
+function getFontSourceHint(source: FontSource, resolvedFamily: string) {
+  return source.kind === 'theme' ? '跟随主题' : resolvedFamily;
 }
 
 export function SettingsModal({ visible, onClose }: SettingsModalProps) {
@@ -117,7 +120,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
   return (
     <>
       <div className="modal-overlay" onClick={onClose} />
-      <div className="modal" role="dialog" aria-label="设置中心">
+      <div className="modal settings-modal" role="dialog" aria-label="设置中心">
         <div className="modal-header">
           <div className="modal-title">设置中心</div>
           <button className="modal-close" onClick={onClose} aria-label="关闭">×</button>
@@ -201,7 +204,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
             <div className="settings-row">
               <div>
                 <div className="row-label">编辑器字体</div>
-                <div className="row-hint">{settings.editorFontFamily}</div>
+                <div className="row-hint">{getFontSourceHint(settings.editorFontSource, settings.editorFontFamily)}</div>
               </div>
               <select
                 value={encodeFontSource(settings.editorFontSource)}
@@ -265,7 +268,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
             <div className="settings-row">
               <div>
                 <div className="row-label">预览字体</div>
-                <div className="row-hint">{settings.previewFontFamily}</div>
+                <div className="row-hint">{getFontSourceHint(settings.previewFontSource, settings.previewFontFamily)}</div>
               </div>
               <select
                 value={encodeFontSource(settings.previewFontSource)}
@@ -310,22 +313,6 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
 
           <div className="settings-group">
             <h4>导出</h4>
-            <div className="settings-row">
-              <div>
-                <div className="row-label">默认格式</div>
-                <div className="row-hint">导出菜单仍可直接选择具体格式</div>
-              </div>
-              <select
-                value={settings.exportDefaults.format}
-                onChange={(e) => settings.setExportDefaultFormat(e.target.value as ExportDefaultFormat)}
-                style={selectStyle}
-              >
-                <option value="pdf">PDF</option>
-                <option value="docx">Word (.docx)</option>
-                <option value="html">HTML</option>
-                <option value="png">PNG 图像</option>
-              </select>
-            </div>
             <div className="settings-row">
               <div>
                 <div className="row-label">导出模板</div>

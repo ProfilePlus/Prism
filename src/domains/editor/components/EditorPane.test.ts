@@ -48,6 +48,47 @@ describe('EditorPane Miaoyan code highlighting', () => {
   });
 });
 
+describe('EditorPane settings integration helpers', () => {
+  it('maps editor typography settings to CSS variables consumed by compatibility themes', () => {
+    expect(__editorPaneTesting.getEditorTypographyStyle(
+      18,
+      1.8,
+      "'JetBrains Mono', monospace",
+    )).toEqual({
+      fontFamily: "'JetBrains Mono', monospace",
+      fontSize: '18px',
+      lineHeight: '32.4px',
+      variables: {
+        '--prism-editor-font-family': "'JetBrains Mono', monospace",
+        '--prism-editor-font-size': '18px',
+        '--prism-editor-line-height': '32.4px',
+      },
+    });
+  });
+
+  it('leaves theme font variables unset when editor font follows the current theme', () => {
+    expect(__editorPaneTesting.getEditorTypographyStyle(
+      18,
+      1.8,
+      "'JetBrains Mono', monospace",
+      true,
+    )).toEqual({
+      fontFamily: undefined,
+      fontSize: '18px',
+      lineHeight: '32.4px',
+      variables: {
+        '--prism-editor-font-size': '18px',
+        '--prism-editor-line-height': '32.4px',
+      },
+    });
+  });
+
+  it('only installs line-number gutters when line numbers are enabled', () => {
+    expect(__editorPaneTesting.getLineNumberExtensions(false)).toHaveLength(0);
+    expect(__editorPaneTesting.getLineNumberExtensions(true).length).toBeGreaterThan(0);
+  });
+});
+
 describe('EditorPane context menu formatting', () => {
   const applyEditorFormatAt = (
     doc: string,
