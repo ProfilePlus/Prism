@@ -13,10 +13,10 @@ import type { ContentTheme } from '../settings/types';
 import type { ExportDocumentInput } from './types';
 import {
   docxThemeByContentTheme,
-  mermaidFontByTheme,
   writeClassByTheme,
   type DocxTheme,
 } from './exportSettings';
+import { getMermaidThemeConfig } from '../themes';
 
 type DocxModule = typeof import('docx');
 type DocxBlock = DocxParagraph | DocxTable;
@@ -153,105 +153,7 @@ async function collectExportCss() {
 }
 
 function getMermaidConfig(contentTheme: ContentTheme) {
-  const shared = {
-    theme: contentTheme === 'miaoyan' ? 'neutral' as const : 'base' as const,
-    securityLevel: 'loose' as const,
-    fontSize: contentTheme === 'mono' ? 13 : contentTheme === 'slate' ? 14 : 15,
-    fontFamily: mermaidFontByTheme[contentTheme],
-    flowchart: {
-      useMaxWidth: true,
-      htmlLabels: true,
-      curve: 'basis',
-      nodeSpacing: 80,
-      rankSpacing: 80,
-      padding: 30,
-    },
-    sequence: { useMaxWidth: true },
-    gantt: { useMaxWidth: true },
-    journey: { useMaxWidth: true },
-  };
-
-  const variables: Record<ContentTheme, Record<string, string>> = {
-    miaoyan: {
-      background: '#FFFFFF',
-      textColor: '#1f2933',
-      primaryColor: '#FFFFFF',
-      primaryTextColor: '#1f2933',
-      primaryBorderColor: '#262626',
-      secondaryColor: '#f0f3f6',
-      secondaryTextColor: '#1f2933',
-      secondaryBorderColor: '#262626',
-      lineColor: '#1C5D33',
-      mainBkg: '#FFFFFF',
-      nodeBorder: '#262626',
-      clusterBkg: '#f0f3f6',
-      clusterBorder: '#262626',
-      edgeLabelBackground: 'transparent',
-      titleColor: '#1C5D33',
-    },
-    inkstone: {
-      background: '#fcfbf7',
-      primaryColor: '#fffdf8',
-      primaryTextColor: '#24231f',
-      primaryBorderColor: '#466f57',
-      secondaryColor: '#f0eadf',
-      lineColor: '#466f57',
-      textColor: '#24231f',
-      mainBkg: '#fffdf8',
-      nodeBorder: '#466f57',
-      clusterBkg: '#f0eadf',
-      clusterBorder: '#d7cebd',
-      titleColor: '#8f4638',
-      edgeLabelBackground: '#fcfbf7',
-    },
-    slate: {
-      background: '#f7f8f8',
-      primaryColor: '#fbfcfc',
-      primaryTextColor: '#222829',
-      primaryBorderColor: '#587a85',
-      secondaryColor: '#e4e9e9',
-      lineColor: '#587a85',
-      textColor: '#222829',
-      mainBkg: '#fbfcfc',
-      nodeBorder: '#587a85',
-      clusterBkg: '#e4e9e9',
-      clusterBorder: '#cbd4d5',
-      titleColor: '#4f6d7a',
-      edgeLabelBackground: '#f7f8f8',
-    },
-    mono: {
-      background: '#fbfbfa',
-      primaryColor: '#fbfbfa',
-      primaryTextColor: '#171817',
-      primaryBorderColor: '#3b6f48',
-      secondaryColor: '#e7ebe4',
-      lineColor: '#3b6f48',
-      textColor: '#171817',
-      mainBkg: '#fbfbfa',
-      nodeBorder: '#3b6f48',
-      clusterBkg: '#e7ebe4',
-      clusterBorder: '#d4d8d0',
-      titleColor: '#6d4c9f',
-      edgeLabelBackground: '#fbfbfa',
-    },
-    nocturne: {
-      background: '#171a18',
-      primaryColor: '#171a18',
-      primaryTextColor: '#e5e1d7',
-      primaryBorderColor: '#86a878',
-      secondaryColor: '#262b25',
-      lineColor: '#86a878',
-      textColor: '#e5e1d7',
-      mainBkg: '#171a18',
-      nodeBorder: '#86a878',
-      clusterBkg: '#262b25',
-      clusterBorder: '#394035',
-      titleColor: '#d1ad82',
-      edgeLabelBackground: '#20241f',
-    },
-  };
-
-  return { ...shared, themeVariables: variables[contentTheme] };
+  return getMermaidThemeConfig(contentTheme);
 }
 
 function normalizeMermaidSvg(svg: SVGSVGElement) {

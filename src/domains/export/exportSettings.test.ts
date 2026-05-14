@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CONTENT_THEMES } from '../settings/types';
 import { docxThemeByContentTheme, mermaidFontByTheme, writeClassByTheme } from './exportSettings';
 import { getExportFormatLabel } from './types';
+import { getThemeContract } from '../themes';
 
 describe('export domain settings', () => {
   it('covers every content theme with export tokens', () => {
@@ -10,6 +11,9 @@ describe('export domain settings', () => {
       expect(docxThemeByContentTheme[theme].font).toBeTruthy();
       expect(docxThemeByContentTheme[theme].codeFont).toBeTruthy();
       expect(mermaidFontByTheme[theme]).toBeTruthy();
+      expect(writeClassByTheme[theme]).toBe(getThemeContract(theme).export.writeClass);
+      expect(docxThemeByContentTheme[theme]).toBe(getThemeContract(theme).export.docx);
+      expect(mermaidFontByTheme[theme]).toBe(getThemeContract(theme).mermaid.fontFamily);
     }
   });
 
