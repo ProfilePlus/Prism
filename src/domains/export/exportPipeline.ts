@@ -1,4 +1,5 @@
 import { writeFile, writeTextFile } from '@tauri-apps/plugin-fs';
+import { readCustomFontBytes } from '../settings/fontService';
 import type {
   Paragraph as DocxParagraph,
   Table as DocxTable,
@@ -34,6 +35,10 @@ function reportProgress(input: ExportDocumentInput, message: string) {
   input.onProgress?.(message);
 }
 
+function reportWarning(input: ExportDocumentInput, message: string) {
+  input.onWarning?.(message);
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, '&amp;')
@@ -41,6 +46,39 @@ function escapeHtml(value: string) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+
+const pdfPaperCss = {
+  a4: 'A4',
+  letter: 'Letter',
+} as const;
+
+const pdfPageSizePoints = {
+  a4: { width: 595.28, height: 841.89 },
+  letter: { width: 612, height: 792 },
+} as const;
+
+const pdfPageMarginsCss = {
+  compact: '12mm 12mm 14mm',
+  standard: '18mm 18mm 20mm',
+  wide: '25mm 25mm 28mm',
+} as const;
+
+const pdfPageMarginsPoints = {
+  compact: { top: 34, right: 34, bottom: 40, left: 34 },
+  standard: { top: 51, right: 51, bottom: 57, left: 51 },
+  wide: { top: 71, right: 71, bottom: 79, left: 71 },
+} as const;
+
+const docxPageSizeTwips = {
+  a4: { width: 11906, height: 16838 },
+  letter: { width: 12240, height: 15840 },
+} as const;
+
+const docxPageMarginsTwips = {
+  compact: { top: 680, right: 680, bottom: 794, left: 680 },
+  standard: { top: 1020, right: 1020, bottom: 1134, left: 1020 },
+  wide: { top: 1418, right: 1418, bottom: 1588, left: 1418 },
+} as const;
 
 function dataUrlToBytes(dataUrl: string) {
   const [, base64 = ''] = dataUrl.split(',');
@@ -103,7 +141,9 @@ async function inlineCssUrls(css: string) {
   });
 }
 
-async function collectExportCss() {
+async function collectExportCss(options: Pick<ExportDocumentInput, 'pdfPaper' | 'pdfMargin'> = {}) {
+  const paper = options.pdfPaper ?? 'a4';
+  const margin = options.pdfMargin ?? 'standard';
   let css = '';
   for (const sheet of Array.from(document.styleSheets)) {
     try {
@@ -137,7 +177,30 @@ async function collectExportCss() {
       padding-top: 44px !important;
       padding-bottom: 56px !important;
     }
-    @page { margin: 18mm 18mm 20mm; }
+    .prism-export-template--plain pre,
+    .prism-export-template--plain code {
+      background: transparent !important;
+      border-color: color-mix(in srgb, var(--theme-divider, #e5e0d8) 45%, transparent) !important;
+    }
+    .prism-export-template--plain table,
+    .prism-export-template--plain th,
+    .prism-export-template--plain td {
+      background: transparent !important;
+    }
+    .prism-export-template--business table,
+    .prism-export-template--academic table {
+      border-collapse: collapse !important;
+    }
+    .prism-export-template--business th,
+    .prism-export-template--business td,
+    .prism-export-template--academic th,
+    .prism-export-template--academic td {
+      border-width: 1px !important;
+    }
+    @page {
+      size: ${pdfPaperCss[paper]};
+      margin: ${pdfPageMarginsCss[margin]};
+    }
     @media print {
       body { background: #fff !important; }
       .prism-export-document { background: #fff !important; }
@@ -321,7 +384,12 @@ async function inlineImages(root: HTMLElement) {
 async function createRenderedExportNode(input: ExportDocumentInput) {
   const html = markdownToHtml(input.content);
   const root = document.createElement('div');
-  root.className = `prism-export-document preview-compat preview-compat--${input.contentTheme}`;
+  root.className = [
+    'prism-export-document',
+    `prism-export-template--${input.templateId ?? 'theme'}`,
+    'preview-compat',
+    `preview-compat--${input.contentTheme}`,
+  ].join(' ');
   root.style.position = 'fixed';
   root.style.left = '-12000px';
   root.style.top = '0';
@@ -350,10 +418,10 @@ async function buildStandaloneHtml(
   renderedRoot?: HTMLElement,
   options: { includeTheme?: boolean } = {},
 ) {
-  const css = options.includeTheme === false ? '' : await collectExportCss();
+  const css = options.includeTheme === false ? '' : await collectExportCss(input);
   const body = (() => {
     if (!renderedRoot) {
-      return `<div class="prism-export-document preview-compat preview-compat--${input.contentTheme}">
+      return `<div class="prism-export-document prism-export-template--${input.templateId ?? 'theme'} preview-compat preview-compat--${input.contentTheme}">
         <div id="write" class="${writeClassByTheme[input.contentTheme]}">${markdownToHtml(input.content)}</div>
       </div>`;
     }
@@ -456,17 +524,21 @@ export async function exportPdf(input: ExportDocumentInput, outputPath?: string)
   const pdf = await PDFDocument.create();
   const embedded = await pdf.embedPng(dataUrlToBytes(image.dataUrl));
 
-  const pageWidth = 595.28;
-  const pageHeight = 841.89;
-  const scaledHeight = pageWidth * (image.height / image.width);
-  const pageCount = Math.max(1, Math.ceil(scaledHeight / pageHeight));
+  const paper = pdfPageSizePoints[input.pdfPaper ?? 'a4'];
+  const margins = pdfPageMarginsPoints[input.pdfMargin ?? 'standard'];
+  const pageWidth = paper.width;
+  const pageHeight = paper.height;
+  const contentWidth = pageWidth - margins.left - margins.right;
+  const contentHeight = pageHeight - margins.top - margins.bottom;
+  const scaledHeight = contentWidth * (image.height / image.width);
+  const pageCount = Math.max(1, Math.ceil(scaledHeight / contentHeight));
 
   for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
     const page = pdf.addPage([pageWidth, pageHeight]);
     page.drawImage(embedded, {
-      x: 0,
-      y: pageHeight - scaledHeight + pageIndex * pageHeight,
-      width: pageWidth,
+      x: margins.left,
+      y: pageHeight - margins.top - scaledHeight + pageIndex * contentHeight,
+      width: contentWidth,
       height: scaledHeight,
     });
   }
@@ -894,11 +966,42 @@ export async function exportDocx(input: ExportDocumentInput, outputPath?: string
   reportProgress(input, '正在生成 Word 文档');
   const processor = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
   const tree = processor.runSync(processor.parse(input.content)) as any;
-  const theme = docxThemeByContentTheme[input.contentTheme];
+  const baseTheme = docxThemeByContentTheme[input.contentTheme];
+  const theme: DocxTheme = {
+    ...baseTheme,
+    font: input.docxFontFamily || baseTheme.font,
+    fill: input.codeStyle === 'plain' ? 'FFFFFF' : baseTheme.fill,
+    border: input.tableStyle === 'minimal' ? 'D8D2C8' : baseTheme.border,
+  };
   const blocks = await mdastToDocxBlocks(docx, tree.children ?? [], theme, input.contentTheme);
   const { Document, Packer, Paragraph } = docx;
+  const fonts = [];
+  const pageSize = docxPageSizeTwips[input.pdfPaper ?? 'a4'];
+  const pageMargin = docxPageMarginsTwips[input.pdfMargin ?? 'standard'];
+
+  if (input.docxFontFile) {
+    try {
+      reportProgress(input, '正在嵌入 Word 字体');
+      fonts.push({
+        name: theme.font,
+        data: await readCustomFontBytes({
+          id: input.docxFontFile.filename,
+          family: theme.font,
+          displayName: theme.font,
+          filename: input.docxFontFile.filename,
+          path: input.docxFontFile.path,
+          format: input.docxFontFile.format,
+          importedAt: Date.now(),
+        }),
+      } as any);
+    } catch (err) {
+      console.error('[Export] DOCX font embedding failed:', err);
+      reportWarning(input, 'Word 字体嵌入受限，已写入字体名称；打开设备需安装该字体才能完全一致。');
+    }
+  }
 
   const document = new Document({
+    fonts,
     styles: {
       default: {
         document: {
@@ -939,7 +1042,8 @@ export async function exportDocx(input: ExportDocumentInput, outputPath?: string
     sections: [{
       properties: {
         page: {
-          margin: { top: 1134, right: 1134, bottom: 1134, left: 1134 },
+          size: pageSize,
+          margin: pageMargin,
         },
       },
       children: blocks.length > 0 ? blocks : [new Paragraph('')],

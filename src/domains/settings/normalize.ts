@@ -1,8 +1,19 @@
 import {
   DEFAULT_SETTINGS,
+  type AutoSaveStrategy,
   type AppearanceMode,
+  type CustomFont,
+  type DocxFontPolicy,
   type DefaultViewMode,
+  type ExportDefaultLocation,
   type ExportDefaultFormat,
+  type ExportTemplateId,
+  type FontSource,
+  type FontSourceKind,
+  type LastSessionState,
+  type PdfMargin,
+  type PdfPaper,
+  type RecentFileEntry,
   type SettingsState,
   type ShortcutStyle,
   isContentTheme,
@@ -20,8 +31,36 @@ function isShortcutStyle(value: unknown): value is ShortcutStyle {
   return value === 'auto' || value === 'mac' || value === 'windows';
 }
 
+function isAutoSaveStrategy(value: unknown): value is AutoSaveStrategy {
+  return value === 'instant' || value === 'balanced' || value === 'battery';
+}
+
 function isExportDefaultFormat(value: unknown): value is ExportDefaultFormat {
   return value === 'html' || value === 'pdf' || value === 'docx' || value === 'png';
+}
+
+function isPdfPaper(value: unknown): value is PdfPaper {
+  return value === 'a4' || value === 'letter';
+}
+
+function isPdfMargin(value: unknown): value is PdfMargin {
+  return value === 'compact' || value === 'standard' || value === 'wide';
+}
+
+function isExportTemplateId(value: unknown): value is ExportTemplateId {
+  return value === 'theme' || value === 'business' || value === 'plain' || value === 'academic';
+}
+
+function isExportDefaultLocation(value: unknown): value is ExportDefaultLocation {
+  return value === 'ask' || value === 'document' || value === 'downloads' || value === 'custom';
+}
+
+function isDocxFontPolicy(value: unknown): value is DocxFontPolicy {
+  return value === 'theme' || value === 'preview' || value === 'custom';
+}
+
+function isFontSourceKind(value: unknown): value is FontSourceKind {
+  return value === 'theme' || value === 'builtin' || value === 'system' || value === 'custom';
 }
 
 function numberInRange(value: unknown, fallback: number, min: number, max: number): number {
@@ -37,11 +76,138 @@ function stringOrDefault(value: unknown, fallback: string): string {
   return typeof value === 'string' && value.trim() ? value : fallback;
 }
 
+function inferAutoSaveStrategy(interval: number): AutoSaveStrategy {
+  if (interval <= 1000) return 'instant';
+  if (interval <= 4000) return 'balanced';
+  return 'battery';
+}
+
+function normalizeFontSource(value: unknown, fallback: FontSource): FontSource {
+  if (!value || typeof value !== 'object') return fallback;
+  const source = value as Partial<FontSource>;
+  return {
+    kind: isFontSourceKind(source.kind) ? source.kind : fallback.kind,
+    value: typeof source.value === 'string' ? source.value : fallback.value,
+  };
+}
+
+function normalizeCustomFonts(value: unknown): CustomFont[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((font): CustomFont | null => {
+      if (!font || typeof font !== 'object') return null;
+      const candidate = font as Partial<CustomFont>;
+      if (
+        typeof candidate.id !== 'string' ||
+        typeof candidate.family !== 'string' ||
+        typeof candidate.displayName !== 'string' ||
+        typeof candidate.filename !== 'string' ||
+        typeof candidate.path !== 'string' ||
+        !(candidate.format === 'ttf' || candidate.format === 'otf' || candidate.format === 'woff' || candidate.format === 'woff2')
+      ) {
+        return null;
+      }
+      return {
+        id: candidate.id,
+        family: candidate.family,
+        displayName: candidate.displayName,
+        filename: candidate.filename,
+        path: candidate.path,
+        format: candidate.format,
+        importedAt: typeof candidate.importedAt === 'number' ? candidate.importedAt : Date.now(),
+      };
+    })
+    .filter((font): font is CustomFont => Boolean(font));
+}
+
+export function normalizeRecentFiles(value: unknown, limit = DEFAULT_SETTINGS.recentFilesLimit): RecentFileEntry[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const normalized: RecentFileEntry[] = [];
+
+  for (const file of value) {
+    if (!file || typeof file !== 'object') continue;
+    const candidate = file as Partial<RecentFileEntry>;
+    if (typeof candidate.path !== 'string' || !candidate.path.trim()) continue;
+    const key = candidate.path.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    normalized.push({
+      path: candidate.path,
+      name: stringOrDefault(candidate.name, candidate.path.split(/[\\/]/).pop() || candidate.path),
+      lastOpened: typeof candidate.lastOpened === 'number' ? candidate.lastOpened : Date.now(),
+    });
+  }
+
+  return normalized
+    .sort((a, b) => b.lastOpened - a.lastOpened)
+    .slice(0, limit);
+}
+
+function normalizeLastSession(value: unknown): LastSessionState | null {
+  if (!value || typeof value !== 'object') return null;
+  const session = value as Partial<LastSessionState>;
+  const filePath = typeof session.filePath === 'string' ? session.filePath : undefined;
+  const folderPath = typeof session.folderPath === 'string' ? session.folderPath : undefined;
+  if (!filePath && !folderPath) return null;
+
+  return {
+    filePath,
+    folderPath,
+    viewMode: isDefaultViewMode(session.viewMode) ? session.viewMode : undefined,
+    sidebarVisible: typeof session.sidebarVisible === 'boolean' ? session.sidebarVisible : undefined,
+    sidebarTab: session.sidebarTab === 'files' || session.sidebarTab === 'outline' || session.sidebarTab === 'search'
+      ? session.sidebarTab
+      : undefined,
+    updatedAt: typeof session.updatedAt === 'number' ? session.updatedAt : Date.now(),
+  };
+}
+
+function migrateEditorFontSource(saved: Partial<SettingsState>): FontSource {
+  if (saved.editorFontSource) {
+    return normalizeFontSource(saved.editorFontSource, DEFAULT_SETTINGS.editorFontSource);
+  }
+  if (
+    typeof saved.editorFontFamily === 'string' &&
+    saved.editorFontFamily.trim() &&
+    saved.editorFontFamily !== DEFAULT_SETTINGS.editorFontFamily
+  ) {
+    return { kind: 'builtin', value: saved.editorFontFamily };
+  }
+  return DEFAULT_SETTINGS.editorFontSource;
+}
+
+function migratePreviewFontSource(saved: Partial<SettingsState>): FontSource {
+  if (saved.previewFontSource) {
+    return normalizeFontSource(saved.previewFontSource, DEFAULT_SETTINGS.previewFontSource);
+  }
+  if (
+    typeof saved.previewFontFamily === 'string' &&
+    saved.previewFontFamily.trim() &&
+    saved.previewFontFamily !== 'inherit'
+  ) {
+    return { kind: 'builtin', value: saved.previewFontFamily };
+  }
+  return DEFAULT_SETTINGS.previewFontSource;
+}
+
 export function normalizeSettings(saved: Partial<SettingsState>): SettingsState {
   const exportDefaults =
     saved.exportDefaults && typeof saved.exportDefaults === 'object'
       ? saved.exportDefaults
       : {} as Partial<SettingsState['exportDefaults']>;
+  const autoSaveInterval = numberInRange(
+    saved.autoSaveInterval,
+    DEFAULT_SETTINGS.autoSaveInterval,
+    500,
+    60000,
+  );
+  const recentFilesLimit = numberInRange(
+    saved.recentFilesLimit,
+    DEFAULT_SETTINGS.recentFilesLimit,
+    5,
+    20,
+  );
 
   return {
     ...DEFAULT_SETTINGS,
@@ -79,17 +245,44 @@ export function normalizeSettings(saved: Partial<SettingsState>): SettingsState 
         exportDefaults.htmlIncludeTheme,
         DEFAULT_SETTINGS.exportDefaults.htmlIncludeTheme,
       ),
+      pdfPaper: isPdfPaper(exportDefaults.pdfPaper)
+        ? exportDefaults.pdfPaper
+        : DEFAULT_SETTINGS.exportDefaults.pdfPaper,
+      pdfMargin: isPdfMargin(exportDefaults.pdfMargin)
+        ? exportDefaults.pdfMargin
+        : DEFAULT_SETTINGS.exportDefaults.pdfMargin,
+      templateId: isExportTemplateId(exportDefaults.templateId)
+        ? exportDefaults.templateId
+        : DEFAULT_SETTINGS.exportDefaults.templateId,
+      defaultLocation: isExportDefaultLocation(exportDefaults.defaultLocation)
+        ? exportDefaults.defaultLocation
+        : DEFAULT_SETTINGS.exportDefaults.defaultLocation,
+      customDirectory: typeof exportDefaults.customDirectory === 'string'
+        ? exportDefaults.customDirectory
+        : DEFAULT_SETTINGS.exportDefaults.customDirectory,
+      docxFontPolicy: isDocxFontPolicy(exportDefaults.docxFontPolicy)
+        ? exportDefaults.docxFontPolicy
+        : DEFAULT_SETTINGS.exportDefaults.docxFontPolicy,
+      docxCustomFontId: typeof exportDefaults.docxCustomFontId === 'string'
+        ? exportDefaults.docxCustomFontId
+        : DEFAULT_SETTINGS.exportDefaults.docxCustomFontId,
     },
     shortcutStyle: isShortcutStyle(saved.shortcutStyle)
       ? saved.shortcutStyle
       : DEFAULT_SETTINGS.shortcutStyle,
-    autoSaveInterval: numberInRange(
-      saved.autoSaveInterval,
-      DEFAULT_SETTINGS.autoSaveInterval,
-      500,
-      60000,
-    ),
+    autoSaveEnabled: booleanOrDefault(saved.autoSaveEnabled, DEFAULT_SETTINGS.autoSaveEnabled),
+    autoSaveInterval,
+    autoSaveStrategy: isAutoSaveStrategy(saved.autoSaveStrategy)
+      ? saved.autoSaveStrategy
+      : inferAutoSaveStrategy(autoSaveInterval),
     showLineNumbers: booleanOrDefault(saved.showLineNumbers, DEFAULT_SETTINGS.showLineNumbers),
+    customFonts: normalizeCustomFonts(saved.customFonts),
+    editorFontSource: migrateEditorFontSource(saved),
+    previewFontSource: migratePreviewFontSource(saved),
+    recentFilesLimit,
+    recentFiles: normalizeRecentFiles(saved.recentFiles, recentFilesLimit),
+    restoreLastSession: booleanOrDefault(saved.restoreLastSession, DEFAULT_SETTINGS.restoreLastSession),
+    lastSession: normalizeLastSession(saved.lastSession),
     windowState: {
       ...DEFAULT_SETTINGS.windowState,
       ...saved.windowState,

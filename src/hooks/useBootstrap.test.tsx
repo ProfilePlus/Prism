@@ -2,24 +2,39 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useDocumentStore } from '../domains/document/store';
 import { useWorkspaceStore } from '../domains/workspace/store';
+import { useSettingsStore } from '../domains/settings/store';
 
 vi.mock('@tauri-apps/plugin-fs', () => ({
   readTextFile: vi.fn(),
+  exists: vi.fn(),
+}));
+
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: vi.fn(),
 }));
 
 vi.mock('../domains/workspace/lib/loadFolderTree', () => ({
   loadFolderTree: vi.fn(),
 }));
 
-import { readTextFile } from '@tauri-apps/plugin-fs';
+import { invoke } from '@tauri-apps/api/core';
+import { exists, readTextFile } from '@tauri-apps/plugin-fs';
 import { loadFolderTree } from '../domains/workspace/lib/loadFolderTree';
 import { useBootstrap } from './useBootstrap';
 
 beforeEach(() => {
   useDocumentStore.setState({ currentDocument: null });
   useWorkspaceStore.setState({ fileTree: [], rootPath: null });
+  useSettingsStore.setState({
+    restoreLastSession: true,
+    lastSession: null,
+    recentFiles: [],
+    saveSettings: vi.fn(),
+  });
   window.history.replaceState({}, '', '?file=C:/docs/bootstrap.md');
   vi.clearAllMocks();
+  (exists as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+  (invoke as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 });
 
 describe('useBootstrap', () => {
@@ -65,6 +80,7 @@ describe('useBootstrap', () => {
 
     await act(async () => {
       resolveTree(mockTree);
+      await Promise.resolve();
       await Promise.resolve();
     });
 

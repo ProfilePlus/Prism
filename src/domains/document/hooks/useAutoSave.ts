@@ -2,13 +2,13 @@ import { useEffect, useRef } from 'react';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { useDocumentStore } from '../store';
 
-export function useAutoSave(interval = 2000) {
+export function useAutoSave(interval = 2000, enabled = true) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentDocument = useDocumentStore((s) => s.currentDocument);
   const markSaved = useDocumentStore((s) => s.markSaved);
 
   useEffect(() => {
-    if (!currentDocument || !currentDocument.isDirty) {
+    if (!enabled || !currentDocument || !currentDocument.isDirty || !currentDocument.path) {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
@@ -39,5 +39,5 @@ export function useAutoSave(interval = 2000) {
         clearTimeout(timerRef.current);
       }
     };
-  }, [currentDocument, markSaved, interval]);
+  }, [currentDocument, markSaved, interval, enabled]);
 }

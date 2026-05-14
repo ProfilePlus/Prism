@@ -199,6 +199,7 @@ async function handleNewFile(parentPath: string | undefined, context: FileAction
   await writeTextFile(filePath, '', { createNew: true });
   const content = await readTextFile(filePath);
   context.documentStore.openDocument(filePath, basename(filePath), content);
+  addRecentFile(filePath, basename(filePath));
   await refreshWorkspace(context);
   requestInlineRename(filePath);
   context.showToast?.('已创建新文件');

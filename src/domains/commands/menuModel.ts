@@ -10,7 +10,8 @@ import type { ShortcutDisplayStyle } from './platform';
 type MenuModelItem =
   | { type: 'separator' }
   | { command: CommandId; label?: string; hidden?: (context: CommandContext) => boolean }
-  | { label: string; children: MenuModelItem[]; hidden?: (context: CommandContext) => boolean };
+  | { label: string; children: MenuModelItem[]; hidden?: (context: CommandContext) => boolean }
+  | { dynamic: (context: CommandContext) => MenuItem[] };
 
 type MenuModel = Record<string, MenuModelItem[]>;
 
@@ -21,6 +22,24 @@ const menuModel: MenuModel = {
     { type: 'separator' },
     { command: 'open' },
     { command: 'openFolder' },
+    {
+      label: '打开最近文档',
+      children: [
+        {
+          dynamic: (context) => {
+            const recentFiles = context.settingsStore.recentFiles.slice(0, 10);
+            if (recentFiles.length === 0) {
+              return [{ label: '无最近文档', disabled: true }];
+            }
+
+            return recentFiles.map((file) => ({
+              label: file.name,
+              action: `openRecentFile:${encodeURIComponent(file.path)}`,
+            }));
+          },
+        },
+      ],
+    },
     { type: 'separator' },
     { command: 'save' },
     { command: 'saveAs' },
@@ -181,14 +200,18 @@ function toMenuItem(
   context: CommandContext,
   displayStyle: ShortcutDisplayStyle,
 ): MenuItem | null {
+  if ('dynamic' in item) return null;
   if ('hidden' in item && item.hidden?.(context)) return null;
   if ('type' in item && item.type === 'separator') return { type: 'separator' };
 
   if ('children' in item) {
     const children = normalizeItems(
       item.children
-        .map((child) => toMenuItem(child, context, displayStyle))
-        .filter((child): child is MenuItem => Boolean(child)),
+        .flatMap((child) => {
+          if ('dynamic' in child) return child.dynamic(context);
+          const menuItem = toMenuItem(child, context, displayStyle);
+          return menuItem ? [menuItem] : [];
+        }),
     );
 
     if (!children.length) return null;

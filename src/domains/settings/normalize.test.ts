@@ -50,6 +50,7 @@ describe('normalizeSettings', () => {
     expect(settings.shortcutStyle).toBe(DEFAULT_SETTINGS.shortcutStyle);
     expect(settings.showLineNumbers).toBe(DEFAULT_SETTINGS.showLineNumbers);
     expect(settings.exportDefaults).toEqual({
+      ...DEFAULT_SETTINGS.exportDefaults,
       format: 'docx',
       pngScale: 3,
       htmlIncludeTheme: false,

@@ -7,7 +7,12 @@ import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
 import { loadFolderTree } from '../workspace/lib/loadFolderTree';
 import { openPrismWindow } from '../../lib/openWindow';
 import { MARKDOWN_FILE_FILTERS, addRecentFile, basename, dirname } from '../workspace/services';
-import { exportDocument, getExportFormatLabel, type ExportFormat } from '../export';
+import {
+  exportDocument,
+  getExportFormatLabel,
+  resolveExportOptions,
+  type ExportFormat,
+} from '../export';
 import type {
   CommandContext,
   CommandDefinition,
@@ -152,6 +157,7 @@ async function handleSave(context: CommandContext): Promise<void> {
   if (!doc.path) {
     context.documentStore.openDocument(targetPath, basename(targetPath), doc.content);
   }
+  addRecentFile(targetPath, basename(targetPath));
 
   context.documentStore.markSaved();
 }
@@ -173,6 +179,7 @@ async function handleSaveAs(context: CommandContext): Promise<void> {
 
   await writeTextFile(chosen, doc.content);
   context.documentStore.openDocument(chosen, basename(chosen), doc.content);
+  addRecentFile(chosen, basename(chosen));
   context.documentStore.markSaved();
 }
 
@@ -202,14 +209,13 @@ async function handleExport(format: ExportFormat, context: CommandContext): Prom
     });
     if (!outputPath) return;
 
-    const exported = await exportDocument({
+    const exported = await exportDocument(resolveExportOptions({
       content: doc.content,
       filename: doc.name,
-      contentTheme: context.settingsStore.contentTheme,
-      htmlIncludeTheme: context.settingsStore.exportDefaults.htmlIncludeTheme,
-      pngScale: context.settingsStore.exportDefaults.pngScale,
+      settings: context.settingsStore,
       onProgress: (message) => setExportProgress(message),
-    }, format, outputPath);
+      onWarning: (message) => context.showToast?.(message),
+    }), format, outputPath);
 
     if (exported) {
       context.showToast?.(`${getExportFormatLabel(format)} 导出完成`);

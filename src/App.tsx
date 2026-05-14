@@ -1,6 +1,5 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { listen } from '@tauri-apps/api/event';
-import { invoke } from '@tauri-apps/api/core';
 import { useDocumentStore } from './domains/document/store';
 import { useSettingsStore } from './domains/settings/store';
 import { useWorkspaceStore } from './domains/workspace/store';
@@ -11,7 +10,7 @@ import { Sidebar } from './domains/workspace/components/Sidebar';
 import { useBootstrap } from './hooks/useBootstrap';
 import { exists as fsExists } from '@tauri-apps/plugin-fs';
 import { open } from '@tauri-apps/plugin-dialog';
-import { homeDir } from '@tauri-apps/api/path';
+import { downloadDir, homeDir } from '@tauri-apps/api/path';
 import { EditorPaneHandle } from './domains/editor/components/EditorPane';
 import type { ExportFormat } from './domains/export';
 import { getExportFormatLabel } from './domains/export';
@@ -34,6 +33,7 @@ import {
   type CommandContext,
 } from './domains/commands';
 import { basename, dirname, getShowInFileManagerLabel, joinPath } from './domains/workspace/services';
+import type { ExportDefaultLocation } from './domains/settings/types';
 
 const exportExtensionByFormat: Record<ExportFormat, string> = {
   html: 'html',
@@ -61,6 +61,42 @@ function ensureMarkdownExtension(filename: string) {
 
 function defaultExportFilename(filename: string, format: ExportFormat) {
   return ensureExportExtension(stripMarkdownExtension(filename), format);
+}
+
+async function resolveDefaultExportDirectory(input: {
+  defaultLocation: ExportDefaultLocation;
+  customDirectory: string;
+  documentPath?: string;
+  rootPath?: string | null;
+  showToast?: (message: string) => void;
+}) {
+  const fallback = input.documentPath
+    ? dirname(input.documentPath)
+    : input.rootPath || await homeDir();
+
+  if (input.defaultLocation === 'ask' || input.defaultLocation === 'document') {
+    return fallback;
+  }
+
+  if (input.defaultLocation === 'downloads') {
+    try {
+      return await downloadDir();
+    } catch {
+      return fallback;
+    }
+  }
+
+  const customDirectory = input.customDirectory.trim();
+  if (customDirectory) {
+    try {
+      if (await fsExists(customDirectory)) return customDirectory;
+    } catch {
+      // Fall through to toast and fallback.
+    }
+  }
+
+  input.showToast?.('默认导出目录不可用，已回退到当前文档位置');
+  return fallback;
 }
 
 type SaveDialogKind = 'export' | 'markdown';
@@ -99,6 +135,9 @@ function App() {
   const contentTheme = useSettingsStore((s) => s.contentTheme);
   const shortcutStyle = useSettingsStore((s) => s.shortcutStyle);
   const autoSaveInterval = useSettingsStore((s) => s.autoSaveInterval);
+  const autoSaveEnabled = useSettingsStore((s) => s.autoSaveEnabled);
+  const exportDefaults = useSettingsStore((s) => s.exportDefaults);
+  const recentFiles = useSettingsStore((s) => s.recentFiles);
   const workspace = useWorkspaceStore();
 
   const editorRef = useRef<EditorPaneHandle>(null);
@@ -120,7 +159,7 @@ function App() {
   const [settingsVisible, setSettingsVisible] = useState(false);
 
   useBootstrap();
-  useAutoSave(autoSaveInterval);
+  useAutoSave(autoSaveInterval, autoSaveEnabled);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -154,6 +193,33 @@ function App() {
   useEffect(() => {
     document.body.classList.toggle('typewriter-mode', workspace.typewriterMode);
   }, [workspace.typewriterMode]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const doc = useDocumentStore.getState().currentDocument;
+      const ws = useWorkspaceStore.getState();
+      useSettingsStore.getState().setLastSession(
+        doc?.path || ws.rootPath
+          ? {
+              filePath: doc?.path || undefined,
+              folderPath: ws.rootPath || undefined,
+              viewMode: doc?.viewMode,
+              sidebarVisible: ws.sidebarVisible,
+              sidebarTab: ws.sidebarTab,
+              updatedAt: Date.now(),
+            }
+          : null,
+      );
+    }, 500);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    currentDocument?.path,
+    currentDocument?.viewMode,
+    workspace.rootPath,
+    workspace.sidebarTab,
+    workspace.sidebarVisible,
+  ]);
 
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
@@ -195,12 +261,6 @@ function App() {
       }
     });
 
-    invoke<string[]>('get_pending_files').then((paths) => {
-      if (paths.length > 0 && mounted) {
-        handleFileAction({ action: 'openFile', path: paths[0] });
-      }
-    }).catch(() => {});
-
     return () => {
       mounted = false;
       unlisten.then(fn => fn());
@@ -216,9 +276,13 @@ function App() {
     filename: string;
     documentPath?: string;
   }) => {
-    const initialDirectory = input.documentPath
-      ? dirname(input.documentPath)
-      : workspace.rootPath || await homeDir();
+    const initialDirectory = await resolveDefaultExportDirectory({
+      defaultLocation: exportDefaults.defaultLocation,
+      customDirectory: exportDefaults.customDirectory,
+      documentPath: input.documentPath,
+      rootPath: workspace.rootPath,
+      showToast,
+    });
 
     return new Promise<string | null>((resolve) => {
       setSaveDialog({
@@ -231,7 +295,7 @@ function App() {
         resolve,
       });
     });
-  }, [workspace.rootPath]);
+  }, [exportDefaults.customDirectory, exportDefaults.defaultLocation, showToast, workspace.rootPath]);
 
   const requestMarkdownSavePath = useCallback(async (input: {
     filename: string;
@@ -349,6 +413,8 @@ function App() {
     workspace.isAlwaysOnTop,
     contentTheme,
     shortcutStyle,
+    exportDefaults,
+    recentFiles,
   ]);
 
   const menuSections = useMemo(
@@ -362,6 +428,14 @@ function App() {
   );
 
   const handleCommandAction = useCallback(async (action: string) => {
+    if (action.startsWith('openRecentFile:')) {
+      await handleFileAction({
+        action: 'openFile',
+        path: decodeURIComponent(action.slice('openRecentFile:'.length)),
+      });
+      return;
+    }
+
     if (!isCommandId(action)) {
       console.warn(`[Command] Unknown command id: ${action}`);
       showToast(`未知命令: ${action}`);
@@ -369,7 +443,7 @@ function App() {
     }
 
     await runCommand(action, createCommandContext());
-  }, [createCommandContext, showToast]);
+  }, [createCommandContext, handleFileAction, showToast]);
 
   useEffect(() => {
     const handler = (event: Event) => {
