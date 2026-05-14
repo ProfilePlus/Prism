@@ -112,6 +112,37 @@ describe('command registry', () => {
     expect(actions.every((action) => commandRegistryById.has(action as never))).toBe(true);
   });
 
+  it('places settings in File and product help in Help', () => {
+    const sections = getMenuSections(createCommandContext());
+    const fileActions = sections['文件'].flatMap((item) => item.type === 'separator' ? [] : [item.action]);
+    const helpActions = sections['帮助'].flatMap((item) => item.type === 'separator' ? [] : [item.action]);
+
+    expect(Object.keys(sections)).not.toContain('Prism');
+    expect(fileActions).toContain('preferences');
+    expect(helpActions).toEqual(expect.arrayContaining(['commandPalette', 'showShortcuts', 'about']));
+  });
+
+  it('builds recent document menu items from settings', () => {
+    const sections = getMenuSections(createCommandContext({
+      settingsStore: {
+        ...createCommandContext().settingsStore,
+        recentFiles: [
+          { path: '/tmp/a.md', name: 'a.md', lastOpened: 2 },
+          { path: '/tmp/b.md', name: 'b.md', lastOpened: 1 },
+        ],
+      },
+    }));
+    const recentMenu = sections['文件'].find((item) => item.type !== 'separator' && item.label === '打开最近文档');
+
+    expect(recentMenu).toMatchObject({
+      submenu: true,
+      children: [
+        { label: 'a.md', action: `openRecentFile:${encodeURIComponent('/tmp/a.md')}` },
+        { label: 'b.md', action: `openRecentFile:${encodeURIComponent('/tmp/b.md')}` },
+      ],
+    });
+  });
+
   it('does not expose document-only commands in the command palette without a document', () => {
     const items = getCommandPaletteItems(createCommandContext());
     const ids = items.map((item) => item.id);
