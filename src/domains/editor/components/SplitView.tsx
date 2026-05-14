@@ -4,7 +4,10 @@ import { PreviewPane } from './PreviewPane';
 import { buildSearchPattern, countMatches, SearchAction, SearchMode, SearchPanel, SearchParams } from './SearchPanel';
 import { ContextMenu, type ContextMenuItem } from '../../../components/shell/ContextMenu';
 import { useDocumentStore } from '../../document/store';
+import { useSettingsStore } from '../../settings/store';
+import { useWorkspaceStore } from '../../workspace/store';
 import { markdownToHtml } from '../../../lib/markdownToHtml';
+import { getCommandMenuItems, type CommandContext } from '../../commands';
 
 interface SplitViewProps {
   content: string;
@@ -43,8 +46,16 @@ function getSerializedSelectionHtml(preview: HTMLElement | null) {
   return container.innerHTML;
 }
 
-function dispatchMenuAction(action: string) {
-  window.dispatchEvent(new CustomEvent('prism-menu-action', { detail: { action } }));
+function dispatchCommand(action: string) {
+  window.dispatchEvent(new CustomEvent('prism-command', { detail: { action } }));
+}
+
+function createReadonlyCommandContext(): CommandContext {
+  return {
+    documentStore: useDocumentStore.getState(),
+    settingsStore: useSettingsStore.getState(),
+    workspaceStore: useWorkspaceStore.getState(),
+  };
 }
 
 // 借鉴 VSCode markdown preview scroll-sync 算法
@@ -379,30 +390,32 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
       return normalizeSelectionSeed(getPreviewRawSelectedText());
     }, [getPreviewRawSelectedText]);
 
-    const getPreviewContextMenuItems = useCallback((hasSelection: boolean, line: number | null): ContextMenuItem[] => [
-      { label: '复制', action: 'copy', shortcut: '⌘C', disabled: !hasSelection },
-      { label: '全选', action: 'selectAll', shortcut: '⌘A' },
-      { type: 'separator' },
-      {
-        label: '复制为',
-        children: [
-          { label: '纯文本', action: 'copyPlain' },
-          { label: 'Markdown', action: 'copyMd' },
-          { label: 'HTML', action: 'copyHtml' },
-        ],
-      },
-      { label: '在编辑器中定位源码', action: 'locateSource', disabled: line === null },
-      { type: 'separator' },
-      {
-        label: '导出',
-        children: [
-          { label: '导出为 PDF', action: 'exportPdf' },
-          { label: '导出为 Word (.docx)', action: 'exportDocx' },
-          { label: '导出为 HTML', action: 'exportHtml' },
-          { label: '导出为 PNG 图像', action: 'exportPng' },
-        ],
-      },
-    ], []);
+    const getPreviewContextMenuItems = useCallback((hasSelection: boolean, line: number | null): ContextMenuItem[] => {
+      const exportItems = getCommandMenuItems(
+        ['exportPdf', 'exportDocx', 'exportHtml', 'exportPng'],
+        createReadonlyCommandContext(),
+      ) as ContextMenuItem[];
+
+      return [
+        { label: '复制', action: 'copy', shortcut: '⌘C', disabled: !hasSelection },
+        { label: '全选', action: 'selectAll', shortcut: '⌘A' },
+        { type: 'separator' },
+        {
+          label: '复制为',
+          children: [
+            { label: '纯文本', action: 'copyPlain' },
+            { label: 'Markdown', action: 'copyMd' },
+            { label: 'HTML', action: 'copyHtml' },
+          ],
+        },
+        { label: '在编辑器中定位源码', action: 'locateSource', disabled: line === null },
+        { type: 'separator' },
+        {
+          label: '导出',
+          children: exportItems,
+        },
+      ];
+    }, []);
 
     const handlePreviewContextMenu = useCallback((event: React.MouseEvent) => {
       event.preventDefault();
@@ -464,7 +477,7 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
         case 'exportDocx':
         case 'exportHtml':
         case 'exportPng':
-          dispatchMenuAction(action);
+          dispatchCommand(action);
           break;
       }
     }, [getPreviewRawSelectedText, previewContextMenu?.line]);

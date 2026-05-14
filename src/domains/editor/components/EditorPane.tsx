@@ -64,6 +64,7 @@ import { useWorkspaceStore } from '../../workspace/store';
 import type { SearchAction, SearchParams } from './SearchPanel';
 import { ContextMenu, ContextMenuItem } from '../../../components/shell/ContextMenu';
 import { markdownToHtml } from '../../../lib/markdownToHtml';
+import { getCommandDefinition, getPrimaryShortcutLabel, isCommandId, type CommandId } from '../../commands';
 
 const editorLineNumbersCompartment = new Compartment();
 const editorDarkThemeCompartment = new Compartment();
@@ -912,74 +913,49 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       [],
     );
 
-    const getEditorContextMenuItems = useCallback((hasSelection: boolean): ContextMenuItem[] => [
-      { label: '剪切', action: 'cut', shortcut: '⌘X', disabled: !hasSelection },
-      { label: '复制', action: 'copy', shortcut: '⌘C', disabled: !hasSelection },
-      { label: '粘贴', action: 'paste', shortcut: '⌘V' },
-      { label: '粘贴并匹配样式', action: 'pastePlain', shortcut: '⇧⌘V' },
-      { type: 'separator' },
-      { label: '粗体', action: 'format:bold', shortcut: '⌘B' },
-      { label: '斜体', action: 'format:italic', shortcut: '⌘I' },
-      { label: '下划线', action: 'format:underline', shortcut: '⌘U' },
-      { label: '删除线', action: 'format:strikethrough', shortcut: '⌥⇧5' },
-      { type: 'separator' },
-      {
-        label: '复制为',
-        children: [
-          { label: '纯文本', action: 'copyPlain', disabled: !hasSelection },
-          { label: 'Markdown', action: 'copyMd', disabled: !hasSelection },
-          { label: 'HTML', action: 'copyHtml', disabled: !hasSelection },
-        ],
-      },
-    ], []);
+    const getEditorContextMenuItems = useCallback((hasSelection: boolean): ContextMenuItem[] => {
+      const commandItem = (
+        id: CommandId,
+        options: { label?: string; disabled?: boolean } = {},
+      ): ContextMenuItem => ({
+        label: options.label ?? getCommandDefinition(id).label,
+        action: id,
+        shortcut: getPrimaryShortcutLabel(id),
+        disabled: options.disabled,
+      });
+
+      return [
+        commandItem('cut', { disabled: !hasSelection }),
+        commandItem('copy', { disabled: !hasSelection }),
+        commandItem('paste'),
+        commandItem('pastePlain'),
+        { type: 'separator' },
+        commandItem('bold'),
+        commandItem('italic'),
+        commandItem('underline'),
+        commandItem('strikethrough'),
+        { type: 'separator' },
+        {
+          label: '复制为',
+          children: [
+            commandItem('copyPlain', { label: '纯文本', disabled: !hasSelection }),
+            commandItem('copyMd', { label: 'Markdown', disabled: !hasSelection }),
+            commandItem('copyHtml', { label: 'HTML', disabled: !hasSelection }),
+          ],
+        },
+      ];
+    }, []);
 
     const handleEditorContextMenuAction = useCallback(async (action: string) => {
       const view = viewRef.current;
       if (!view) return;
 
-      if (action.startsWith('format:')) {
-        handleFormat(action.slice('format:'.length) as EditorFormat);
-        return;
-      }
-
-      const selection = view.state.selection.main;
-      const selectedText = selection.from === selection.to
-        ? ''
-        : view.state.doc.sliceString(selection.from, selection.to);
-
-      switch (action) {
-        case 'cut':
-          if (!selectedText) break;
-          await navigator.clipboard.writeText(selectedText);
-          view.dispatch({
-            changes: { from: selection.from, to: selection.to, insert: '' },
-            selection: { anchor: selection.from },
-          });
-          break;
-        case 'copy':
-          if (selectedText) await navigator.clipboard.writeText(selectedText);
-          break;
-        case 'copyPlain':
-        case 'copyMd':
-          if (selectedText) await navigator.clipboard.writeText(selectedText);
-          break;
-        case 'copyHtml':
-          if (selectedText) await navigator.clipboard.writeText(markdownToHtml(selectedText));
-          break;
-        case 'paste':
-        case 'pastePlain': {
-          const text = await navigator.clipboard.readText();
-          if (!text) break;
-          view.dispatch({
-            changes: { from: selection.from, to: selection.to, insert: text },
-            selection: { anchor: selection.from + text.length },
-          });
-          break;
-        }
+      if (isCommandId(action)) {
+        window.dispatchEvent(new CustomEvent('prism-command', { detail: { action } }));
       }
 
       view.focus();
-    }, [handleFormat]);
+    }, []);
 
     // 监听菜单格式化事件
     useEffect(() => {

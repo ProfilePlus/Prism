@@ -46,6 +46,7 @@ export function getShortcutLabel(
   platform: AppPlatform = getCurrentPlatform(),
 ): string | undefined {
   if (!shortcut) return undefined;
+  if (shortcut.platforms && !shortcut.platforms.includes(platform)) return undefined;
 
   if (typeof shortcut.label === 'string') return shortcut.label;
   const platformLabel = shortcut.label?.[platform];
@@ -76,6 +77,7 @@ export function shortcutMatchesEvent(
   platform: AppPlatform = getCurrentPlatform(),
 ): boolean {
   if (event.code !== shortcut.code) return false;
+  if (shortcut.platforms && !shortcut.platforms.includes(platform)) return false;
 
   const expectedCtrl = shortcut.ctrl ?? (shortcut.mod ? platform !== 'mac' : false);
   const expectedMeta = shortcut.meta ?? (shortcut.mod ? platform === 'mac' : false);

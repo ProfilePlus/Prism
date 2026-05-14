@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import { useDocumentStore } from './domains/document/store';
@@ -18,14 +18,21 @@ import { getExportFormatLabel } from './lib/exportDocument';
 import { WindowShell } from './components/shell/WindowShell';
 import { TitleBar } from './components/shell/TitleBar';
 import { MenuBar } from './components/shell/MenuBar';
-import { executeMenuAction } from './lib/menuActions';
 import { executeFileAction, FileActionInput } from './lib/fileActions';
 import { ContextMenu, type ContextMenuItem } from './components/shell/ContextMenu';
 import { ShortcutPanel } from './components/shell/ShortcutPanel';
 import { CommandPalette } from './components/shell/CommandPalette';
 import { AboutModal } from './components/shell/AboutModal';
 import { SettingsModal } from './components/shell/SettingsModal';
-import { ALL_COMMANDS } from './lib/commands';
+import {
+  findCommandByKeyboardEvent,
+  getCommandMenuItems,
+  getCommandPaletteItems,
+  getMenuSections,
+  isCommandId,
+  runCommand,
+  type CommandContext,
+} from './domains/commands';
 
 function basename(path: string): string {
   const parts = path.split(/[\\/]/);
@@ -104,6 +111,7 @@ function App() {
   const currentDocument = useDocumentStore((s) => s.currentDocument);
 
   const { loadSettings } = useSettingsStore();
+  const contentTheme = useSettingsStore((s) => s.contentTheme);
   const workspace = useWorkspaceStore();
 
   const editorRef = useRef<EditorPaneHandle>(null);
@@ -126,24 +134,6 @@ function App() {
 
   useBootstrap();
   useAutoSave(2000);
-
-  // Ctrl+/ 快捷键面板
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === '/') {
-        e.preventDefault();
-        setShortcutPanelVisible(true);
-      }
-      // Ctrl+Shift+P 命令面板
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
-        e.preventDefault();
-        setCommandPaletteVisible(true);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -345,29 +335,62 @@ function App() {
     closeSaveDialog(targetPath);
   }, [closeSaveDialog, saveDialog]);
 
-  const handleMenuAction = useCallback(async (action: string) => {
-    if (action === 'about') { setAboutVisible(true); return; }
-    if (action === 'preferences') { setSettingsVisible(true); return; }
-    if (action === 'showShortcuts') { setShortcutPanelVisible(true); return; }
-    if (action === 'showCmd' || action === 'commandPalette') { setCommandPaletteVisible(true); return; }
-    await executeMenuAction(action, {
+  const createCommandContext = useCallback((): CommandContext => ({
       documentStore: useDocumentStore.getState(),
       settingsStore: useSettingsStore.getState(),
       workspaceStore: useWorkspaceStore.getState(),
       showToast,
       requestExportPath,
       requestSavePath: requestMarkdownSavePath,
-    });
-  }, [requestExportPath, requestMarkdownSavePath, showToast]);
+      openAbout: () => setAboutVisible(true),
+      openSettings: () => setSettingsVisible(true),
+      openShortcuts: () => setShortcutPanelVisible(true),
+      openCommandPalette: () => setCommandPaletteVisible(true),
+  }), [requestExportPath, requestMarkdownSavePath, showToast]);
+
+  const commandContext = useMemo(() => createCommandContext(), [
+    createCommandContext,
+    currentDocument?.path,
+    currentDocument?.isDirty,
+    currentDocument?.viewMode,
+    workspace.sidebarVisible,
+    workspace.sidebarTab,
+    workspace.statusBarVisible,
+    workspace.focusMode,
+    workspace.typewriterMode,
+    workspace.isFullscreen,
+    workspace.isAlwaysOnTop,
+    contentTheme,
+  ]);
+
+  const menuSections = useMemo(
+    () => getMenuSections(commandContext),
+    [commandContext],
+  );
+
+  const commandPaletteItems = useMemo(
+    () => getCommandPaletteItems(commandContext),
+    [commandContext],
+  );
+
+  const handleCommandAction = useCallback(async (action: string) => {
+    if (!isCommandId(action)) {
+      console.warn(`[Command] Unknown command id: ${action}`);
+      showToast(`未知命令: ${action}`);
+      return;
+    }
+
+    await runCommand(action, createCommandContext());
+  }, [createCommandContext, showToast]);
 
   useEffect(() => {
     const handler = (event: Event) => {
       const action = (event as CustomEvent<{ action?: string }>).detail?.action;
-      if (action) handleMenuAction(action);
+      if (action) handleCommandAction(action);
     };
-    window.addEventListener('prism-menu-action', handler);
-    return () => window.removeEventListener('prism-menu-action', handler);
-  }, [handleMenuAction]);
+    window.addEventListener('prism-command', handler);
+    return () => window.removeEventListener('prism-command', handler);
+  }, [handleCommandAction]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -389,47 +412,13 @@ function App() {
       workspace.toggleFocusMode();
       return;
     }
-    const ctrl = e.ctrlKey || e.metaKey;
-    const shift = e.shiftKey;
-    const alt = e.altKey;
-    const code = e.code;
 
-    if (ctrl && !shift && !alt && code === 'KeyS') {
+    const command = findCommandByKeyboardEvent(e);
+    if (command) {
       e.preventDefault();
-      if (!currentDocument || !currentDocument.isDirty) return;
-      await handleMenuAction('save');
-      return;
+      await runCommand(command.id, createCommandContext());
     }
-
-    let action: string | null = null;
-    if (ctrl && !shift && !alt) {
-      action = ({
-        KeyN: 'new', KeyO: 'open', KeyW: 'closeDocument', KeyM: 'minimize', Comma: 'preferences',
-        Digit1: 'h1', Digit2: 'h2', Digit3: 'h3', Digit4: 'h4', Digit5: 'h5', Digit6: 'h6', Digit0: 'paragraph',
-        Equal: 'increaseHeading', Minus: 'decreaseHeading', Slash: 'sourceMode',
-        KeyB: 'bold', KeyI: 'italic', KeyU: 'underline', KeyK: 'link', Backslash: 'clearFormat',
-      } as Record<string, string>)[code] ?? null;
-    } else if (ctrl && shift && !alt) {
-      action = ({
-        KeyN: 'newWindow', KeyO: 'openFolder', KeyS: 'saveAs', KeyZ: 'redo',
-        KeyC: 'copyMd', KeyV: 'pastePlain', KeyL: 'toggleSidebar',
-        Digit1: 'showOutline', Digit2: 'showDocs', Digit3: 'showFiles', Digit9: 'actualSize',
-        KeyF: 'showSearch', KeyM: 'mathBlock', KeyK: 'codeBlock', KeyQ: 'quote',
-        BracketLeft: 'orderedList', BracketRight: 'unorderedList', KeyX: 'taskList', Backquote: 'inlineCode',
-        Equal: 'zoomIn', Minus: 'zoomOut',
-      } as Record<string, string>)[code] ?? null;
-    } else if (!ctrl && !shift && !alt) {
-      action = ({ F8: 'focusMode', F9: 'typewriterMode', F11: 'fullscreen' } as Record<string, string>)[code] ?? null;
-    } else if (!ctrl && shift && alt && code === 'Digit5') {
-      action = 'strikethrough';
-    } else if (!ctrl && shift && !alt && code === 'F12') {
-      action = 'devTools';
-    }
-    if (action) {
-      e.preventDefault();
-      handleMenuAction(action);
-    }
-  }, [currentDocument, workspace, handleMenuAction]);
+  }, [createCommandContext, workspace]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -466,12 +455,10 @@ function App() {
 
   const handleExportContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    const items: ContextMenuItem[] = [
-      { label: '导出为 PDF', action: 'exportPdf' },
-      { label: '导出为 Word (.docx)', action: 'exportDocx' },
-      { label: '导出为 HTML', action: 'exportHtml' },
-      { label: '导出为 PNG 图像', action: 'exportPng' },
-    ];
+    const items = getCommandMenuItems(
+      ['exportPdf', 'exportDocx', 'exportHtml', 'exportPng'],
+      createCommandContext(),
+    ) as ContextMenuItem[];
     setGlobalContextMenu({ x: e.clientX, y: e.clientY, items, kind: 'menu' });
   };
 
@@ -479,9 +466,9 @@ function App() {
   const titleDirty = currentDocument?.isDirty ?? false;
 
   return (
-    <WindowShell>
+      <WindowShell>
       <TitleBar docName={titleDocName} isDirty={titleDirty} />
-      <MenuBar onAction={handleMenuAction} />
+      <MenuBar sections={menuSections} onAction={handleCommandAction} />
       <div className="app-main" style={{ flex: 1, display: 'flex', minHeight: 0, minWidth: 0 }}>
         {workspace.sidebarVisible && (
           <div
@@ -536,7 +523,7 @@ function App() {
             if (globalContextMenu.kind === 'file') {
               handleFileAction(action);
             } else {
-              handleMenuAction(action);
+              handleCommandAction(action);
             }
           }}
           onClose={() => setGlobalContextMenu(null)}
@@ -631,9 +618,9 @@ function App() {
 
       <CommandPalette
         visible={commandPaletteVisible}
-        commands={ALL_COMMANDS}
+        commands={commandPaletteItems}
         onClose={() => setCommandPaletteVisible(false)}
-        onExecute={(commandId) => handleMenuAction(commandId)}
+        onExecute={(commandId) => handleCommandAction(commandId)}
       />
 
       <AboutModal visible={aboutVisible} onClose={() => setAboutVisible(false)} />

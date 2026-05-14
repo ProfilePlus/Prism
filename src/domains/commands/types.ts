@@ -1,4 +1,7 @@
-import type { MenuActionContext } from '../../lib/menuActions.types';
+import type { useDocumentStore } from '../document/store';
+import type { useSettingsStore } from '../settings/store';
+import type { useWorkspaceStore } from '../workspace/store';
+import type { ExportFormat } from '../../lib/exportDocument';
 
 export type CommandCategory =
   | '文件'
@@ -97,6 +100,7 @@ export type AppPlatform = 'mac' | 'windows' | 'linux';
 
 export interface ShortcutBinding {
   code: string;
+  platforms?: AppPlatform[];
   mod?: boolean;
   ctrl?: boolean;
   meta?: boolean;
@@ -105,7 +109,20 @@ export interface ShortcutBinding {
   label?: string | Partial<Record<AppPlatform, string>>;
 }
 
-export interface CommandContext extends MenuActionContext {
+export interface CommandContext {
+  documentStore: ReturnType<typeof useDocumentStore.getState>;
+  settingsStore: ReturnType<typeof useSettingsStore.getState>;
+  workspaceStore: ReturnType<typeof useWorkspaceStore.getState>;
+  showToast?: (message: string) => void;
+  requestExportPath?: (input: {
+    format: ExportFormat;
+    filename: string;
+    documentPath?: string;
+  }) => Promise<string | null>;
+  requestSavePath?: (input: {
+    filename: string;
+    documentPath?: string;
+  }) => Promise<string | null>;
   openAbout?: () => void;
   openSettings?: () => void;
   openShortcuts?: () => void;
