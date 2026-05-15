@@ -339,16 +339,18 @@ body.typewriter-mode .cm-editor {
   transition: opacity 140ms var(--ease-out);
 }
 
+.prism-horizontal-scrollbar[data-scrollable='true'] {
+  pointer-events: auto;
+}
+
 .prism-horizontal-scrollbar[data-scrollable='false'] {
   opacity: 0;
   pointer-events: none;
 }
 
-.prism-scrollbar-host:hover > .prism-horizontal-scrollbar[data-scrollable='true'],
-.prism-scrollbar-host:focus-within > .prism-horizontal-scrollbar[data-scrollable='true'],
+.prism-horizontal-scrollbar[data-scrollable='true']:hover,
 .prism-horizontal-scrollbar[data-dragging='true'] {
   opacity: 1;
-  pointer-events: auto;
 }
 
 .prism-horizontal-scrollbar__thumb {
