@@ -3,7 +3,7 @@
 > 日期：2026-05-15  
 > 目标：用同一份复杂 Markdown 文件验证 HTML / PDF / PNG / DOCX 导出在真实桌面运行时的可靠性。  
 > 计划来源：`docs/prism-product-optimization-plan.md` 第 7 节“导出工作台”。  
-> 当前状态：已补自动化 pipeline 产物 smoke 与命令入口集成 smoke；真实 Prism UI 四格式导出仍受当前 UI 自动化工具阻塞，尚未闭环。
+> 当前状态：自动化 pipeline 产物 smoke、命令入口集成 smoke、真实 Prism UI 四格式导出 smoke 均已闭环；真实 Pandoc citeproc 仍受本机未安装 Pandoc 阻塞。
 
 ## 1. 覆盖范围
 
@@ -198,7 +198,7 @@ P0 问题定义：
 
 ## 9. 本轮记录
 
-本轮已完成自动化 pipeline 产物 smoke，尚未完成真实 UI 导出 smoke。
+本轮已完成自动化 pipeline 产物 smoke、命令入口集成 smoke，以及真实 Prism UI 四格式导出 smoke。
 
 ### 2026-05-15 自动化 pipeline 产物 smoke
 
@@ -299,25 +299,66 @@ open -n -a /Users/Alex/AI/project/Prism/src-tauri/target/release/bundle/macos/Pr
   - 主编辑/预览区域显示 front matter、标题、正文、citekey 占位、本地图片 Markdown、表格段落。
   - 底部状态栏显示 `已保存`。
 
-仍然阻塞：
+此前阻塞：
 
 - Prism release app 进程存在。
 - Computer Use 本轮读取 `Prism` 或列出 apps 时返回 `codex app-server exited before returning a response`。
 - AppleScript / System Events 可读取窗口元信息，但坐标点击应用内“文件”菜单时返回 `-25200`，随后 Prism 进程仍在但没有可读窗口，重新 `open` 文件也未恢复窗口。
 - `screencapture` 在该失败状态后只能得到黑屏截图，不能作为 UI 通过证据。
-- 因此不能宣称真实 UI 四格式导出通过；本项仍是弱验证。
+- 因此当时不能宣称真实 UI 四格式导出通过；该记录保留为历史失败尝试。
 
-待真实 smoke 完成后，在此追加：
+### 2026-05-15 真实 Prism UI 四格式导出 smoke
+
+Checkpoint：
+
+- 目标：用真实 macOS Prism `.app` 通过应用内导出菜单生成 HTML / PDF / PNG / DOCX，并确认产物不是空文件、不是测试替身结果。
+- 运行方式：`npm run tauri:build:app-smoke` 构建 `src-tauri/target/release/bundle/macos/Prism.app`，随后打开 `.codex-smoke/complex-export/complex-export.md`。
+- Prism 进程：Computer Use 读取到 bundle `com.prism.editor.v1`，窗口 URL 为 `tauri://localhost/?file=...complex-export.md&folder=...complex-export`。
+- Pandoc 状态：`pandoc --version` 返回 `zsh:1: command not found: pandoc`；因此 citeproc 参考文献仍未覆盖，基础导出必须保留 citekey 占位。
+
+真实 UI 操作：
+
+- 通过底部状态栏“导出”菜单分别选择 `导出为 PDF`、`导出为 HTML`、`导出为 PNG 图像`、`导出为 Word (.docx)`。
+- 每次都使用 Prism 自带导出 modal 修改文件名并点击“导出”。
+- PDF 导出前曾暴露真实 bug：阶段停在“正在渲染图表”，失败诊断为 `图像渲染失败: Attempting to parse an unsupported color function "color"`。原因是 `html2canvas` 不支持 WebKit 计算样式中的现代 CSS `color(...)` 函数。
+- 本轮最小修复后，PDF / PNG 栅格导出使用 raster-safe CSS，并在调用 `html2canvas` 前把 computed color 函数归一为 `rgb(...)` / `rgba(...)`；HTML 导出仍保留完整主题 CSS。
+
+产物：
 
 ```text
-日期：
-Prism 版本：
-运行方式：
-Pandoc 状态：
-HTML：
-PDF：
-PNG：
-DOCX：
-失败诊断：
-结论：
+.codex-smoke/complex-export/ui-raster-fixed.html
+.codex-smoke/complex-export/ui-raster-fixed.pdf
+.codex-smoke/complex-export/ui-raster-fixed.png
+.codex-smoke/complex-export/ui-raster-fixed.docx
 ```
+
+产物检查：
+
+- `ls -lh`：
+  - HTML：`75M`
+  - PDF：`141K`
+  - PNG：`395K`
+  - DOCX：`14K`
+- `file`：
+  - HTML：`HTML document text, Unicode text, UTF-8 text`
+  - PDF：`PDF document, version 1.7`
+  - PNG：`PNG image data, 2054 x 3316, 8-bit/color RGBA, non-interlaced`
+  - DOCX：`Microsoft Word 2007+`
+- `pdf-lib`：PDF 可加载，`pages = 2`，首页尺寸 `595.28 x 841.89`，符合 A4。
+- `sips`：PNG `pixelWidth = 2054`，`pixelHeight = 3316`。
+- HTML 内容检查：包含中文标题、`@doe2024` citekey、`<table`、`<td>`、KaTeX class、Mermaid SVG、`prism-citation`。
+- `jszip` 读取 DOCX：`word/document.xml` 长度 `15686`，`word/media/` 包含 1 个 SVG 和 1 个 PNG；中文标题、表格文本、`Mermaid`、已完成 / 待完成任务均存在；`graph TD` 未原样进入正文。
+- `textutil -convert txt -stdout`：macOS 系统可解析 DOCX，输出保留中文标题、正文、表格文本、`☑ 已完成的任务`、`☐ 待完成的任务`。
+- `qlmanage -t -s 1024`：DOCX 可生成 Quick Look thumbnail。
+
+结论：
+
+- 真实 Prism UI 四格式导出通过。
+- 本次发现并修复 PDF / PNG 栅格导出对现代 CSS color function 的兼容性问题。
+- 真实 Pandoc citeproc 仍未覆盖；阻塞项是本机无 `pandoc`。
+
+验证命令：
+
+- `npm test -- --run src/domains/commands/exportCommand.integration.test.ts src/domains/commands/registry.test.ts src/domains/export/exportPipeline.test.ts`：通过，3 files / 45 tests。
+- `npm test -- --run`：通过，55 files / 319 tests。
+- `npm run build`：通过，仅有既有 Vite large chunk warning。

@@ -36,7 +36,7 @@
 核心 1.0.x 本地写作体验已经有较多实现和自动测试覆盖，但还不能判定“完全闭环”。可以把状态分成三类：
 
 - **已具备最小闭环**：文件保存状态、外部修改冲突、recovery、图片粘贴/拖拽、表格/列表/模板、快速打开、源码-预览跳转、导出设置、引用设置与 Pandoc 回退。
-- **弱验证**：长文预览性能、复杂文档真实导出、DOCX/Mermaid 保真、真实 Pandoc citeproc、正式签名/公证、Windows 发布链路。
+- **弱验证**：长文预览性能、真实 Pandoc citeproc、正式签名/公证、Windows 发布链路、Finder / Explorer 图片拖拽。
 - **未闭环但非当前主线**：CLI/deep link、主题包 / 导出模板包、插件 API。插件市场按计划为明确非目标。
 
 下一步不建议再盲目加功能；应先补 1-2 个真实 smoke 文档或自动化检查，把弱验证变成可复现验证。
@@ -52,10 +52,10 @@
 | 文件安全与发布可信核心路径有证据 | 保存状态、外部修改冲突、recovery、App 层 recovery modal 接线、macOS App-only 真实 crash / restart recovery smoke、fs scope、macOS Prism UI 文件树删除到废纸篓、release checklist、updater manifest、macOS fallback DMG、Windows release smoke 文档 | 自动化与 macOS 运行时 smoke 较强，但正式签名 / 公证 / Windows release 环境未闭环 |
 | 写作效率核心路径有证据 | 图片 helper、Markdown 链接补全/诊断、轻量 `[[note]]` 工作区内链补全、表格、列表、模板、快速打开、字数统计、CodeMirror 全局命令事件接线、paste / normal-drop / Alt-drop DOM 接线测试、Alt-drop 缺路径提示、列表 keymap 组件级回归、链接补全上下文组件回归、macOS 真实 `.app` 系统剪贴板图片粘贴、快速打开、链接补全/诊断、表格命令、列表续写/退出、PRD 模板插入、大纲搜索和选区统计 smoke | 自动化较强，macOS 主要写作路径已补真实桌面证据；Finder / Explorer 拖拽、Option / Alt 原路径和 Windows 桌面路径未闭环 |
 | 预览同步与 HTML 安全有证据 | source-line mapping、点击跳源码、长文 / 重媒体 mapping、内容更新后 source-line 刷新、10 万字符级 Markdown -> HTML smoke、Mermaid 队列、KaTeX/Mermaid 错误定位、链接安全清理测试、macOS 真实 `.app` 长文分栏滚动 / 预览点击 / 尾部错误区 smoke | 自动化中等偏强，macOS 真实 drift 证据已补一轮；真实 CodeMirror 输入性能、undo history 和重媒体端到端性能未闭环 |
-| 导出工作台可靠性有证据 | HTML/PDF/PNG/DOCX pipeline、golden fixture、复杂导出产物 smoke、命令入口四格式集成 smoke、真实 app 打开复杂文档预览截图、DOCX task list、Pandoc 回退、安全清理测试、导出进度事件、App 层进度 UI / 失败诊断复制测试 | 自动化较强，但真实 Prism UI 四格式导出和人工打开产物未闭环 |
+| 导出工作台可靠性有证据 | HTML/PDF/PNG/DOCX pipeline、golden fixture、复杂导出产物 smoke、命令入口四格式集成 smoke、真实 Prism UI 四格式导出、PDF / PNG 栅格颜色兼容修复、DOCX task list、Pandoc 回退、安全清理测试、导出进度事件、App 层进度 UI / 失败诊断复制测试 | 自动化和 macOS 真实 UI smoke 较强；真实 Pandoc citeproc 仍受环境阻塞 |
 | 专业扩展有证据 | citation settings、Pandoc citeproc 分支、citekey / suppress-author 占位、邮箱/代码语境误报防护、专业写作 smoke 文档、中文排版 10 万字符级 micro benchmark、排版诊断 250 条长列表组件回归 | 自动化中等偏强，但本机缺 Pandoc，真实 citeproc 未闭环 |
 | 每批验证 gate 通过 | 最近多批均执行 `npm test -- --run`、`npm run build`、`git diff --check` 并通过；最新全量为 55 files / 315 tests；涉及 Tauri 的历史批次已记录 build / fallback DMG 结果 | 已满足当前自动化 gate |
-| 无剩余必需工作 | 复杂导出真实 UI、Finder / Explorer 图片拖拽与 Option / Alt 原路径、预览真实输入性能 / undo / 重媒体端到端性能、Pandoc、签名公证、Windows release 仍未完成 | 未满足 |
+| 无剩余必需工作 | Finder / Explorer 图片拖拽与 Option / Alt 原路径、预览真实输入性能 / undo / 重媒体端到端性能、Pandoc、签名公证、Windows release 仍未完成 | 未满足 |
 
 因此，当前 goal 的正确状态是“继续推进或拆分为更小 goal”，不能调用 `update_goal complete`。
 
@@ -239,25 +239,26 @@
 - `src/domains/commands/registry.test.ts` 覆盖导出进度事件接线：pipeline progress 会派发 `prism-export-progress` 可见事件，成功或失败后都会派发 `{ visible: false }` 清理进度状态。
 - `src/domains/commands/registry.ts` 会把导出失败前产生的 pipeline warning 汇总到可复制失败诊断中，避免 Pandoc / CSL / citekey 回退原因只以 toast 出现后丢失；`registry.test.ts` 覆盖 warning 汇总进入诊断文本。
 - `src/App.recovery.test.tsx` 覆盖 App 层导出进度与失败诊断：`prism-export-progress` 事件会展示/隐藏进度状态并清理旧失败浮层；`prism-export-failure` 事件会展示诊断浮层，诊断文本可复制到系统剪贴板，并显示复制成功 toast。
-- `docs/verification/prism-complex-export-smoke.md` 记录自动化 pipeline 产物 smoke 与命令入口集成 smoke 通过；2026-05-15 通过当前 `.app` 真实打开 `complex-export.md` 并截取 `.codex-smoke/complex-export/prism-opened-preview.png`，确认复杂文档可见、状态栏为已保存；导出菜单和保存面板仍被 Computer Use / AppleScript 控制能力阻塞。
+- `docs/verification/prism-complex-export-smoke.md` 记录自动化 pipeline 产物 smoke、命令入口集成 smoke 和真实 Prism UI 四格式导出 smoke 通过；2026-05-15 通过当前 `.app` 应用内导出菜单生成 `ui-raster-fixed.html|pdf|png|docx`，并用 `file`、`pdf-lib`、`sips`、`jszip`、`textutil` 和 Quick Look thumbnail 检查产物。
+- `src/domains/export/exportPipeline.ts` 已修复真实 PDF / PNG 导出暴露的 `html2canvas` 现代 CSS color function 兼容问题：栅格导出 iframe 使用 raster-safe CSS，并在截图前把 computed `color(...)` 归一为 `rgb(...)` / `rgba(...)`；HTML 导出保持完整主题 CSS。
 - `docs/verification/prism-pandoc-citation-html-smoke.md` 记录 Pandoc smoke 方案和本机阻塞。
 
 ### 验证强度
 
 - 自动测试强：导出 pipeline、命令入口和设置归一化覆盖广；HTML 导出已覆盖 Pandoc 返回 HTML 的安全清理；导出进度事件、App 层进度 UI、失败诊断浮层、warning 汇总和复制路径已有回归；导出 pipeline 已从主入口 chunk 拆出，降低启动首包压力。
-- 自动化产物 smoke 中等：复杂 Markdown 已可生成并读取 HTML/PDF/PNG/DOCX 产物；但 PNG 使用 `html2canvas` 测试替身，本项不能替代真实视觉检查。
-- 真实导出 UI smoke 仍弱：当前 `.app` 可真实打开复杂文档并渲染可见内容，但 Computer Use app-server 退出、System Events 坐标点击返回 `-25200` 后窗口消失，未通过真实 UI 导出四种产物。
+- 自动化产物 smoke 中等偏强：复杂 Markdown 已可生成并读取 HTML/PDF/PNG/DOCX 产物；PNG 自动化仍使用 `html2canvas` 测试替身，但真实 UI smoke 已补同一 fixture 的 PDF / PNG 文件级结果。
+- 真实导出 UI smoke 较强：当前 `.app` 通过真实导出菜单生成 HTML / PDF / PNG / DOCX；PDF 用 `pdf-lib` 确认 2 页 A4，PNG 用 `sips` 确认 2054 x 3316，DOCX 用 `jszip`、`textutil` 和 Quick Look thumbnail 确认可解析、保留中文 / 表格 / 任务列表且 Mermaid 未退化为源码。
 - Pandoc 真实验证弱：本机 `pandoc --version` 为 `command not found`，未生成 citeproc 实际 HTML。
 
 ### 缺口
 
-- DOCX Mermaid 和 task list 已有自动化产物级检查，确认 Mermaid 不以源码留在正文且存在 media 文件，GFM task list 保留可读勾选状态；真实 Word / Pages 打开效果仍需人工确认。
-- PDF/PNG 导出视觉正确性仍缺少真实 UI 截图和文件打开检查。
+- DOCX Mermaid 和 task list 已有自动化与真实 UI 产物级检查，确认 Mermaid 不以源码留在正文且存在 media 文件，GFM task list 保留可读勾选状态；Word / Pages 的逐页人工视觉检查仍可作为发布前补充。
+- PDF / PNG 导出已通过真实 UI 文件级检查；人工逐页视觉审阅仍可作为发布前补充。
 - 真实 Pandoc citeproc 依赖本机安装 Pandoc，当前阻塞。
 
 ### 下一步
 
-继续补真实 Prism UI 导出 smoke：同一个 golden Markdown 通过应用菜单导出 HTML/PDF/PNG/DOCX，并人工打开产物确认视觉、图片和 DOCX 兼容性。Pandoc 安装后再重跑 `docs/verification/prism-pandoc-citation-html-smoke.md`。
+导出主链路已从“弱验证”提升为 macOS 真实 UI smoke 通过；下一步应安装 Pandoc 后重跑 `docs/verification/prism-pandoc-citation-html-smoke.md`，或在发布前补 Word / Pages 人工视觉审阅。
 
 ## 8. 专业扩展
 
@@ -326,7 +327,7 @@
 
 ### 下一步
 
-按 1.0.x 核心体验排序，CLI/deep link 暂缓；等文件安全、导出真实 smoke、发布可信完成后再拆小切片。
+按 1.0.x 核心体验排序，CLI/deep link 暂缓；等文件安全、导出主链路、发布可信和剩余桌面 smoke 完成后再拆小切片。
 
 ## 10. 本批补充：文件树空壳入口闭环
 
@@ -364,7 +365,7 @@
 
 ### 下一步
 
-短期不继续扩展文件树功能；macOS 删除到废纸篓主链路已经补强，下一批应转向写作效率桌面 smoke 或复杂导出真实 UI smoke。Windows 机器验证完成前，不能宣称系统废纸篓在 macOS / Windows 桌面都已闭环。
+短期不继续扩展文件树功能；macOS 删除到废纸篓主链路已经补强，下一批应转向写作效率桌面 smoke 或预览真实输入 / 性能 smoke。Windows 机器验证完成前，不能宣称系统废纸篓在 macOS / Windows 桌面都已闭环。
 
 ## 11. 后续执行建议
 
@@ -373,8 +374,8 @@
 1. **写作效率桌面 smoke**
    `docs/verification/prism-writing-efficiency-smoke.md` 已补 smoke 协议和检查表，macOS 图片粘贴、快速打开、链接补全/诊断、表格、列表、模板、大纲和选区统计已回填真实 `.app` 证据；下一步应真实执行 Finder / Explorer 图片拖拽和 Option / Alt 原路径。价值是把剩余图片拖拽系统事件证据提升为真实桌面工作流验证。
 
-2. **复杂导出真实 smoke**
-   `docs/verification/prism-complex-export-smoke.md` 已补 smoke 协议、自动化 pipeline 产物 smoke 和 UI 阻塞记录；下一步仍应通过真实 Prism UI 生成 HTML/PDF/PNG/DOCX 产物并回填结果。价值高，因为导出可靠是 Prism 的核心承诺，也是当前弱验证最多的区域。
+2. **预览真实输入 / 性能 smoke**
+   `docs/verification/prism-preview-sync-smoke.md` 已补长文 drift 真实 `.app` 证据；下一步应真实执行连续输入延迟、undo history、键盘跳转即时同步和重媒体端到端性能。价值是把预览同步从滚动 / 点击证据提升到真实写作过程证据。
 
 3. **文件动作剩余桌面 smoke**
    `docs/verification/prism-file-actions-smoke.md` 已补 macOS Prism UI 删除到废纸篓证据；剩余价值集中在 Windows Explorer 废纸篓 / 打开位置、复制路径，以及 macOS 文件夹删除、重命名、创建副本等逐项真实桌面确认。
@@ -413,15 +414,15 @@
 - `src/domains/editor/components/TypographyDiagnosticsPanel.test.tsx` 覆盖 250 条诊断长列表的首尾渲染、晚段跳源码和 Escape 关闭。
 - `src/domains/settings/normalize.test.ts` 覆盖旧 `settingsVersion` 配置升级到当前版本、旧字体字段迁移到 `FontSource`、临时 PDF 页眉页脚字段迁移到通用页面字段且不泄漏旧 key，以及缺失 Pandoc / citation / exportHistory / lastSession 时回填安全默认值。
 - `src/domains/commands/exportCommand.integration.test.ts` 覆盖命令入口四格式导出：`exportHtml`、`exportPdf`、`exportPng`、`exportDocx` 都通过真实 export domain 写出产物并记录 history。
+- `docs/verification/prism-complex-export-smoke.md` 记录真实 Prism UI 四格式导出 smoke：通过当前 `.app` 应用内导出菜单生成 HTML / PDF / PNG / DOCX；PDF 为 2 页 A4，PNG 为 2054 x 3316，DOCX 可由 `jszip`、`textutil` 和 Quick Look 解析，Mermaid 未退化为源码；本轮同时修复 PDF / PNG 栅格导出对现代 CSS color function 的兼容性问题。
 - `docs/verification/prism-professional-writing-smoke.md` 补齐专业写作能力 smoke 入口。
 - `src/domains/commands/registry.test.ts` 覆盖插件市场、deep link、云同步、移动端、实时协作、图谱和完整 WYSIWYG 等延后能力不会出现在菜单或命令面板。
-- 最新验证：`npm test -- --run` 通过 55 files / 315 tests；`npm run build` 通过，仅有既有 Vite large chunk warning；`git diff --check` 通过。
+- 最新验证：导出聚焦测试 `npm test -- --run src/domains/commands/exportCommand.integration.test.ts src/domains/commands/registry.test.ts src/domains/export/exportPipeline.test.ts` 通过 3 files / 45 tests；`npm test -- --run` 通过 55 files / 319 tests；`npm run build` 通过，仅有既有 Vite large chunk warning；`git diff --check` 通过。
 
 ### 未完成项
 
 - macOS 文件树删除到系统废纸篓已通过真实桌面 smoke；Windows 废纸篓、Finder / Explorer 拖拽、Option / Alt 原路径和文件动作剩余分支仍需真实桌面 smoke。系统剪贴板图片粘贴、链接补全/诊断、表格、列表、模板、大纲和选区统计已有 macOS 真实 `.app` smoke，但 Windows 剪贴板和 Windows 写作效率桌面路径未验证。
 - 预览真实 CodeMirror 输入延迟、undo history、键盘跳转即时同步和批量 Mermaid / KaTeX / 图片组合端到端性能仍未回填；真实 Preview viewport drift 已补一轮 macOS `.app` 证据，但不能覆盖所有导航路径。
-- 复杂导出真实 Prism UI 四格式导出、PDF / PNG 视觉检查、DOCX 打开检查仍未闭环。
 - 本机未安装 Pandoc，真实 BibTeX / CSL citeproc HTML 未验证。
 - Apple Developer ID 签名、公证、Windows installer / updater / 文件关联仍是发布环境阻塞。
 

@@ -462,7 +462,82 @@ async function inlineCssUrls(css: string) {
   });
 }
 
-async function collectExportCss(options: Pick<ExportDocumentInput, 'pdfPaper' | 'pdfMargin'> = {}) {
+function stripRasterUnsafeColorDeclarations(css: string) {
+  return css.replace(
+    /([{\s;])[-\w]+\s*:\s*[^;{}]*\b(?:color-mix|color|lab|lch|oklab|oklch)\([^;{}]*\)[^;{}]*(?:;|(?=}))/gi,
+    '$1',
+  );
+}
+
+function normalizeRasterColorChannel(value: string, scale: number) {
+  const trimmed = value.trim();
+  if (trimmed.endsWith('%')) {
+    return Number.parseFloat(trimmed) / 100 * scale;
+  }
+  const numeric = Number.parseFloat(trimmed);
+  return numeric <= 1 ? numeric * scale : numeric;
+}
+
+function normalizeCssColorFunctionsForRaster(value: string) {
+  if (!value) return value;
+  return value.replace(
+    /color\(\s*(?:srgb|display-p3)\s+([+-]?\d*\.?\d+%?)\s+([+-]?\d*\.?\d+%?)\s+([+-]?\d*\.?\d+%?)(?:\s*\/\s*([+-]?\d*\.?\d+%?))?\s*\)/gi,
+    (_match, red: string, green: string, blue: string, alpha?: string) => {
+      const r = Math.round(Math.max(0, Math.min(255, normalizeRasterColorChannel(red, 255))));
+      const g = Math.round(Math.max(0, Math.min(255, normalizeRasterColorChannel(green, 255))));
+      const b = Math.round(Math.max(0, Math.min(255, normalizeRasterColorChannel(blue, 255))));
+      if (!alpha) return `rgb(${r}, ${g}, ${b})`;
+      const a = Math.max(0, Math.min(1, normalizeRasterColorChannel(alpha, 1)));
+      return `rgba(${r}, ${g}, ${b}, ${Number(a.toFixed(3))})`;
+    },
+  );
+}
+
+const rasterColorProperties = [
+  'background-color',
+  'border-bottom-color',
+  'border-left-color',
+  'border-right-color',
+  'border-top-color',
+  'box-shadow',
+  'caret-color',
+  'color',
+  'column-rule-color',
+  'fill',
+  'outline-color',
+  'stroke',
+  'text-decoration-color',
+  'text-shadow',
+] as const;
+
+function normalizeRasterComputedColors(root: HTMLElement) {
+  const view = root.ownerDocument.defaultView;
+  if (!view) return;
+  const elements = [root, ...Array.from(root.querySelectorAll<HTMLElement | SVGElement>('*'))];
+  elements.forEach((element) => {
+    let computed: CSSStyleDeclaration;
+    try {
+      computed = view.getComputedStyle(element);
+    } catch {
+      return;
+    }
+    rasterColorProperties.forEach((property) => {
+      try {
+        const value = computed.getPropertyValue(property);
+        const normalized = normalizeCssColorFunctionsForRaster(value);
+        if (normalized !== value) {
+          element.style.setProperty(property, normalized, 'important');
+        }
+      } catch {
+        // Some jsdom/SVG style properties are incomplete. Raster export can keep the original value.
+      }
+    });
+  });
+}
+
+async function collectExportCss(
+  options: Pick<ExportDocumentInput, 'pdfPaper' | 'pdfMargin'> & { rasterSafe?: boolean } = {},
+) {
   const paper = options.pdfPaper ?? 'a4';
   const margin = options.pdfMargin ?? 'standard';
   let css = '';
@@ -573,7 +648,8 @@ async function collectExportCss(options: Pick<ExportDocumentInput, 'pdfPaper' | 
     }
   `;
 
-  return inlineCssUrls(css);
+  const inlinedCss = await inlineCssUrls(css);
+  return options.rasterSafe ? stripRasterUnsafeColorDeclarations(inlinedCss) : inlinedCss;
 }
 
 function getMermaidConfig(contentTheme: ContentTheme) {
@@ -818,9 +894,12 @@ async function createRenderedExportNode(input: ExportDocumentInput, options: { h
 async function buildStandaloneHtml(
   input: ExportDocumentInput,
   renderedRoot?: HTMLElement,
-  options: { includeTheme?: boolean } = {},
+  options: { includeTheme?: boolean; rasterSafeCss?: boolean } = {},
 ) {
-  const css = options.includeTheme === false ? '' : await collectExportCss(input);
+  const css = options.includeTheme === false ? '' : await collectExportCss({
+    ...input,
+    rasterSafe: options.rasterSafeCss,
+  });
   const body = (() => {
     if (!renderedRoot) {
       return `<div class="prism-export-document prism-export-template--${input.templateId ?? 'theme'} preview-compat preview-compat--${input.contentTheme}">
@@ -853,7 +932,7 @@ async function createStandaloneExportFrame(input: ExportDocumentInput) {
   const node = await createRenderedExportNode(input);
   let html = '';
   try {
-    html = await buildStandaloneHtml(input, node);
+    html = await buildStandaloneHtml(input, node, { rasterSafeCss: true });
   } finally {
     node.remove();
   }
@@ -1030,9 +1109,10 @@ async function createRenderedPng(input: ExportDocumentInput, options: { scale?: 
     iframe.style.width = `${width}px`;
     iframe.style.height = `${height}px`;
     await nextFrame();
+    normalizeRasterComputedColors(target);
 
     const canvas = await html2canvas(target, {
-      backgroundColor: getComputedStyle(target).backgroundColor || '#ffffff',
+      backgroundColor: normalizeCssColorFunctionsForRaster(getComputedStyle(target).backgroundColor) || '#ffffff',
       scale: options.scale ?? 2,
       useCORS: true,
       logging: false,
@@ -1654,5 +1734,7 @@ export const __exportPipelineTesting = {
   getPdfHeaderY,
   getPdfPageNumberLabel,
   getPdfPageNumberY,
+  normalizeCssColorFunctionsForRaster,
   normalizePdfChromeText,
+  stripRasterUnsafeColorDeclarations,
 };

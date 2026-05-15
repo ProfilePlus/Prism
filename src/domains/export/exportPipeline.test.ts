@@ -420,6 +420,40 @@ describe('export pipeline pdf page numbers', () => {
   });
 });
 
+describe('export pipeline raster CSS compatibility', () => {
+  it('removes modern color function declarations before html2canvas rendering', () => {
+    const css = `
+      .preview-compat {
+        --preview-search-match-bg: color-mix(in srgb, #1c5d33 15%, transparent);
+        color: #262626;
+        box-shadow: 0 0 0 3px color-mix(in srgb, #1c5d33 18%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+      }
+      .prism-export-document {
+        background: color(display-p3 1 1 1);
+        border: 1px solid #dddddd;
+      }
+    `;
+
+    const safeCss = __exportPipelineTesting.stripRasterUnsafeColorDeclarations(css);
+
+    expect(safeCss).not.toContain('color-mix(');
+    expect(safeCss).not.toContain('color(display-p3');
+    expect(safeCss).toContain('color: #262626;');
+    expect(safeCss).toContain('border: 1px solid #dddddd;');
+  });
+
+  it('normalizes WebKit color functions before html2canvas reads computed styles', () => {
+    expect(
+      __exportPipelineTesting.normalizeCssColorFunctionsForRaster('color(srgb 1 0.5 0 / 75%)'),
+    ).toBe('rgba(255, 128, 0, 0.75)');
+    expect(
+      __exportPipelineTesting.normalizeCssColorFunctionsForRaster(
+        '0 0 0 1px color(display-p3 0.1 0.2 0.3)',
+      ),
+    ).toBe('0 0 0 1px rgb(26, 51, 77)');
+  });
+});
+
 describe('export pipeline image progress', () => {
   const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
   const originalImage = globalThis.Image;
