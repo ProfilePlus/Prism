@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { EditorPane, EditorPaneHandle } from './EditorPane';
+import { HorizontalScrollbar } from './HorizontalScrollbar';
 import { PreviewPane } from './PreviewPane';
 import { buildSearchPattern, countMatches, SearchAction, SearchMode, SearchPanel, SearchParams } from './SearchPanel';
 import { ContextMenu, type ContextMenuItem } from '../../../components/shell/ContextMenu';
@@ -786,6 +787,7 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
     const isPreviewOnly = viewMode === 'preview';
     const showPreview = viewMode !== 'edit';
     const isSplit = viewMode === 'split';
+    const getPreviewScroller = useCallback(() => previewContainerRef.current, []);
 
     return (
       <div style={{ display: 'flex', flex: 1, minHeight: 0, minWidth: 0, backgroundColor: 'transparent', position: 'relative' }}>
@@ -817,23 +819,36 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
 
         {showPreview && (
           <div
-            ref={previewContainerRef}
-            onScroll={handlePreviewScroll}
-            onClick={handlePreviewClick}
-            onContextMenu={handlePreviewContextMenu}
+            className="prism-scrollbar-host"
             style={{
               flex: 1,
               minWidth: 0,
               display: 'flex',
               flexDirection: 'column',
-              overflowY: 'auto',
-              overflowX: 'hidden',
+              minHeight: 0,
+              overflow: 'hidden',
+              position: 'relative',
               background: 'var(--bg-preview)',
             }}
           >
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <div
+              ref={previewContainerRef}
+              onScroll={handlePreviewScroll}
+              onClick={handlePreviewClick}
+              onContextMenu={handlePreviewContextMenu}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                minHeight: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                overflowY: 'auto',
+                overflowX: 'hidden',
+              }}
+            >
               <PreviewPane content={content} documentPath={documentPath} onNotice={onNotice} />
             </div>
+            <HorizontalScrollbar getScroller={getPreviewScroller} />
           </div>
         )}
 

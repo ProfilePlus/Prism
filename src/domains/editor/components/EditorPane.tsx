@@ -28,6 +28,7 @@ import { isCommandId } from '../../commands';
 import { getEditorContextMenuItems } from '../extensions/contextMenu';
 import { getEditorFormatResult, type EditorFormat } from '../extensions/formatting';
 import { createMarkdownLinkCompletionSource } from '../extensions/linkCompletion';
+import { HorizontalScrollbar } from './HorizontalScrollbar';
 import {
   getMarkdownImageForPath,
   getNativeImageFilePath,
@@ -1054,12 +1055,20 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       });
     }, [currentDocumentPath, workspaceLinkFiles, workspaceRootPath]);
 
+    const getEditorScroller = useCallback(() => {
+      return viewRef.current?.scrollDOM ?? null;
+    }, []);
+
     return (
-      <>
+      <div
+        className="prism-scrollbar-host"
+        style={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
+      >
         <div
           ref={editorRef}
           style={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
         />
+        <HorizontalScrollbar getScroller={getEditorScroller} />
         {editorContextMenu && (
           <ContextMenu
             x={editorContextMenu.x}
@@ -1069,7 +1078,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             onClose={() => setEditorContextMenu(null)}
           />
         )}
-      </>
+      </div>
     );
   },
 );
