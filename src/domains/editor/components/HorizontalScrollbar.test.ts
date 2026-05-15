@@ -7,14 +7,14 @@ import { __horizontalScrollbarTesting } from './HorizontalScrollbar';
 const { getScrollbarMetrics, MAX_THUMB_WIDTH } = __horizontalScrollbarTesting;
 
 describe('HorizontalScrollbar metrics', () => {
-  it('keeps a compact bottom affordance even when the current surface has no horizontal overflow', () => {
+  it('hides the bottom affordance when the current surface has no horizontal overflow', () => {
     expect(getScrollbarMetrics({
       clientWidth: 800,
       scrollLeft: 0,
       scrollWidth: 800,
       trackWidth: 600,
     })).toEqual({
-      scrollable: true,
+      scrollable: false,
       thumbLeft: 0,
       thumbWidth: MAX_THUMB_WIDTH,
     });

@@ -34,9 +34,9 @@ function getScrollbarMetrics(input: {
 
   if (maxScroll <= 1) {
     return {
-      scrollable: true,
+      scrollable: false,
       thumbLeft: 0,
-      thumbWidth: Math.min(MAX_THUMB_WIDTH, input.trackWidth),
+      thumbWidth: Math.min(MIN_THUMB_WIDTH, input.trackWidth),
     };
   }
 
