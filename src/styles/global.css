@@ -334,9 +334,7 @@ body.typewriter-mode .cm-editor {
   left: var(--prism-horizontal-scrollbar-inset);
   z-index: 8;
   height: 16px;
-  opacity: 0;
   pointer-events: none;
-  transition: opacity 240ms var(--ease-out);
 }
 
 .prism-horizontal-scrollbar[data-scrollable='true'] {
@@ -344,13 +342,7 @@ body.typewriter-mode .cm-editor {
 }
 
 .prism-horizontal-scrollbar[data-scrollable='false'] {
-  opacity: 0;
   pointer-events: none;
-}
-
-.prism-horizontal-scrollbar[data-scrollable='true']:hover,
-.prism-horizontal-scrollbar[data-dragging='true'] {
-  opacity: 1;
 }
 
 .prism-horizontal-scrollbar__thumb {
@@ -371,23 +363,32 @@ body.typewriter-mode .cm-editor {
   border-radius: 999px;
   background: var(--c-fog);
   opacity: 0;
-  transform: translateY(2px) scaleX(0.72);
+  transform: translateY(1px);
   transform-origin: center;
   transition:
-    opacity 240ms var(--ease-out),
-    transform 240ms var(--ease-out),
+    opacity 420ms cubic-bezier(0.16, 1, 0.3, 1) 120ms,
+    transform 420ms cubic-bezier(0.16, 1, 0.3, 1) 120ms,
     background-color 140ms var(--ease-out);
 }
 
 .prism-horizontal-scrollbar[data-scrollable='true']:hover .prism-horizontal-scrollbar__thumb-visual,
 .prism-horizontal-scrollbar[data-dragging='true'] .prism-horizontal-scrollbar__thumb-visual {
-  opacity: 1;
-  transform: translateY(0) scaleX(1);
+  opacity: 0.72;
+  transform: translateY(0);
 }
 
 .prism-horizontal-scrollbar__thumb:hover .prism-horizontal-scrollbar__thumb-visual,
 .prism-horizontal-scrollbar[data-dragging='true'] .prism-horizontal-scrollbar__thumb-visual {
+  opacity: 0.88;
   background: var(--c-ash);
+  transition-delay: 0ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prism-horizontal-scrollbar__thumb-visual {
+    transition-duration: 120ms;
+    transition-delay: 0ms;
+  }
 }
 
 /* ============================================================
