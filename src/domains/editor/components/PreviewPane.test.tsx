@@ -12,6 +12,13 @@ const mermaidMock = vi.hoisted(() => ({
 const openerMock = vi.hoisted(() => ({
   openUrl: vi.fn(),
 }));
+const fsMock = vi.hoisted(() => ({
+  readFile: vi.fn(),
+}));
+
+vi.mock('@tauri-apps/plugin-fs', () => ({
+  readFile: fsMock.readFile,
+}));
 
 vi.mock('@tauri-apps/plugin-opener', () => ({
   openUrl: openerMock.openUrl,
@@ -49,10 +56,22 @@ describe('PreviewPane theme switching', () => {
     mermaidMock.render.mockResolvedValue({ svg: '<svg viewBox="0 0 10 10"></svg>' });
     __previewPaneTesting.clearMermaidCache();
     openerMock.openUrl.mockReset();
+    fsMock.readFile.mockReset();
+    fsMock.readFile.mockResolvedValue(new Uint8Array([60, 115, 118, 103, 62]));
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn(() => 'blob:prism-preview-media'),
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: vi.fn(),
+    });
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    Reflect.deleteProperty(URL, 'createObjectURL');
+    Reflect.deleteProperty(URL, 'revokeObjectURL');
   });
 
   it('does not rerun the markdown pipeline when only the content theme changes', async () => {
@@ -131,6 +150,29 @@ describe('PreviewPane theme switching', () => {
     expect(document.querySelector('[data-source-line="20"]')).not.toBeInTheDocument();
     expect(document.querySelector('[data-source-line="80"]')).toHaveTextContent('Updated section');
     expect(document.querySelector('[data-source-line="81"]')).toHaveTextContent('Fresh preview');
+  });
+
+  it('resolves relative preview images against the current document path', async () => {
+    vi.mocked(markdownToHtml).mockReturnValueOnce(
+      [
+        '<p>',
+        '<img alt="local" src="assets/preview-1.png">',
+        '<img alt="absolute" src="/Users/Alex/Pictures/preview-2.png">',
+        '<img alt="remote" src="https://example.com/preview-3.png">',
+        '</p>',
+      ].join(''),
+    );
+
+    render(<PreviewPane content="images" documentPath="/Users/Alex/Notes/Plan.md" />);
+
+    await waitFor(() => {
+      expect(fsMock.readFile).toHaveBeenCalledWith('/Users/Alex/Notes/assets/preview-1.png');
+    });
+    expect(fsMock.readFile).toHaveBeenCalledWith('/Users/Alex/Pictures/preview-2.png');
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
+    expect(screen.getByAltText('local')).toHaveAttribute('src', 'blob:prism-preview-media');
+    expect(screen.getByAltText('absolute')).toHaveAttribute('src', 'blob:prism-preview-media');
+    expect(screen.getByAltText('remote')).toHaveAttribute('src', 'https://example.com/preview-3.png');
   });
 
   it('renders Mermaid failures as source-locatable diagnostics', async () => {

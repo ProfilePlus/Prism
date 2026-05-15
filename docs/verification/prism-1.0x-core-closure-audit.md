@@ -51,11 +51,11 @@
 | 保持单文档单窗口与 OpenAI 极简方向 | `CONTEXT.md`、ADR、原型约束；本轮未引入 tab、图谱、云同步、移动端、插件市场或 WYSIWYG | 已满足 |
 | 文件安全与发布可信核心路径有证据 | 保存状态、外部修改冲突、recovery、App 层 recovery modal 接线、macOS App-only 真实 crash / restart recovery smoke、fs scope、macOS Prism UI 文件树删除到废纸篓、release checklist、updater manifest、macOS fallback DMG、Windows release smoke 文档 | 自动化与 macOS 运行时 smoke 较强，但正式签名 / 公证 / Windows release 环境未闭环 |
 | 写作效率核心路径有证据 | 图片 helper、Markdown 链接补全/诊断、轻量 `[[note]]` 工作区内链补全、表格、列表、模板、快速打开、字数统计、CodeMirror 全局命令事件接线、paste / normal-drop / Alt-drop DOM 接线测试、Alt-drop 缺路径提示、列表 keymap 组件级回归、链接补全上下文组件回归、macOS 真实 `.app` 系统剪贴板图片粘贴、快速打开、链接补全/诊断、表格命令、列表续写/退出、PRD 模板插入、大纲搜索和选区统计 smoke | 自动化较强，macOS 主要写作路径已补真实桌面证据；macOS Finder 拖拽已尝试但当前自动化工具无法安全完成，Finder / Explorer 拖拽、Option / Alt 原路径和 Windows 桌面路径仍未闭环 |
-| 预览同步与 HTML 安全有证据 | source-line mapping、点击跳源码、长文 / 重媒体 mapping、内容更新后 source-line 刷新、10 万字符级 Markdown -> HTML smoke、Mermaid 队列、KaTeX/Mermaid 错误定位、链接安全清理测试、macOS 真实 `.app` 长文分栏滚动 / 预览点击 / 尾部错误区 / 单次输入预览刷新 / undo history / `Cmd+Down` 跳文末同步 smoke | 自动化中等偏强，macOS 真实 drift 与单次输入撤销证据已补；真实连续输入性能和重媒体端到端性能未闭环 |
+| 预览同步与 HTML 安全有证据 | source-line mapping、点击跳源码、长文 / 重媒体 mapping、内容更新后 source-line 刷新、10 万字符级 Markdown -> HTML smoke、Mermaid 队列、KaTeX/Mermaid 错误定位、链接安全清理测试、macOS 真实 `.app` 长文分栏滚动 / 预览点击 / 尾部错误区 / 单次输入预览刷新 / undo history / `Cmd+Down` 跳文末同步 / 本地图片重媒体 smoke | 自动化中等偏强，macOS 真实 drift、单次输入撤销和重媒体渲染证据已补；真实连续输入性能和精确帧率 / CPU 量化未闭环 |
 | 导出工作台可靠性有证据 | HTML/PDF/PNG/DOCX pipeline、golden fixture、复杂导出产物 smoke、命令入口四格式集成 smoke、真实 Prism UI 四格式导出、PDF / PNG 栅格颜色兼容修复、DOCX task list、Pandoc 回退、安全清理测试、导出进度事件、App 层进度 UI / 失败诊断复制测试 | 自动化和 macOS 真实 UI smoke 较强；真实 Pandoc citeproc 仍受环境阻塞 |
 | 专业扩展有证据 | citation settings、Pandoc citeproc 分支、citekey / suppress-author 占位、邮箱/代码语境误报防护、专业写作 smoke 文档、中文排版 10 万字符级 micro benchmark、排版诊断 250 条长列表组件回归 | 自动化中等偏强，但本机缺 Pandoc，真实 citeproc 未闭环 |
 | 每批验证 gate 通过 | 最近多批均执行 `npm test -- --run`、`npm run build`、`git diff --check` 并通过；最新全量为 55 files / 319 tests；涉及 Tauri 的历史批次已记录 build / fallback DMG 结果 | 已满足当前自动化 gate |
-| 无剩余必需工作 | Finder / Explorer 图片拖拽与 Option / Alt 原路径、预览真实输入性能 / undo / 重媒体端到端性能、Pandoc、签名公证、Windows release 仍未完成 | 未满足 |
+| 无剩余必需工作 | Finder / Explorer 图片拖拽与 Option / Alt 原路径、预览连续输入性能、链接诊断对本地图片资产的误报、Pandoc、签名公证、Windows release 仍未完成 | 未满足 |
 
 因此，当前 goal 的正确状态是“继续推进或拆分为更小 goal”，不能调用 `update_goal complete`。
 
@@ -195,21 +195,24 @@
 - `PreviewPane.test.tsx` 覆盖 Mermaid 顺序渲染：第一个 `mermaid.render()` 未完成前不会启动第二个图表渲染。
 - `docs/verification/prism-preview-sync-smoke.md` 记录 macOS 真实 `.app` 长文预览 drift smoke：约 193KB、120 节、超过 8.5 万字符 fixture 在分栏模式打开后预览非空白；源码滚动约 10 页后左右两栏同在第 14/15 节附近；预览区域滚动后左右两栏稳定到第 27/28 节附近；点击右侧第 28 节标题后左侧源码定位到第 28 节，状态栏显示 `LN 716 COL 1`；尾部区域正常 Mermaid 图可见，错误区出现 `Syntax error in text`，没有整篇预览空白。
 - `docs/verification/prism-preview-sync-smoke.md` 记录 macOS 真实 `.app` 单次输入 / undo / 键盘跳转 smoke：一次性粘贴 marker 后编辑器和预览同时刷新，视图切换回编辑后内容仍保留；一次 `Cmd+Z` 后 marker 从 UI 和落盘文件移除，UI 回到“已保存”；从顶部按 `Cmd+Down` 后编辑区与预览同步到第 120 节尾部，未复现此前键盘跳文末预览不立即跟随的弱观察。
+- `src/domains/editor/components/PreviewPane.tsx` 已修复本地预览图片加载：预览接收当前文档路径后，将相对 / 绝对本地媒体路径通过已授权的 Tauri fs scope 读取为 `blob:` URL，不需要放开 Tauri `assetProtocol` 静态全盘 scope；`PreviewPane.test.tsx` 覆盖本地图片和远程图片分支。
+- `docs/verification/prism-preview-sync-smoke.md` 记录 macOS 真实 `.app` 重媒体端到端 smoke：`.codex-smoke/preview-heavy/preview-heavy.md` 含 50 张本地 SVG、20 个 Mermaid、20 个 display math；分栏模式下本地图片可见且不再断图，中段 Mermaid 图渲染正常，尾部第 39/40 张图片和第 20 个 Mermaid 仍可见，整篇预览没有空白。
 
 ### 验证强度
 
 - 自动测试中等偏强：source-line、点击跳转、scroll ratio、长文 mapping、重媒体 round-trip drift、内容更新后的 source-line DOM 刷新、长文 Markdown -> HTML smoke、重媒体 Markdown -> HTML smoke、Mermaid/KaTeX 错误路径、Mermaid 顺序渲染队列和基础链接安全已覆盖。
-- 性能验证仍偏弱：已有 Mermaid 并发控制、10 万字符级 Markdown -> HTML 宽松预算回归、重媒体 scroll mapping 宽松预算回归，以及 macOS 真实 `.app` 长文滚动 / 点击 / 单次输入撤销 smoke；但没有可信的真实 CodeMirror 连续输入延迟和真实浏览器布局下的 50 图片、20 Mermaid、20 KaTeX 端到端性能基准结果。
-- 真实 E2E 中等：已有 macOS 真实 `.app` 截图和可复查命令证明长文滚动区间、预览点击跳源码、尾部错误区非空白、单次输入预览刷新、视图切换后内容保留、undo history 和 `Cmd+Down` 跳文末同步；但没有覆盖连续输入性能和重媒体批量渲染。
+- 性能验证仍偏弱：已有 Mermaid 并发控制、10 万字符级 Markdown -> HTML 宽松预算回归、重媒体 scroll mapping 宽松预算回归，以及 macOS 真实 `.app` 长文滚动 / 点击 / 单次输入撤销 / 重媒体显示 smoke；但没有可信的真实 CodeMirror 连续输入延迟、帧率或 CPU 指标。
+- 真实 E2E 中等偏强：已有 macOS 真实 `.app` 截图和可复查命令证明长文滚动区间、预览点击跳源码、尾部错误区非空白、单次输入预览刷新、视图切换后内容保留、undo history、`Cmd+Down` 跳文末同步，以及本地图片 / Mermaid / KaTeX 混排可显示；但没有覆盖连续输入性能量化。
 
 ### 缺口
 
-- 长文基础 Markdown -> HTML、重媒体 Markdown -> HTML、重媒体 scroll mapping 已有宽松量化指标，Mermaid 批量渲染已有并发控制；macOS 真实 `.app` 长文滚动 drift、预览点击、尾部错误区、单次输入预览刷新和 undo history 已补证据；真实连续输入延迟和批量媒体 / Mermaid / KaTeX 组合的端到端浏览器渲染性能仍没有量化结果。
+- 长文基础 Markdown -> HTML、重媒体 Markdown -> HTML、重媒体 scroll mapping 已有宽松量化指标，Mermaid 批量渲染已有并发控制；macOS 真实 `.app` 长文滚动 drift、预览点击、尾部错误区、单次输入预览刷新、undo history 和重媒体显示已补证据；真实连续输入延迟和批量媒体 / Mermaid / KaTeX 组合的帧率 / CPU 仍没有量化结果。
 - 双向滚动同步已有长文和重媒体算法回归，也已有一轮真实 CodeMirror / Preview viewport drift 记录；2026-05-15 复测 `Cmd+Down` 从顶部直接跳文末，编辑区与预览同步到第 120 节尾部，未复现此前“跳文末后预览不立即跟随”的弱观察，后续只需作为回归观察。
+- 重媒体真实 smoke 暴露状态栏 `LINK 50` 对已存在本地图片资产的误报：链接诊断只使用 Markdown 文件树作为存在性索引，不包含图片资产；这是独立缺口，不能把链接诊断宣称完全闭环。
 
 ### 下一步
 
-`docs/verification/prism-preview-sync-smoke.md` 已补长文 fixture 生成方式、source-line 点击、双向滚动、Mermaid/KaTeX 错误定位、视图切换、长文性能检查表、jsdom 长文 / 重媒体 mapping 回归、Markdown -> HTML 长文 smoke，以及 macOS 真实 `.app` 长文滚动 / 点击 / 输入撤销 / 键盘跳转 smoke；下一步应真实执行并回填 CodeMirror 连续输入延迟与重媒体端到端性能结果。
+`docs/verification/prism-preview-sync-smoke.md` 已补长文 fixture 生成方式、source-line 点击、双向滚动、Mermaid/KaTeX 错误定位、视图切换、长文性能检查表、jsdom 长文 / 重媒体 mapping 回归、Markdown -> HTML 长文 smoke，以及 macOS 真实 `.app` 长文滚动 / 点击 / 输入撤销 / 键盘跳转 / 重媒体显示 smoke；下一步应真实执行并回填 CodeMirror 连续输入延迟量化，并单独处理链接诊断对本地图片的误报。
 
 ## 7. 导出工作台
 
@@ -376,7 +379,7 @@
    `docs/verification/prism-writing-efficiency-smoke.md` 已补 smoke 协议和检查表，macOS 图片粘贴、快速打开、链接补全/诊断、表格、列表、模板、大纲和选区统计已回填真实 `.app` 证据；Finder 拖拽当前自动化无法安全完成，下一步需要人工 smoke 或更可靠跨应用拖拽工具，Windows Explorer 图片拖拽和 Alt 原路径仍需 Windows 机器。价值是把剩余图片拖拽系统事件证据提升为真实桌面工作流验证。
 
 2. **预览真实输入 / 性能 smoke**
-   `docs/verification/prism-preview-sync-smoke.md` 已补长文 drift 真实 `.app` 证据；下一步应真实执行连续输入延迟、undo history、键盘跳转即时同步和重媒体端到端性能。价值是把预览同步从滚动 / 点击证据提升到真实写作过程证据。
+   `docs/verification/prism-preview-sync-smoke.md` 已补长文 drift、输入撤销、键盘跳转和重媒体显示真实 `.app` 证据；下一步应真实执行连续输入延迟量化，并修复链接诊断对本地图片资产的误报。价值是把预览同步从滚动 / 点击证据提升到真实写作过程证据。
 
 3. **文件动作剩余桌面 smoke**
    `docs/verification/prism-file-actions-smoke.md` 已补 macOS Prism UI 删除到废纸篓证据；剩余价值集中在 Windows Explorer 废纸篓 / 打开位置、复制路径，以及 macOS 文件夹删除、重命名、创建副本等逐项真实桌面确认。

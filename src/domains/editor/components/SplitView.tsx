@@ -12,6 +12,7 @@ import { getCommandMenuItems, type CommandContext } from '../../commands';
 
 interface SplitViewProps {
   content: string;
+  documentPath?: string;
   scrollState?: DocumentScrollState;
   viewMode: 'edit' | 'split' | 'preview';
   onChange: (content: string) => void;
@@ -350,6 +351,7 @@ function applyPreviewSearch(
 export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
   function SplitView({
     content,
+    documentPath,
     scrollState,
     viewMode,
     onChange,
@@ -829,7 +831,7 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
             }}
           >
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-              <PreviewPane content={content} onNotice={onNotice} />
+              <PreviewPane content={content} documentPath={documentPath} onNotice={onNotice} />
             </div>
           </div>
         )}

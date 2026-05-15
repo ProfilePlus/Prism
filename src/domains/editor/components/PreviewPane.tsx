@@ -1,12 +1,15 @@
 import { useMemo, useEffect, useRef, useState } from 'react';
+import { readFile } from '@tauri-apps/plugin-fs';
 import { markdownToHtml } from '../../../lib/markdownToHtml';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { ContentTheme, DEFAULT_SETTINGS, isContentTheme } from '../../settings/types';
 import { useSettingsStore } from '../../settings/store';
 import { getMermaidThemeConfig, getThemeContract } from '../../themes';
+import { dirname, joinPath } from '../../workspace/services/path';
 
 interface PreviewPaneProps {
   content: string;
+  documentPath?: string;
   onNotice?: (message: string) => void;
 }
 
@@ -22,6 +25,67 @@ function getExternalHttpUrl(rawHref: string, resolvedHref: string) {
   if (/^https?:\/\//i.test(rawHref)) return rawHref;
   if (rawHref.startsWith('//') && /^https?:\/\//i.test(resolvedHref)) return resolvedHref;
   return null;
+}
+
+function isWindowsAbsolutePath(value: string) {
+  return /^[a-zA-Z]:[\\/]/.test(value);
+}
+
+function isExternalMediaSrc(value: string) {
+  if (/^https?:\/\//i.test(value) || value.startsWith('//')) return true;
+  if (isWindowsAbsolutePath(value)) return false;
+  return /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(value);
+}
+
+function resolvePreviewMediaPath(rawSrc: string, documentPath?: string) {
+  const src = rawSrc.trim();
+  if (!src || !documentPath || src.startsWith('#') || src.startsWith('?')) return null;
+  if (isExternalMediaSrc(src)) return null;
+  if (src.startsWith('/')) return src;
+  if (isWindowsAbsolutePath(src)) return src;
+  return joinPath(dirname(documentPath), src);
+}
+
+function getPreviewMediaMimeType(filePath: string) {
+  const normalized = filePath.toLowerCase();
+  if (normalized.endsWith('.svg')) return 'image/svg+xml';
+  if (normalized.endsWith('.png')) return 'image/png';
+  if (normalized.endsWith('.jpg') || normalized.endsWith('.jpeg')) return 'image/jpeg';
+  if (normalized.endsWith('.gif')) return 'image/gif';
+  if (normalized.endsWith('.webp')) return 'image/webp';
+  return 'application/octet-stream';
+}
+
+async function resolveLocalPreviewMedia(
+  container: HTMLElement,
+  documentPath: string | undefined,
+  options: {
+    isCancelled: () => boolean;
+    trackObjectUrl: (url: string) => void;
+  },
+) {
+  if (!documentPath) return;
+
+  const mediaElements = Array.from(container.querySelectorAll<HTMLImageElement | HTMLSourceElement>('img[src], source[src]'));
+
+  await Promise.all(mediaElements.map(async (media) => {
+    const rawSrc = media.getAttribute('src') ?? '';
+    const filePath = resolvePreviewMediaPath(rawSrc, documentPath);
+    if (!filePath) return;
+
+    try {
+      const bytes = await readFile(filePath);
+      if (options.isCancelled()) return;
+
+      const objectUrl = URL.createObjectURL(new Blob([bytes], { type: getPreviewMediaMimeType(filePath) }));
+      options.trackObjectUrl(objectUrl);
+      media.dataset.prismOriginalSrc = rawSrc;
+      media.dataset.prismFileSrc = filePath;
+      media.setAttribute('src', objectUrl);
+    } catch (error) {
+      media.dataset.prismMediaError = error instanceof Error ? error.message : String(error);
+    }
+  }));
 }
 
 function escapeHtml(value: string) {
@@ -173,7 +237,7 @@ function normalizeMermaidSvg(svg: SVGSVGElement) {
   }
 }
 
-export function PreviewPane({ content, onNotice }: PreviewPaneProps) {
+export function PreviewPane({ content, documentPath, onNotice }: PreviewPaneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [contentTheme, setContentTheme] = useState<ContentTheme>(getCurrentContentTheme);
   const [renderContent, setRenderContent] = useState(content);
@@ -209,9 +273,24 @@ export function PreviewPane({ content, onNotice }: PreviewPaneProps) {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    const objectUrls: string[] = [];
     const write = containerRef.current?.querySelector<HTMLElement>('#write');
-    if (write) enhanceKatexErrors(write);
-  }, [html]);
+    if (!write) {
+      return () => {
+        cancelled = true;
+      };
+    }
+    void resolveLocalPreviewMedia(write, documentPath, {
+      isCancelled: () => cancelled,
+      trackObjectUrl: (url) => objectUrls.push(url),
+    });
+    enhanceKatexErrors(write);
+    return () => {
+      cancelled = true;
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [html, documentPath]);
 
   useEffect(() => {
     const container = containerRef.current;

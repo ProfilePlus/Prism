@@ -46,6 +46,7 @@ export const DocumentView = forwardRef<EditorPaneHandle, DocumentViewProps>(
         <SplitView
           ref={ref}
           content={currentDocument.content}
+          documentPath={currentDocument.path}
           scrollState={currentDocument.scrollState}
           viewMode={currentDocument.viewMode}
           onChange={updateContent}

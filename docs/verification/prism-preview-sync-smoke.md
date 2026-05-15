@@ -3,7 +3,7 @@
 > 日期：2026-05-15  
 > 目标：验证源码编辑与 Markdown 预览之间的映射、滚动同步、点击跳转和渲染诊断在真实长文中可信。  
 > 计划来源：`docs/prism-product-optimization-plan.md` 第 6 节“预览同步与渲染诊断”。  
-> 当前状态：已补长文和重媒体 source-line mapping 自动化回归，并降低预览滚动回算中的样式读取成本；macOS 真实 `.app` 已补分栏长文打开、源码/预览滚动同步、预览点击跳源码、底部错误区不空白、单次真实输入预览刷新、视图切换、undo history 和 `Cmd+Down` 跳文末同步 smoke；连续输入延迟和批量媒体端到端性能尚未闭环。
+> 当前状态：已补长文和重媒体 source-line mapping 自动化回归，并降低预览滚动回算中的样式读取成本；macOS 真实 `.app` 已补分栏长文打开、源码/预览滚动同步、预览点击跳源码、底部错误区不空白、单次真实输入预览刷新、视图切换、undo history、`Cmd+Down` 跳文末同步，以及本地图片 / Mermaid / KaTeX 混排重媒体 smoke；连续输入延迟和精确帧率 / CPU 量化尚未闭环。
 
 ## 1. 覆盖范围
 
@@ -238,6 +238,22 @@ P1 问题：
 - 在编辑器焦点内按一次 `Cmd+Z` 后，marker 从编辑器和右侧预览同时消失；等待自动保存后 UI 显示“已保存”，`rg -n "PREVIEW_UNDO" .codex-smoke/preview-sync/preview-sync.md` 无命中，fixture 文件恢复到无 marker 状态。
 - 从文档顶部按 `Cmd+Down` 后，编辑区跳到文档尾部，状态栏显示 `LN 3210 COL 1`；右侧预览同步显示第 120 节末尾、代码块、Mermaid 错误和 KaTeX 错误区域，未复现此前“键盘跳尾后预览不立即跟随”的弱观察。
 - 本轮仍不把连续输入性能判定为通过：前序 `type_text` 工具耗时无法区分 app 输入延迟和 Computer Use 输入开销；需要后续用更接近真实键盘输入的工具或人工计时补证。
+
+### 2026-05-15 macOS 真实 `.app` 重媒体端到端 smoke
+
+- 实现补丁：`PreviewPane` 接收当前文档路径后，将本地 `img[src]` / `source[src]` 相对路径解析到当前文档目录，通过已授权的 Tauri fs scope 读取文件并转为 `blob:` URL；没有引入 Tauri `assetProtocol` 静态全盘 scope。`DocumentView` / `SplitView` 负责把 `currentDocument.path` 传入预览。
+- 自动化回归：`PreviewPane.test.tsx` 覆盖相对本地图片、绝对本地图片和远程 HTTPS 图片；本地图片走 `readFile()` + `URL.createObjectURL()`，远程图片保持原 URL。
+- fixture：`.codex-smoke/preview-heavy/preview-heavy.md`，20 节、50 张本地 SVG 图片、20 个 Mermaid 块、20 个 display math 块，末尾包含 Mermaid 错误和 KaTeX 错误。
+- 真实 app 路径：`npm run tauri:build:app-smoke` 重新生成 `src-tauri/target/release/bundle/macos/Prism.app`，再用 `open -na .../Prism.app .codex-smoke/preview-heavy/preview-heavy.md` 通过 macOS Opened 事件打开文件。
+- 分栏打开：右侧预览显示标题、正文、行内 KaTeX 和本地 SVG 图片；第 1 节可见 `Prism preview media 01`，不再是断图。
+- 中段滚动：滚动到第 4/5 节附近后，源码与预览同段稳定；右侧 Mermaid 图渲染为节点 / 箭头图，没有整篇空白。
+- 尾部跳转：`Cmd+Down` 后源码到第 20 节和末尾错误区，右侧预览显示第 39/40 张本地图片和第 20 个 Mermaid 图，预览仍非空白。
+- 截图证据：
+  - `.codex-smoke/preview-heavy/real-app-heavy-top.png`
+  - `.codex-smoke/preview-heavy/real-app-heavy-tail.png`
+- 限制：
+  - 本轮证明真实 app 中本地图片、Mermaid、KaTeX 和长文本混排可显示、可滚动、尾部不空白；没有采集帧率、CPU 或输入延迟指标。
+  - 本轮暴露状态栏 `LINK 50` 对已存在本地图片仍误报缺失链接；原因是链接诊断只使用 Markdown 文件树作为存在性索引，不包含图片资产。该问题独立于预览渲染，需后续单独修复。
 
 待剩余真实性能 smoke 完成后，在此追加：
 
