@@ -321,6 +321,20 @@ end run"#;
 
 #[cfg(target_os = "macos")]
 fn move_existing_path_to_trash(target_path: &Path) -> Result<(), String> {
+    match move_existing_path_to_finder_trash(target_path) {
+        Ok(()) => Ok(()),
+        Err(finder_error) => {
+            move_existing_path_to_user_trash(target_path)
+                .map(|_| ())
+                .map_err(|fallback_error| {
+                    format!("{finder_error}; ~/.Trash fallback failed: {fallback_error}")
+                })
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn move_existing_path_to_finder_trash(target_path: &Path) -> Result<(), String> {
     const TRASH_TIMEOUT: Duration = Duration::from_secs(8);
 
     let output = wait_for_child_output_with_timeout(
@@ -346,6 +360,60 @@ fn move_existing_path_to_trash(target_path: &Path) -> Result<(), String> {
     } else {
         format!("无法移到系统废纸篓: {stderr}")
     })
+}
+
+#[cfg(target_os = "macos")]
+fn move_existing_path_to_user_trash(target_path: &Path) -> Result<PathBuf, String> {
+    let home = std::env::var_os("HOME").ok_or("无法定位用户主目录")?;
+    move_existing_path_to_user_trash_dir(target_path, &PathBuf::from(home).join(".Trash"))
+}
+
+#[cfg(target_os = "macos")]
+fn move_existing_path_to_user_trash_dir(
+    target_path: &Path,
+    trash_dir: &Path,
+) -> Result<PathBuf, String> {
+    std::fs::create_dir_all(trash_dir)
+        .map_err(|err| format!("无法创建系统废纸篓目录: {err}"))?;
+    let file_name = target_path
+        .file_name()
+        .ok_or("无法识别待删除文件名")?
+        .to_string_lossy()
+        .to_string();
+    let destination = unique_user_trash_path(trash_dir, &file_name)?;
+    std::fs::rename(target_path, &destination)
+        .map_err(|err| format!("无法移入 ~/.Trash: {err}"))?;
+    Ok(destination)
+}
+
+#[cfg(target_os = "macos")]
+fn unique_user_trash_path(trash_dir: &Path, file_name: &str) -> Result<PathBuf, String> {
+    let initial = trash_dir.join(file_name);
+    if !initial.exists() {
+        return Ok(initial);
+    }
+
+    let file_path = Path::new(file_name);
+    let stem = file_path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or(file_name);
+    let extension = file_path
+        .extension()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.is_empty())
+        .map(|value| format!(".{value}"))
+        .unwrap_or_default();
+
+    for index in 1..1000 {
+        let candidate = trash_dir.join(format!("{stem} {index}{extension}"));
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+
+    Err(format!("无法为 {file_name} 生成不冲突的废纸篓路径"))
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -445,6 +513,18 @@ mod tests {
             name
         ));
         fs::write(&path, contents).expect("write temp file");
+        path
+    }
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let mut path = std::env::temp_dir();
+        path.push(format!(
+            "prism-test-dir-{}-{}-{}",
+            std::process::id(),
+            timestamp_millis(),
+            name
+        ));
+        fs::create_dir_all(&path).expect("create temp dir");
         path
     }
 
@@ -550,6 +630,28 @@ mod tests {
     #[test]
     fn macos_finder_trash_script_resolves_posix_file_as_alias() {
         assert!(FINDER_TRASH_SCRIPT.contains("POSIX file (item 1 of argv) as alias"));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_user_trash_fallback_moves_file_with_unique_name() {
+        let source_dir = temp_dir("trash-source");
+        let trash_dir = temp_dir("trash-target");
+        let existing = trash_dir.join("draft.md");
+        let source = source_dir.join("draft.md");
+        fs::write(&existing, "existing").expect("write existing trash file");
+        fs::write(&source, "move me").expect("write source file");
+
+        let destination = move_existing_path_to_user_trash_dir(&source, &trash_dir)
+            .expect("fallback should move file to trash dir");
+
+        assert!(!source.exists());
+        assert_eq!(destination.file_name().and_then(|value| value.to_str()), Some("draft 1.md"));
+        assert_eq!(fs::read_to_string(destination).expect("read moved file"), "move me");
+        assert_eq!(fs::read_to_string(existing).expect("read existing file"), "existing");
+
+        let _ = fs::remove_dir_all(source_dir);
+        let _ = fs::remove_dir_all(trash_dir);
     }
 }
 
