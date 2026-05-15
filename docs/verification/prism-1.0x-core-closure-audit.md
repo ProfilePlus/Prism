@@ -28,7 +28,7 @@
 | 不引入禁用能力 | `rg` 未发现插件市场、云同步、移动端、图谱或完整 WYSIWYG 实现入口；计划中仍标为非目标 | 已满足 |
 | 每批先说明目标和影响面 | 每批开工前均先说明目标和影响面；近期批次分别限定在 recovery App 接线、预览长文 smoke、写作效率事件接线、导出失败诊断、专业写作诊断与审计刷新 | 已完成 |
 | 产出本地审计文档 | `docs/verification/prism-1.0x-core-closure-audit.md` | 已完成 |
-| 运行验证命令 | 最新 `npm test -- --run` 通过 55 files / 314 tests；`npm run build` 通过，仅有既有 Vite large chunk warning；`git diff --check` 通过；历史 Rust / Tauri 相关批次已补 `cargo test`、`cargo check` 或 Tauri build 记录 | 已通过 |
+| 运行验证命令 | 最新 `npm test -- --run` 通过 55 files / 315 tests；`npm run build` 通过，仅有既有 Vite large chunk warning；`git diff --check` 通过；历史 Rust / Tauri 相关批次已补 `cargo test`、`cargo check` 或 Tauri build 记录 | 已通过 |
 | Tauri build gate | `npm run tauri:build:app-smoke` 通过并生成 `.app`；`npm run tauri:build` 完成前端 build、Rust release 编译和 `.app` bundle 后失败在已知 DMG `bundle_dmg.sh` 或 updater 签名环境；`npm run release:mac-dmg:skip-finder` + `hdiutil verify` 通过 | 已验证并记录限制 |
 
 ## 3. 总体结论
@@ -54,7 +54,7 @@
 | 预览同步与 HTML 安全有证据 | source-line mapping、点击跳源码、长文 / 重媒体 mapping、内容更新后 source-line 刷新、10 万字符级 Markdown -> HTML smoke、Mermaid 队列、KaTeX/Mermaid 错误定位、链接安全清理测试 | 自动化中等偏强，但真实 CodeMirror 输入性能未闭环 |
 | 导出工作台可靠性有证据 | HTML/PDF/PNG/DOCX pipeline、golden fixture、复杂导出产物 smoke、命令入口四格式集成 smoke、真实 app 打开复杂文档预览截图、DOCX task list、Pandoc 回退、安全清理测试、导出进度事件、App 层进度 UI / 失败诊断复制测试 | 自动化较强，但真实 Prism UI 四格式导出和人工打开产物未闭环 |
 | 专业扩展有证据 | citation settings、Pandoc citeproc 分支、citekey / suppress-author 占位、邮箱/代码语境误报防护、专业写作 smoke 文档、中文排版 10 万字符级 micro benchmark、排版诊断 250 条长列表组件回归 | 自动化中等偏强，但本机缺 Pandoc，真实 citeproc 未闭环 |
-| 每批验证 gate 通过 | 最近多批均执行 `npm test -- --run`、`npm run build`、`git diff --check` 并通过；最新全量为 55 files / 314 tests；涉及 Tauri 的历史批次已记录 build / fallback DMG 结果 | 已满足当前自动化 gate |
+| 每批验证 gate 通过 | 最近多批均执行 `npm test -- --run`、`npm run build`、`git diff --check` 并通过；最新全量为 55 files / 315 tests；涉及 Tauri 的历史批次已记录 build / fallback DMG 结果 | 已满足当前自动化 gate |
 | 无剩余必需工作 | recovery crash/restart、复杂导出真实 UI、写作效率桌面 smoke、预览真实 drift / 性能、Pandoc、签名公证、Windows release 仍未完成 | 未满足 |
 
 因此，当前 goal 的正确状态是“继续推进或拆分为更小 goal”，不能调用 `update_goal complete`。
@@ -76,6 +76,7 @@
 - `src/domains/document/store.ts` 在 open / update / saving / saved / failed / conflict 各状态间显式更新 `saveStatus`。
 - `src/domains/document/fileSnapshot.ts` 使用 Tauri `stat` 生成 mtime / size 快照。
 - `src/domains/document/hooks/useAutoSave.ts` 保存前创建 recovery，比较磁盘快照；磁盘变化时进入 conflict，不调用 `writeTextFile`。
+- `src/domains/document/hooks/useAutoSave.ts` 在自动保存关闭时仍为 dirty 已保存文档写入 recovery 快照，但不写回原文件，避免用户关闭自动保存后异常退出完全没有本地快照。
 - `src/domains/document/hooks/useExternalFileChangeMonitor.ts` 在窗口重新聚焦时检测 dirty 文档是否被外部修改。
 - `src/domains/document/components/SaveConflictModal.tsx` 暴露三个动作：重新加载磁盘版本、保留我的版本并另存为、覆盖磁盘版本。
 - `src/domains/document/services/conflictResolution.ts` 分别实现 reload / save-as / overwrite，并配有 `conflictResolution.test.ts`。
@@ -395,6 +396,7 @@
 ### 最新证据
 
 - `src/App.recovery.test.tsx` 覆盖 recovery modal App 接线、导出进度 UI 和导出失败诊断浮层。
+- `src/domains/document/hooks/useAutoSave.test.tsx` 覆盖自动保存关闭时仍生成 recovery 快照，且不调用磁盘 stat、原文件写入或 recovery 清理。
 - `src/domains/commands/registry.test.ts` 覆盖导出进度事件接线、成功 / 失败后的进度清理，以及导出失败诊断中的 warning 汇总。
 - `src/lib/fileActions.test.ts` 覆盖删除流程首次取消、废纸篓优先、废纸篓失败后取消永久删除和废纸篓失败后二次确认永久删除。
 - `src/domains/editor/components/EditorPane.integration.test.tsx` 覆盖 CodeMirror 命令事件、剪贴板图片 paste、Alt / Option drop、列表 keymap 按键路径、Markdown 链接补全上下文和 `[[note]]` wiki 内链补全上下文。
@@ -407,7 +409,7 @@
 - `src/domains/commands/exportCommand.integration.test.ts` 覆盖命令入口四格式导出：`exportHtml`、`exportPdf`、`exportPng`、`exportDocx` 都通过真实 export domain 写出产物并记录 history。
 - `docs/verification/prism-professional-writing-smoke.md` 补齐专业写作能力 smoke 入口。
 - `src/domains/commands/registry.test.ts` 覆盖插件市场、deep link、云同步、移动端、实时协作、图谱和完整 WYSIWYG 等延后能力不会出现在菜单或命令面板。
-- 最新验证：`npm test -- --run` 通过 55 files / 314 tests；`npm run build` 通过，仅有既有 Vite large chunk warning；`git diff --check` 通过。
+- 最新验证：`npm test -- --run` 通过 55 files / 315 tests；`npm run build` 通过，仅有既有 Vite large chunk warning；`git diff --check` 通过。
 
 ### 未完成项
 

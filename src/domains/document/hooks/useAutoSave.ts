@@ -27,7 +27,7 @@ export function useAutoSave(interval = 2000, enabled = true) {
   const markSaveConflict = useDocumentStore((s) => s.markSaveConflict);
 
   useEffect(() => {
-    if (!enabled || !isDirty || !documentPath || saveStatus === 'conflict') {
+    if (!isDirty || !documentPath || saveStatus === 'conflict') {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
@@ -47,19 +47,22 @@ export function useAutoSave(interval = 2000, enabled = true) {
           content: documentContent,
           reason: 'autosave',
         }).catch(() => undefined);
-        const diskSnapshot = await getFileSnapshot(documentPath);
-        if (hasFileSnapshotChanged({ mtimeMs: lastKnownMtime, size: lastKnownSize }, diskSnapshot)) {
-          markSaveConflict(getExternalChangeMessage(), documentPath);
-          return;
+        if (enabled) {
+          const diskSnapshot = await getFileSnapshot(documentPath);
+          if (hasFileSnapshotChanged({ mtimeMs: lastKnownMtime, size: lastKnownSize }, diskSnapshot)) {
+            markSaveConflict(getExternalChangeMessage(), documentPath);
+            return;
+          }
+          markSaving(documentPath);
+          await writeTextFile(documentPath, documentContent);
+          markSaved(documentPath, await getFileSnapshotOrNull(documentPath));
+          await clearRecoverySnapshotsForDocument(documentPath).catch(() => undefined);
         }
-        markSaving(documentPath);
-        await writeTextFile(documentPath, documentContent);
-        markSaved(documentPath, await getFileSnapshotOrNull(documentPath));
-        await clearRecoverySnapshotsForDocument(documentPath).catch(() => undefined);
       } catch (err) {
         markSaveFailed(err, documentPath);
+      } finally {
+        timerRef.current = null;
       }
-      timerRef.current = null;
     }, interval);
 
     return () => {

@@ -38,6 +38,7 @@
   - 恢复快照为 dirty 文档，并保留磁盘 mtime / size。
 - `src/domains/document/hooks/useAutoSave.test.tsx`
   - 自动保存前创建 recovery。
+  - 自动保存关闭时，dirty 文档仍按同一计时器写入 recovery 快照，但不写回原文件。
   - 保存失败时保留 failed 状态和错误信息。
   - 磁盘外部修改时不覆盖，进入 conflict。
 - `src/domains/commands/registry.test.ts`
@@ -190,9 +191,15 @@ P1 问题：
 - `src/domains/document/services/recovery.test.ts` 新增 malformed metadata 回归：JSON 可解析但 `createdAt` / `reason` / `content` 非法的快照不会污染恢复队列；缺少 `documentName` 的旧快照回退显示 basename。
 - `src/App.tsx` 新增 `shouldShowRecoveryPrompt()`，把 recovery modal 的 App 级遮挡规则显式化：有快照、没有保存对话框、没有保存冲突时才显示。
 - `src/App.recovery.test.tsx` 新增 App 层接线回归：启动快照会进入 `RecoveryModal`，恢复 / 丢弃点击会转发到 hook handler；保存冲突时隐藏 recovery 并展示冲突弹窗；save dialog 遮挡规则由 `shouldShowRecoveryPrompt()` 覆盖。
+- `src/domains/document/hooks/useAutoSave.ts` 不再把 recovery 快照绑定到自动保存开关：只要已保存文档处于 dirty 且未处于 conflict，就会在计时器触发时先写入 recovery；当自动保存关闭时停在 recovery，不写回原文件。
+- `src/domains/document/hooks/useAutoSave.test.tsx` 新增“自动保存关闭仍写 recovery”回归，确认不会调用 `stat`、`writeTextFile` 或清理 recovery，文档保持 dirty。
 
 本轮仍未真实强退 Prism。已执行的自动化验证在本批最终汇报中记录：
 
+- `npm test -- --run src/domains/document/hooks/useAutoSave.test.tsx`：通过，1 file / 5 tests。
+- `npm test -- --run`：通过，55 files / 315 tests。
+- `npm run build`：通过，仅有既有 Vite large chunk warning。
+- `git diff --check`：通过。
 - `npm test -- --run src/App.recovery.test.tsx`：通过，1 file / 3 tests。
 - `npm test -- --run src/domains/document/services/recovery.test.ts`：通过，10 tests。
 - `npm test -- --run src/domains/document/services/recovery.test.ts src/domains/document/hooks/useRecoveryQueue.test.tsx src/domains/document/components/RecoveryModal.test.tsx`：通过，3 files / 17 tests。

@@ -83,6 +83,31 @@ describe('useAutoSave', () => {
     });
   });
 
+  it('keeps writing recovery snapshots when auto-save is disabled', async () => {
+    useDocumentStore.getState().openDocument('/tmp/a.md', 'a.md', '# A', { size: 3, mtimeMs: 1000 });
+    useDocumentStore.getState().updateContent('# B');
+
+    renderHook(() => useAutoSave(100, false));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+
+    expect(createRecoverySnapshot).toHaveBeenCalledWith({
+      documentPath: '/tmp/a.md',
+      documentName: 'a.md',
+      content: '# B',
+      reason: 'autosave',
+    });
+    expect(stat).not.toHaveBeenCalled();
+    expect(writeTextFile).not.toHaveBeenCalled();
+    expect(clearRecoverySnapshotsForDocument).not.toHaveBeenCalled();
+    expect(useDocumentStore.getState().currentDocument).toMatchObject({
+      isDirty: true,
+      saveStatus: 'dirty',
+    });
+  });
+
   it('marks a conflict and does not overwrite when the file changed on disk', async () => {
     (stat as ReturnType<typeof vi.fn>).mockResolvedValue({ size: 9, mtime: new Date(2000) });
     useDocumentStore.getState().openDocument('/tmp/a.md', 'a.md', '# A', { size: 3, mtimeMs: 1000 });
