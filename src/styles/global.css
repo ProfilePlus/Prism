@@ -336,7 +336,7 @@ body.typewriter-mode .cm-editor {
   height: 16px;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 140ms var(--ease-out);
+  transition: opacity 240ms var(--ease-out);
 }
 
 .prism-horizontal-scrollbar[data-scrollable='true'] {
@@ -355,18 +355,38 @@ body.typewriter-mode .cm-editor {
 
 .prism-horizontal-scrollbar__thumb {
   position: absolute;
+  top: 0;
+  left: 0;
+  height: 16px;
+  cursor: default;
+  will-change: transform, width;
+}
+
+.prism-horizontal-scrollbar__thumb-visual {
+  position: absolute;
   top: 5px;
+  right: 0;
   left: 0;
   height: 6px;
   border-radius: 999px;
   background: var(--c-fog);
-  cursor: default;
-  transition: background-color 140ms var(--ease-out);
-  will-change: transform, width;
+  opacity: 0;
+  transform: translateY(2px) scaleX(0.72);
+  transform-origin: center;
+  transition:
+    opacity 240ms var(--ease-out),
+    transform 240ms var(--ease-out),
+    background-color 140ms var(--ease-out);
 }
 
-.prism-horizontal-scrollbar__thumb:hover,
-.prism-horizontal-scrollbar[data-dragging='true'] .prism-horizontal-scrollbar__thumb {
+.prism-horizontal-scrollbar[data-scrollable='true']:hover .prism-horizontal-scrollbar__thumb-visual,
+.prism-horizontal-scrollbar[data-dragging='true'] .prism-horizontal-scrollbar__thumb-visual {
+  opacity: 1;
+  transform: translateY(0) scaleX(1);
+}
+
+.prism-horizontal-scrollbar__thumb:hover .prism-horizontal-scrollbar__thumb-visual,
+.prism-horizontal-scrollbar[data-dragging='true'] .prism-horizontal-scrollbar__thumb-visual {
   background: var(--c-ash);
 }
 

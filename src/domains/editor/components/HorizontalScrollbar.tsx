@@ -250,7 +250,9 @@ export function HorizontalScrollbar({ getScroller }: HorizontalScrollbarProps) {
           transform: `translateX(${metrics.thumbLeft}px)`,
           width: `${metrics.thumbWidth}px`,
         }}
-      />
+      >
+        <span className="prism-horizontal-scrollbar__thumb-visual" />
+      </div>
     </div>
   );
 }
