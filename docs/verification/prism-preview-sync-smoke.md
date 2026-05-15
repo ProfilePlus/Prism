@@ -3,7 +3,7 @@
 > 日期：2026-05-15  
 > 目标：验证源码编辑与 Markdown 预览之间的映射、滚动同步、点击跳转和渲染诊断在真实长文中可信。  
 > 计划来源：`docs/prism-product-optimization-plan.md` 第 6 节“预览同步与渲染诊断”。  
-> 当前状态：已补长文和重媒体 source-line mapping 自动化回归，并降低预览滚动回算中的样式读取成本；真实 Prism UI drift / 输入性能 smoke 尚未完整执行。
+> 当前状态：已补长文和重媒体 source-line mapping 自动化回归，并降低预览滚动回算中的样式读取成本；macOS 真实 `.app` 已补分栏长文打开、源码/预览滚动同步、预览点击跳源码和底部错误区不空白 smoke；真实输入延迟、undo history 和批量媒体端到端性能尚未闭环。
 
 ## 1. 覆盖范围
 
@@ -208,7 +208,28 @@ P1 问题：
 - `npm run build`：通过，仅有既有 Vite large chunk warning。
 - `git diff --check`：通过。
 
-本轮仍未执行真实 UI 操作；真实 CodeMirror viewport、滚动 drift、输入延迟和预览滚动性能仍需人工或桌面自动化 smoke。
+### 2026-05-15 macOS 真实 `.app` 长文预览 drift smoke
+
+- 使用 `npm run tauri:build:app-smoke` 生成的 `Prism.app`，打开 `.codex-smoke/preview-sync/preview-sync.md`。
+- fixture：约 193KB，120 节，超过 8.5 万字符，包含多段中文/英文混排、行内 KaTeX、每 15 节一个代码块、每 20 节一个 Mermaid 块，末尾包含 Mermaid 错误和 KaTeX 错误。
+- 分栏打开：点击“分栏”后左侧 CodeMirror 和右侧 Preview 同时显示第 1 节内容，预览非空白。
+- 源码滚动到预览：对分栏窗口滚动约 10 页后，左侧源码到第 14/15 节附近，右侧预览同步显示第 14/15 节附近，未出现明显反向抖动。
+- 预览滚动到源码：在右侧预览区域点击后继续滚动，约 1 秒内左侧源码和右侧预览共同稳定到第 27/28 节附近，属于同一章节区间。
+- 预览点击跳源码：点击右侧第 28 节标题后，左侧源码定位到第 28 节标题附近，状态栏显示 `LN 716 COL 1`。
+- 底部错误区：光标跳到末尾后，左侧源码显示第 120 节末尾、Mermaid 错误和 KaTeX 错误；一次小幅滚动后右侧预览同步到尾部，正常 Mermaid 图可见，底部错误诊断区域出现 `Syntax error in text`，整篇预览没有空白。
+- 输入尝试：通过 Computer Use `type_text` 在第 28 节附近插入一段测试文本，实际工具调用耗时约 20 秒，无法区分 app 输入延迟与 Computer Use 输入开销，因此不作为真实输入性能通过证据。
+- 截图证据：
+  - `.codex-smoke/preview-sync/split-top-real-app.png`
+  - `.codex-smoke/preview-sync/editor-to-preview-scroll-real-app.png`
+  - `.codex-smoke/preview-sync/preview-to-editor-scroll-real-app.png`
+  - `.codex-smoke/preview-sync/preview-click-jump-real-app.png`
+  - `.codex-smoke/preview-sync/bottom-mermaid-sync-real-app.png`
+  - `.codex-smoke/preview-sync/error-diagnostic-bottom-real-app.png`
+- 限制：
+  - 这次只证明 macOS 真实 `.app` 的长文滚动 drift、预览点击和尾部错误区可用；没有证明连续 30 秒真实人工输入延迟。
+  - `Cmd+Down` 直接跳到文末后预览没有立即跟随，随后一次小幅滚动触发了尾部同步；该路径需要后续作为键盘跳转同步弱点继续观察。
+  - 未执行视图切换后的 undo history 验证。
+  - 未执行 50 图片 / 20 Mermaid / 20 KaTeX 组合的真实浏览器端到端性能 smoke。
 
 待真实 smoke 完成后，在此追加：
 
