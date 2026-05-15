@@ -34,5 +34,10 @@ export {
 } from './recentFiles';
 export {
   rankQuickOpenFiles,
+  type QuickOpenRecentFile,
   type QuickOpenResult,
 } from './quickOpen';
+export {
+  computeWritingStats,
+  type WritingStats,
+} from './writingStats';

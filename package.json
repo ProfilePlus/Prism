@@ -1,7 +1,7 @@
 {
   "name": "prism",
-  "version": "1.0.3",
-  "description": "",
+  "version": "1.4.0",
+  "description": "A local-first Markdown editor for writing, preview typography, and reliable export.",
   "main": "index.js",
   "directories": {
     "doc": "docs"
@@ -12,16 +12,30 @@
     "test": "vitest",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "tauri:build:app-smoke": "tauri build --config src-tauri/tauri.local-smoke.conf.json --bundles app",
+    "release:mac-dmg:skip-finder": "bash scripts/package-macos-dmg-skip-finder.sh",
+    "release:manifest": "node scripts/generate-updater-manifest.mjs",
+    "release:manifest:check": "node scripts/generate-updater-manifest.mjs --check"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AlexPlum405/Prism.git"
+  },
+  "keywords": [
+    "markdown",
+    "tauri",
+    "editor",
+    "writing"
+  ],
+  "author": "Prism contributors",
+  "license": "MIT",
   "type": "module",
   "devDependencies": {
     "@tauri-apps/cli": "^2.10.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
+    "@types/js-yaml": "^4.0.9",
     "@types/react": "^18.3.28",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.7.0",
@@ -44,10 +58,12 @@
     "@tauri-apps/plugin-dialog": "^2.7.0",
     "@tauri-apps/plugin-fs": "^2.5.0",
     "@tauri-apps/plugin-opener": "^2.5.3",
+    "@tauri-apps/plugin-updater": "^2.10.1",
     "codemirror": "^6.0.2",
     "docx": "^9.6.1",
     "highlight.js": "^11.11.1",
     "html2canvas": "^1.4.1",
+    "js-yaml": "^4.1.1",
     "katex": "^0.16.45",
     "mermaid": "^11.14.0",
     "pdf-lib": "^1.17.1",

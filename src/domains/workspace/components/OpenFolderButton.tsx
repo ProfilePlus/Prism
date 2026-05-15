@@ -3,6 +3,7 @@ import { useDocumentStore } from '../../document/store';
 import { useWorkspaceStore } from '../store';
 import { loadFolderTree } from '../lib/loadFolderTree';
 import { openPrismWindow } from '../../../lib/openWindow';
+import { grantWorkspaceDirectoryScope } from '../../../lib/fileSystemScope';
 
 export function OpenFolderButton() {
   const currentDocument = useDocumentStore((s) => s.currentDocument);
@@ -13,17 +14,17 @@ export function OpenFolderButton() {
       const selected = await open({
         directory: true,
         multiple: false,
+        recursive: true,
       });
 
       if (typeof selected !== 'string') return;
+      await grantWorkspaceDirectoryScope(selected);
 
       if (!currentDocument) {
-        console.log('[OpenFolderButton] Loading in current window');
         setRootPath(selected);
         const tree = await loadFolderTree(selected);
         setFileTree(tree);
       } else {
-        console.log('[OpenFolderButton] Opening new window');
         await openPrismWindow({ folderPath: selected });
       }
     } catch (err) {

@@ -21,48 +21,19 @@
     "dialog:default",
     "dialog:allow-save",
     "core:webview:allow-create-webview-window",
-    {
-      "identifier": "fs:allow-read-text-file",
-      "allow": [{ "path": "**" }]
-    },
-    {
-      "identifier": "fs:allow-write-text-file",
-      "allow": [{ "path": "**" }]
-    },
-    {
-      "identifier": "fs:allow-write-file",
-      "allow": [{ "path": "**" }]
-    },
-    {
-      "identifier": "fs:allow-read-dir",
-      "allow": [{ "path": "**" }]
-    },
-    {
-      "identifier": "fs:allow-exists",
-      "allow": [{ "path": "**" }]
-    },
-    {
-      "identifier": "fs:allow-mkdir",
-      "allow": [{ "path": "**" }]
-    },
-    {
-      "identifier": "fs:allow-remove",
-      "allow": [{ "path": "**" }]
-    },
-    {
-      "identifier": "fs:allow-rename",
-      "allow": [{ "path": "**" }]
-    },
-    {
-      "identifier": "fs:allow-stat",
-      "allow": [{ "path": "**" }]
-    },
+    "fs:default",
+    "fs:read-files",
+    "fs:read-dirs",
+    "fs:write-files",
+    "fs:allow-appdata-read-recursive",
+    "fs:allow-appdata-write-recursive",
     "opener:default",
     "opener:allow-open-path",
     "opener:allow-reveal-item-in-dir",
     {
       "identifier": "opener:allow-open-url",
       "allow": [{ "url": "https?://**" }]
-    }
+    },
+    "updater:allow-check"
   ]
 }

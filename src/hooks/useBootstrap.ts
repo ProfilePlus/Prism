@@ -6,16 +6,20 @@ import { useSettingsStore } from '../domains/settings/store';
 import { useWorkspaceStore } from '../domains/workspace/store';
 import { loadFolderTree } from '../domains/workspace/lib/loadFolderTree';
 import { addRecentFile, basename, dirname } from '../domains/workspace/services';
+import { getFileSnapshotOrNull } from '../domains/document/fileSnapshot';
+import { grantMarkdownFileScope, grantWorkspaceDirectoryScope } from '../lib/fileSystemScope';
 
-export function useBootstrap() {
+export function useBootstrap(enabled = true) {
   const currentDocument = useDocumentStore((s) => s.currentDocument);
   const openDocument = useDocumentStore((s) => s.openDocument);
   const setViewMode = useDocumentStore((s) => s.setViewMode);
+  const updateScrollState = useDocumentStore((s) => s.updateScrollState);
   const restoreLastSession = useSettingsStore((s) => s.restoreLastSession);
   const lastSession = useSettingsStore((s) => s.lastSession);
   const { setRootPath, setFileTree, setSidebarVisible, setSidebarTab } = useWorkspaceStore();
 
   useEffect(() => {
+    if (!enabled) return;
     if (currentDocument) return;
 
     let cancelled = false;
@@ -23,13 +27,20 @@ export function useBootstrap() {
     const filePath = params.get('file');
     const folderPath = params.get('folder');
 
-    const openFile = async (path: string, restoreViewMode?: 'edit' | 'split' | 'preview') => {
+    const openFile = async (
+      path: string,
+      restoreViewMode?: 'edit' | 'split' | 'preview',
+      restoreScrollState?: { editorRatio: number; previewRatio: number },
+    ) => {
+      await grantMarkdownFileScope(path);
       if (!(await exists(path))) return false;
+      const snapshot = await getFileSnapshotOrNull(path);
       const content = await readTextFile(path);
       if (cancelled || useDocumentStore.getState().currentDocument) return true;
 
-      openDocument(path, basename(path), content);
+      openDocument(path, basename(path), content, snapshot);
       if (restoreViewMode) setViewMode(restoreViewMode);
+      if (restoreScrollState) updateScrollState(restoreScrollState);
       addRecentFile(path, basename(path));
 
       const parentDir = dirname(path);
@@ -41,6 +52,7 @@ export function useBootstrap() {
     };
 
     const openFolder = async (path: string) => {
+      await grantWorkspaceDirectoryScope(path);
       if (!(await exists(path))) return false;
       setRootPath(path);
       const tree = await loadFolderTree(path);
@@ -51,7 +63,6 @@ export function useBootstrap() {
 
     (async () => {
       if (filePath) {
-        console.log('[useBootstrap] Loading file:', filePath);
         try {
           await openFile(filePath);
         } catch (err) {
@@ -59,7 +70,6 @@ export function useBootstrap() {
         }
         return;
       } else if (folderPath) {
-        console.log('[useBootstrap] Loading folder:', folderPath);
         try {
           await openFolder(folderPath);
         } catch (err) {
@@ -81,7 +91,11 @@ export function useBootstrap() {
       try {
         if (lastSession.sidebarVisible !== undefined) setSidebarVisible(lastSession.sidebarVisible);
         if (lastSession.sidebarTab) setSidebarTab(lastSession.sidebarTab);
-        if (lastSession.filePath && await openFile(lastSession.filePath, lastSession.viewMode)) return;
+        if (lastSession.filePath && await openFile(
+          lastSession.filePath,
+          lastSession.viewMode,
+          lastSession.scrollState,
+        )) return;
         if (lastSession.folderPath) await openFolder(lastSession.folderPath);
       } catch (err) {
         console.error('[useBootstrap] Failed to restore last session:', err);
@@ -92,6 +106,7 @@ export function useBootstrap() {
       cancelled = true;
     };
   }, [
+    enabled,
     lastSession,
     openDocument,
     restoreLastSession,
@@ -100,5 +115,6 @@ export function useBootstrap() {
     setSidebarTab,
     setSidebarVisible,
     setViewMode,
+    updateScrollState,
   ]);
 }

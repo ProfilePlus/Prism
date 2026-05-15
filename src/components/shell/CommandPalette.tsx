@@ -1,4 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import type { FileNode } from '../../domains/workspace/types';
+import { rankQuickOpenFiles, type QuickOpenRecentFile } from '../../domains/workspace/services';
 
 export interface Command {
   id: string;
@@ -8,9 +10,15 @@ export interface Command {
   keywords?: string[];
 }
 
+export type CommandPaletteMode = 'commands' | 'files';
+
 interface CommandPaletteProps {
   visible: boolean;
   commands: Command[];
+  files?: FileNode[];
+  workspaceRoot?: string | null;
+  recentFiles?: QuickOpenRecentFile[];
+  mode?: CommandPaletteMode;
   onClose: () => void;
   onExecute: (commandId: string) => void;
 }
@@ -22,15 +30,38 @@ const SearchIcon = () => (
   </svg>
 );
 
-export function CommandPalette({ visible, commands, onClose, onExecute }: CommandPaletteProps) {
+export function CommandPalette({
+  visible,
+  commands,
+  files = [],
+  workspaceRoot = null,
+  recentFiles = [],
+  mode = 'commands',
+  onClose,
+  onExecute,
+}: CommandPaletteProps) {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const filteredCommands = commands.filter((cmd) => {
+  const filteredCommands = useMemo(() => commands.filter((cmd) => {
     const searchText = `${cmd.label} ${cmd.category} ${cmd.keywords?.join(' ') || ''}`.toLowerCase();
     return searchText.includes(query.toLowerCase());
-  });
+  }), [commands, query]);
+  const quickOpenItems = useMemo(
+    () => rankQuickOpenFiles(files, query, 30, workspaceRoot, recentFiles),
+    [files, query, recentFiles, workspaceRoot],
+  );
+  const visibleItems = useMemo(() => (mode === 'files'
+    ? quickOpenItems.map((result) => ({
+        id: `openWorkspaceFile:${encodeURIComponent(result.node.path)}`,
+        label: result.node.name,
+        category: result.folderLabel || '工作区文件',
+        shortcut: undefined,
+      }))
+    : filteredCommands), [filteredCommands, mode, quickOpenItems]);
+  const placeholder = mode === 'files' ? '搜索工作区文件…' : '输入命令或搜索…';
+  const emptyText = mode === 'files' ? '未找到匹配的文件' : '未找到匹配的命令';
 
   useEffect(() => {
     if (visible) {
@@ -38,7 +69,7 @@ export function CommandPalette({ visible, commands, onClose, onExecute }: Comman
       setSelectedIndex(0);
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [visible]);
+  }, [visible, mode]);
 
   useEffect(() => { setSelectedIndex(0); }, [query]);
 
@@ -48,34 +79,34 @@ export function CommandPalette({ visible, commands, onClose, onExecute }: Comman
       if (e.key === 'Escape') { e.preventDefault(); onClose(); }
       else if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setSelectedIndex((prev) => Math.min(prev + 1, filteredCommands.length - 1));
+        setSelectedIndex((prev) => visibleItems.length === 0 ? 0 : Math.min(prev + 1, visibleItems.length - 1));
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setSelectedIndex((prev) => Math.max(prev - 1, 0));
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        if (filteredCommands[selectedIndex]) {
-          onExecute(filteredCommands[selectedIndex].id);
+        if (visibleItems[selectedIndex]) {
+          onExecute(visibleItems[selectedIndex].id);
           onClose();
         }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [visible, selectedIndex, filteredCommands, onClose, onExecute]);
+  }, [visible, selectedIndex, visibleItems, onClose, onExecute]);
 
   if (!visible) return null;
 
   return (
     <>
       <div className="cmdk-overlay" onClick={onClose} />
-      <div className="cmdk" role="dialog" aria-label="命令面板">
+      <div className="cmdk" role="dialog" aria-label={mode === 'files' ? '快速打开' : '命令面板'}>
         <div className="cmdk-search">
           <SearchIcon />
           <input
             ref={inputRef}
             type="text"
-            placeholder="输入命令或搜索…"
+            placeholder={placeholder}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="cmdk-input"
@@ -83,10 +114,10 @@ export function CommandPalette({ visible, commands, onClose, onExecute }: Comman
           <span className="kbd">Esc</span>
         </div>
         <div className="cmdk-list">
-          {filteredCommands.length === 0 ? (
-            <div className="cmdk-empty">未找到匹配的命令</div>
+          {visibleItems.length === 0 ? (
+            <div className="cmdk-empty">{emptyText}</div>
           ) : (
-            filteredCommands.map((cmd, index) => (
+            visibleItems.map((cmd, index) => (
               <div
                 key={cmd.id}
                 className={`cmdk-item ${index === selectedIndex ? 'selected' : ''}`}

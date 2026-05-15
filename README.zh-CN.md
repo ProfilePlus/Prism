@@ -70,15 +70,17 @@ Prism 是一个基于 Tauri、React、TypeScript 和 CodeMirror 6 的桌面 Mark
 
 ## 下载
 
-最新版本：**v0.1.1**
+当前源码版本：**v1.4.0**
+
+稳定构建通过 [GitHub Releases](https://github.com/AlexPlum405/Prism/releases/latest) 发布。不同平台与签名状态下的产物命名可能不同，请以 latest release 页面为准。
 
 | 平台 | 下载 |
 | --- | --- |
-| macOS Apple Silicon | [Prism_0.1.1_aarch64.dmg](https://github.com/AlexPlum405/Prism/releases/latest/download/Prism_0.1.1_aarch64.dmg) |
-| Windows 安装包 | [Prism_0.1.1_x64-setup.exe](https://github.com/AlexPlum405/Prism/releases/latest/download/Prism_0.1.1_x64-setup.exe) |
-| Windows 绿色版 | [app.exe](https://github.com/AlexPlum405/Prism/releases/latest/download/app.exe) |
+| macOS Apple Silicon | [Latest release](https://github.com/AlexPlum405/Prism/releases/latest) |
+| Windows 安装包 | [Latest release](https://github.com/AlexPlum405/Prism/releases/latest) |
+| Windows 绿色版 | [Latest release](https://github.com/AlexPlum405/Prism/releases/latest) |
 
-当前 macOS 版本尚未签名。如果系统首次启动时拦截应用，请使用 **右键 -> 打开**。
+开发构建可能尚未签名。正式稳定版应以已签名、公证的 macOS 构建为目标。
 
 ## 截图
 

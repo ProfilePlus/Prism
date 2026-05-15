@@ -1,0 +1,15 @@
+{
+  "version": "1.4.0",
+  "notes": "Release notes go here.",
+  "pub_date": "2026-05-14T00:00:00Z",
+  "platforms": {
+    "darwin-aarch64": {
+      "signature": "<TAURI_UPDATER_SIGNATURE>",
+      "url": "https://github.com/AlexPlum405/Prism/releases/download/v1.4.0/Prism.app.tar.gz"
+    },
+    "windows-x86_64": {
+      "signature": "<TAURI_UPDATER_SIGNATURE>",
+      "url": "https://github.com/AlexPlum405/Prism/releases/download/v1.4.0/Prism_1.4.0_x64-setup.nsis.zip"
+    }
+  }
+}

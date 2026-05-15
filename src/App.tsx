@@ -1,26 +1,43 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useDocumentStore } from './domains/document/store';
 import { useSettingsStore } from './domains/settings/store';
 import { useWorkspaceStore } from './domains/workspace/store';
+import { useWorkspaceFocusRefresh } from './domains/workspace/hooks/useWorkspaceFocusRefresh';
 import { useAutoSave } from './domains/document/hooks/useAutoSave';
+import { useExternalFileChangeMonitor } from './domains/document/hooks/useExternalFileChangeMonitor';
+import { useRecoveryQueue } from './domains/document/hooks/useRecoveryQueue';
 import { DocumentView } from './domains/document/components/DocumentView';
+import { RecoveryModal } from './domains/document/components/RecoveryModal';
+import { SaveConflictModal, type SaveConflictAction } from './domains/document/components/SaveConflictModal';
+import {
+  overwriteConflictedDocument,
+  reloadConflictedDocument,
+  saveConflictedDocumentAs,
+} from './domains/document/services/conflictResolution';
 import { StatusBar } from './domains/workspace/components/StatusBar';
 import { Sidebar } from './domains/workspace/components/Sidebar';
+import { createFileTreeContextMenuItems } from './domains/workspace/components/fileTreeContextMenu';
 import { useBootstrap } from './hooks/useBootstrap';
 import { exists as fsExists } from '@tauri-apps/plugin-fs';
 import { open } from '@tauri-apps/plugin-dialog';
 import { downloadDir, homeDir } from '@tauri-apps/api/path';
 import { EditorPaneHandle } from './domains/editor/components/EditorPane';
+import { LinkDiagnosticsPanel } from './domains/editor/components/LinkDiagnosticsPanel';
+import { TypographyDiagnosticsPanel } from './domains/editor/components/TypographyDiagnosticsPanel';
+import { scanMarkdownLinks } from './domains/editor/extensions/linkDiagnostics';
+import { scanChineseTypography } from './domains/editor/extensions/typographyDiagnostics';
 import type { ExportFormat } from './domains/export';
 import { getExportFormatLabel } from './domains/export';
 import { WindowShell } from './components/shell/WindowShell';
 import { TitleBar } from './components/shell/TitleBar';
 import { MenuBar } from './components/shell/MenuBar';
 import { executeFileAction, FileActionInput } from './lib/fileActions';
+import { grantWorkspaceDirectoryScope } from './lib/fileSystemScope';
 import { ContextMenu, type ContextMenuItem } from './components/shell/ContextMenu';
 import { ShortcutPanel } from './components/shell/ShortcutPanel';
-import { CommandPalette } from './components/shell/CommandPalette';
+import { CommandPalette, type CommandPaletteMode } from './components/shell/CommandPalette';
 import { AboutModal } from './components/shell/AboutModal';
 import { SettingsModal } from './components/shell/SettingsModal';
 import {
@@ -32,7 +49,13 @@ import {
   runCommand,
   type CommandContext,
 } from './domains/commands';
-import { basename, dirname, getShowInFileManagerLabel, joinPath } from './domains/workspace/services';
+import {
+  basename,
+  computeWritingStats,
+  dirname,
+  flattenFiles,
+  joinPath,
+} from './domains/workspace/services';
 import type { ExportDefaultLocation } from './domains/settings/types';
 
 const exportExtensionByFormat: Record<ExportFormat, string> = {
@@ -63,6 +86,10 @@ function defaultExportFilename(filename: string, format: ExportFormat) {
   return ensureExportExtension(stripMarkdownExtension(filename), format);
 }
 
+function delay(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 async function resolveDefaultExportDirectory(input: {
   defaultLocation: ExportDefaultLocation;
   customDirectory: string;
@@ -89,6 +116,7 @@ async function resolveDefaultExportDirectory(input: {
   const customDirectory = input.customDirectory.trim();
   if (customDirectory) {
     try {
+      await grantWorkspaceDirectoryScope(customDirectory);
       if (await fsExists(customDirectory)) return customDirectory;
     } catch {
       // Fall through to toast and fallback.
@@ -111,6 +139,25 @@ interface SaveDialogState {
   resolve: (path: string | null) => void;
 }
 
+interface ExportFailureState {
+  title: string;
+  diagnostic: string;
+}
+
+interface RecoveryPromptVisibilityInput {
+  hasSnapshot: boolean;
+  hasSaveDialog: boolean;
+  hasSaveConflict: boolean;
+}
+
+export function shouldShowRecoveryPrompt({
+  hasSnapshot,
+  hasSaveDialog,
+  hasSaveConflict,
+}: RecoveryPromptVisibilityInput) {
+  return hasSnapshot && !hasSaveDialog && !hasSaveConflict;
+}
+
 function getSaveDialogTitle(dialog: SaveDialogState) {
   if (dialog.kind === 'export' && dialog.format) {
     return `导出 ${getExportFormatLabel(dialog.format)}`;
@@ -126,6 +173,12 @@ function getSaveDialogOverwriteText(dialog: SaveDialogState) {
   return dialog.kind === 'export'
     ? '继续导出会覆盖当前位置的同名文件。'
     : '继续保存会覆盖当前位置的同名文件。';
+}
+
+function formatAppError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error instanceof Event) return error.type || '未知事件错误';
+  return String(error);
 }
 
 function App() {
@@ -144,6 +197,7 @@ function App() {
   const editorRef = useRef<EditorPaneHandle>(null);
   const toastTimerRef = useRef<number | null>(null);
   const [cursor, setCursor] = useState({ line: 1, column: 1 });
+  const [selectionText, setSelectionText] = useState('');
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [globalContextMenu, setGlobalContextMenu] = useState<{
     x: number;
@@ -153,14 +207,26 @@ function App() {
   } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [exportProgress, setExportProgress] = useState<string | null>(null);
+  const [exportFailure, setExportFailure] = useState<ExportFailureState | null>(null);
   const [saveDialog, setSaveDialog] = useState<SaveDialogState | null>(null);
   const [shortcutPanelVisible, setShortcutPanelVisible] = useState(false);
   const [commandPaletteVisible, setCommandPaletteVisible] = useState(false);
+  const [commandPaletteMode, setCommandPaletteMode] = useState<CommandPaletteMode>('commands');
   const [aboutVisible, setAboutVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [linkDiagnosticsVisible, setLinkDiagnosticsVisible] = useState(false);
+  const [typographyDiagnosticsVisible, setTypographyDiagnosticsVisible] = useState(false);
+  const [conflictAction, setConflictAction] = useState<SaveConflictAction | null>(null);
+  const [settingsReady, setSettingsReady] = useState(false);
 
-  useBootstrap();
+  useBootstrap(settingsReady);
   useAutoSave(autoSaveInterval, autoSaveEnabled);
+  useExternalFileChangeMonitor();
+  useWorkspaceFocusRefresh(settingsReady);
+
+  useEffect(() => {
+    setSelectionText('');
+  }, [currentDocument?.path]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -184,7 +250,17 @@ function App() {
   }, [currentDocument?.path, workspace.rootPath]);
 
   useEffect(() => {
-    loadSettings();
+    let cancelled = false;
+    setSettingsReady(false);
+    loadSettings()
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setSettingsReady(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [loadSettings]);
 
   useEffect(() => {
@@ -196,6 +272,8 @@ function App() {
   }, [workspace.typewriterMode]);
 
   useEffect(() => {
+    if (!settingsReady) return;
+
     const timer = window.setTimeout(() => {
       const doc = useDocumentStore.getState().currentDocument;
       const ws = useWorkspaceStore.getState();
@@ -205,6 +283,7 @@ function App() {
               filePath: doc?.path || undefined,
               folderPath: ws.rootPath || undefined,
               viewMode: doc?.viewMode,
+              scrollState: doc?.scrollState,
               sidebarVisible: ws.sidebarVisible,
               sidebarTab: ws.sidebarTab,
               updatedAt: Date.now(),
@@ -216,7 +295,10 @@ function App() {
     return () => window.clearTimeout(timer);
   }, [
     currentDocument?.path,
+    currentDocument?.scrollState?.editorRatio,
+    currentDocument?.scrollState?.previewRatio,
     currentDocument?.viewMode,
+    settingsReady,
     workspace.rootPath,
     workspace.sidebarTab,
     workspace.sidebarVisible,
@@ -230,6 +312,61 @@ function App() {
     toastTimerRef.current = window.setTimeout(() => setToastMessage(null), 2800);
   }, []);
 
+  const {
+    activeRecoverySnapshot,
+    recoveryAction,
+    handleRestoreRecovery,
+    handleDiscardRecovery,
+  } = useRecoveryQueue({ showToast });
+
+  const linkDiagnostics = useMemo(() => {
+    if (!currentDocument) return [];
+    return scanMarkdownLinks(currentDocument.content, {
+      currentPath: currentDocument.path || undefined,
+      workspaceFiles: flattenFiles(workspace.fileTree, workspace.rootPath).map(({ node }) => node.path),
+      workspaceRoot: workspace.rootPath,
+    });
+  }, [currentDocument, workspace.fileTree, workspace.rootPath]);
+
+  const firstLinkDiagnostic = linkDiagnostics[0] ?? null;
+  const handleLinkDiagnosticsClick = useCallback(() => {
+    if (linkDiagnostics.length === 0) return;
+    setLinkDiagnosticsVisible(true);
+  }, [linkDiagnostics.length]);
+
+  const handleSelectLinkDiagnostic = useCallback((line: number) => {
+    setLinkDiagnosticsVisible(false);
+    editorRef.current?.jumpToLine(line);
+  }, []);
+
+  useEffect(() => {
+    if (linkDiagnostics.length === 0) {
+      setLinkDiagnosticsVisible(false);
+    }
+  }, [linkDiagnostics.length]);
+
+  const typographyDiagnostics = useMemo(
+    () => currentDocument ? scanChineseTypography(currentDocument.content) : [],
+    [currentDocument?.content],
+  );
+
+  const firstTypographyDiagnostic = typographyDiagnostics[0] ?? null;
+  const handleTypographyDiagnosticsClick = useCallback(() => {
+    if (typographyDiagnostics.length === 0) return;
+    setTypographyDiagnosticsVisible(true);
+  }, [typographyDiagnostics.length]);
+
+  const handleSelectTypographyDiagnostic = useCallback((line: number) => {
+    setTypographyDiagnosticsVisible(false);
+    editorRef.current?.jumpToLine(line);
+  }, []);
+
+  useEffect(() => {
+    if (typographyDiagnostics.length === 0) {
+      setTypographyDiagnosticsVisible(false);
+    }
+  }, [typographyDiagnostics.length]);
+
   useEffect(() => () => {
     if (toastTimerRef.current) {
       window.clearTimeout(toastTimerRef.current);
@@ -239,11 +376,35 @@ function App() {
   useEffect(() => {
     const handleExportProgress = (event: Event) => {
       const detail = (event as CustomEvent<{ visible?: boolean; message?: string }>).detail;
+      if (detail?.visible) setExportFailure(null);
       setExportProgress(detail?.visible ? detail.message ?? '正在导出' : null);
     };
     window.addEventListener('prism-export-progress', handleExportProgress);
     return () => window.removeEventListener('prism-export-progress', handleExportProgress);
   }, []);
+
+  useEffect(() => {
+    const handleExportFailure = (event: Event) => {
+      const detail = (event as CustomEvent<ExportFailureState>).detail;
+      if (!detail?.diagnostic) return;
+      setExportFailure({
+        title: detail.title || '导出失败',
+        diagnostic: detail.diagnostic,
+      });
+    };
+    window.addEventListener('prism-export-failure', handleExportFailure);
+    return () => window.removeEventListener('prism-export-failure', handleExportFailure);
+  }, []);
+
+  const copyExportFailureDiagnostic = useCallback(async () => {
+    if (!exportFailure) return;
+    try {
+      await navigator.clipboard.writeText(exportFailure.diagnostic);
+      showToast('导出诊断文本已复制');
+    } catch {
+      showToast('复制诊断文本失败');
+    }
+  }, [exportFailure, showToast]);
 
   const handleFileAction = useCallback(async (input: FileActionInput) => {
     await executeFileAction(input, {
@@ -255,12 +416,33 @@ function App() {
 
   useEffect(() => {
     let mounted = true;
+    const openPendingFiles = async () => {
+      try {
+        const paths = await invoke<string[]>('get_pending_files');
+        if (paths.length > 0 && mounted) {
+          await handleFileAction({ action: 'openFile', path: paths[0] });
+          return true;
+        }
+      } catch {
+        // Pending file integration is best effort.
+      }
+      return false;
+    };
+
     const unlisten = listen<string[]>('file-opened', (event) => {
       const paths = event.payload;
       if (paths.length > 0 && mounted) {
         handleFileAction({ action: 'openFile', path: paths[0] });
       }
     });
+
+    void (async () => {
+      for (const waitMs of [200, 800]) {
+        await delay(waitMs);
+        if (!mounted) return;
+        if (await openPendingFiles()) return;
+      }
+    })();
 
     return () => {
       mounted = false;
@@ -276,6 +458,7 @@ function App() {
     format: ExportFormat;
     filename: string;
     documentPath?: string;
+    suggestedPath?: string;
   }) => {
     const initialDirectory = await resolveDefaultExportDirectory({
       defaultLocation: exportDefaults.defaultLocation,
@@ -289,8 +472,8 @@ function App() {
       setSaveDialog({
         kind: 'export',
         format: input.format,
-        directory: initialDirectory,
-        filename: defaultExportFilename(input.filename, input.format),
+        directory: input.suggestedPath ? dirname(input.suggestedPath) : initialDirectory,
+        filename: input.suggestedPath ? basename(input.suggestedPath) : defaultExportFilename(input.filename, input.format),
         error: null,
         pendingOverwritePath: null,
         resolve,
@@ -387,6 +570,34 @@ function App() {
     closeSaveDialog(targetPath);
   }, [closeSaveDialog, saveDialog]);
 
+  const runConflictAction = useCallback(async (action: SaveConflictAction) => {
+    if (conflictAction) return;
+    setConflictAction(action);
+    try {
+      let result: { resolved: boolean; path?: string };
+      if (action === 'reload') {
+        result = await reloadConflictedDocument();
+        if (result.resolved) showToast('已重新加载磁盘版本');
+      } else if (action === 'saveAs') {
+        result = await saveConflictedDocumentAs(requestMarkdownSavePath);
+        if (result.resolved) showToast('已保留当前版本并另存为');
+      } else {
+        result = await overwriteConflictedDocument();
+        if (result.resolved) showToast('已覆盖磁盘版本');
+      }
+    } catch (error) {
+      showToast(`冲突处理失败: ${formatAppError(error)}`);
+    } finally {
+      setConflictAction(null);
+    }
+  }, [conflictAction, requestMarkdownSavePath, showToast]);
+
+  useEffect(() => {
+    if (currentDocument?.saveStatus !== 'conflict' && conflictAction) {
+      setConflictAction(null);
+    }
+  }, [conflictAction, currentDocument?.saveStatus]);
+
   const createCommandContext = useCallback((): CommandContext => ({
       documentStore: useDocumentStore.getState(),
       settingsStore: useSettingsStore.getState(),
@@ -397,7 +608,14 @@ function App() {
       openAbout: () => setAboutVisible(true),
       openSettings: () => setSettingsVisible(true),
       openShortcuts: () => setShortcutPanelVisible(true),
-      openCommandPalette: () => setCommandPaletteVisible(true),
+      openCommandPalette: () => {
+        setCommandPaletteMode('commands');
+        setCommandPaletteVisible(true);
+      },
+      openQuickOpen: () => {
+        setCommandPaletteMode('files');
+        setCommandPaletteVisible(true);
+      },
   }), [requestExportPath, requestMarkdownSavePath, showToast]);
 
   const commandContext = useMemo(() => createCommandContext(), [
@@ -405,6 +623,8 @@ function App() {
     currentDocument?.path,
     currentDocument?.isDirty,
     currentDocument?.viewMode,
+    workspace.rootPath,
+    workspace.fileTree,
     workspace.sidebarVisible,
     workspace.sidebarTab,
     workspace.statusBarVisible,
@@ -438,6 +658,14 @@ function App() {
       return;
     }
 
+    if (action.startsWith('openWorkspaceFile:')) {
+      await handleFileAction({
+        action: 'openFile',
+        path: decodeURIComponent(action.slice('openWorkspaceFile:'.length)),
+      });
+      return;
+    }
+
     if (!isCommandId(action)) {
       console.warn(`[Command] Unknown command id: ${action}`);
       showToast(`未知命令: ${action}`);
@@ -446,6 +674,11 @@ function App() {
 
     await runCommand(action, createCommandContext());
   }, [createCommandContext, handleFileAction, showToast]);
+
+  const handleAboutCheckUpdate = useCallback(() => {
+    setAboutVisible(false);
+    void handleCommandAction('checkUpdate');
+  }, [handleCommandAction]);
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -491,37 +724,18 @@ function App() {
 
   const handleFolderContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    const showInFileManagerLabel = getShowInFileManagerLabel();
-    const items: ContextMenuItem[] = [
-      { label: '在新窗口中打开', action: 'openNewWindow' },
-      { type: 'separator' },
-      { label: '新建文件', action: 'newFile' },
-      { label: '新建文件夹', action: 'newFolder' },
-      { type: 'separator' },
-      { label: '文档树', action: 'viewTree', checked: workspace.fileTreeMode === 'tree' },
-      { label: '文档列表', action: 'viewList', checked: workspace.fileTreeMode === 'list' },
-      {
-        label: '排序方式',
-        children: [
-          { label: '名称', action: 'sortByName', checked: workspace.fileSortMode === 'name' },
-          { label: '修改时间', action: 'sortByModified', checked: workspace.fileSortMode === 'modified' },
-          { label: '创建时间', action: 'sortByCreated', checked: workspace.fileSortMode === 'created' },
-          { label: '大小', action: 'sortBySize', checked: workspace.fileSortMode === 'size' },
-        ],
-      },
-      { type: 'separator' },
-      { label: '刷新', action: 'refreshFolder' },
-      { type: 'separator' },
-      { label: '复制工作区路径', action: 'copyRootPath' },
-      { label: showInFileManagerLabel, action: 'openRootLocation' },
-    ];
+    const items = createFileTreeContextMenuItems({
+      fileTreeMode: workspace.fileTreeMode,
+      fileSortMode: workspace.fileSortMode,
+      includeOpenNewWindow: true,
+    });
     setGlobalContextMenu({ x: e.clientX, y: e.clientY, items, kind: 'file' });
   };
 
   const handleExportContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     const items = getCommandMenuItems(
-      ['exportPdf', 'exportDocx', 'exportHtml', 'exportPng'],
+      ['exportWithPrevious', 'exportOverwritePrevious', 'exportPdf', 'exportDocx', 'exportHtml', 'exportPng'],
       createCommandContext(),
     ) as ContextMenuItem[];
     setGlobalContextMenu({ x: e.clientX, y: e.clientY, items, kind: 'menu' });
@@ -529,6 +743,20 @@ function App() {
 
   const titleDocName = currentDocument?.name ?? '未命名';
   const titleDirty = currentDocument?.isDirty ?? false;
+  const hasSaveConflict = currentDocument?.saveStatus === 'conflict' && Boolean(currentDocument.path);
+  const recoveryPromptVisible = shouldShowRecoveryPrompt({
+    hasSnapshot: Boolean(activeRecoverySnapshot),
+    hasSaveDialog: Boolean(saveDialog),
+    hasSaveConflict,
+  });
+  const writingStats = useMemo(
+    () => computeWritingStats(currentDocument?.content ?? ''),
+    [currentDocument?.content],
+  );
+  const selectionWritingStats = useMemo(
+    () => selectionText.trim() ? computeWritingStats(selectionText) : null,
+    [selectionText],
+  );
 
   return (
       <WindowShell>
@@ -557,13 +785,16 @@ function App() {
           key={currentDocument?.path || 'new-doc'}
           ref={editorRef}
           onCursorChange={setCursor}
+          onSelectionTextChange={setSelectionText}
+          onNotice={showToast}
         />
       </div>
 
       {currentDocument && workspace.statusBarVisible && (
         <div className="app-statusbar">
           <StatusBar
-            wordCount={currentDocument.content.split(/\s+/).filter(Boolean).length}
+            writingStats={writingStats}
+            selectionStats={selectionWritingStats}
             cursor={cursor}
             sidebarVisible={workspace.sidebarVisible}
             isSidebarHovered={isSidebarHovered}
@@ -575,6 +806,12 @@ function App() {
             onFolderContextMenu={handleFolderContextMenu}
             onNewFile={() => handleFileAction('newFile')}
             onToggleFileTreeMode={() => handleFileAction(workspace.fileTreeMode === 'tree' ? 'viewList' : 'viewTree')}
+            linkIssueCount={linkDiagnostics.length}
+            linkIssueTitle={firstLinkDiagnostic?.message}
+            onLinkDiagnosticsClick={handleLinkDiagnosticsClick}
+            typographyIssueCount={typographyDiagnostics.length}
+            typographyIssueTitle={firstTypographyDiagnostic?.message}
+            onTypographyDiagnosticsClick={handleTypographyDiagnosticsClick}
           />
         </div>
       )}
@@ -594,6 +831,38 @@ function App() {
           onClose={() => setGlobalContextMenu(null)}
         />
       )}
+
+      <RecoveryModal
+        visible={recoveryPromptVisible}
+        snapshot={activeRecoverySnapshot}
+        busyAction={recoveryAction}
+        onRestore={handleRestoreRecovery}
+        onDiscard={handleDiscardRecovery}
+      />
+
+      <SaveConflictModal
+        visible={Boolean(hasSaveConflict && !saveDialog)}
+        documentName={currentDocument?.name ?? '未命名'}
+        error={currentDocument?.saveError ?? null}
+        busyAction={conflictAction}
+        onReload={() => runConflictAction('reload')}
+        onSaveAs={() => runConflictAction('saveAs')}
+        onOverwrite={() => runConflictAction('overwrite')}
+      />
+
+      <LinkDiagnosticsPanel
+        visible={linkDiagnosticsVisible}
+        diagnostics={linkDiagnostics}
+        onClose={() => setLinkDiagnosticsVisible(false)}
+        onSelect={handleSelectLinkDiagnostic}
+      />
+
+      <TypographyDiagnosticsPanel
+        visible={typographyDiagnosticsVisible}
+        diagnostics={typographyDiagnostics}
+        onClose={() => setTypographyDiagnosticsVisible(false)}
+        onSelect={handleSelectTypographyDiagnostic}
+      />
 
       {saveDialog && (
         <>
@@ -676,6 +945,30 @@ function App() {
         </div>
       )}
 
+      {exportFailure && (
+        <>
+          <div className="modal-overlay" onClick={() => setExportFailure(null)} />
+          <div className="modal prism-export-failure-modal" role="dialog" aria-label={exportFailure.title}>
+            <div className="modal-header">
+              <div className="modal-title">{exportFailure.title}</div>
+              <button className="modal-close" onClick={() => setExportFailure(null)} aria-label="关闭">×</button>
+            </div>
+            <div className="modal-body prism-export-failure-body">
+              <div className="prism-export-failure-summary">
+                导出未完成。下面的诊断文本可用于复现和定位问题。
+              </div>
+              <textarea readOnly value={exportFailure.diagnostic} />
+            </div>
+            <div className="prism-export-save-footer">
+              <button type="button" onClick={() => setExportFailure(null)}>关闭</button>
+              <button type="button" className="primary" onClick={copyExportFailureDiagnostic}>
+                复制诊断文本
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
       <ShortcutPanel
         visible={shortcutPanelVisible}
         onClose={() => setShortcutPanelVisible(false)}
@@ -684,11 +977,19 @@ function App() {
       <CommandPalette
         visible={commandPaletteVisible}
         commands={commandPaletteItems}
+        files={workspace.fileTree}
+        workspaceRoot={workspace.rootPath}
+        recentFiles={recentFiles}
+        mode={commandPaletteMode}
         onClose={() => setCommandPaletteVisible(false)}
         onExecute={(commandId) => handleCommandAction(commandId)}
       />
 
-      <AboutModal visible={aboutVisible} onClose={() => setAboutVisible(false)} />
+      <AboutModal
+        visible={aboutVisible}
+        onClose={() => setAboutVisible(false)}
+        onCheckUpdate={handleAboutCheckUpdate}
+      />
       <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
     </WindowShell>
   );

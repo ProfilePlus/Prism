@@ -38,4 +38,18 @@ describe('workspace file tree services', () => {
     expect(rankQuickOpenFiles(nodes, 'root')[0].node.name).toBe('root.md');
     expect(rankQuickOpenFiles(nodes, 'zeta')[0].node.name).toBe('z.md');
   });
+
+  it('shows recently modified files when quick-open query is empty', () => {
+    const results = rankQuickOpenFiles(nodes, '', 20, '/notes');
+
+    expect(results.map((result) => result.node.name)).toEqual(['a.md', 'root.md', 'z.md']);
+    expect(results[0].folderLabel).toBe('b');
+  });
+
+  it('boosts recently opened files in quick-open ranking', () => {
+    const recent = [{ path: '/notes/b/z.md', lastOpened: 100 }];
+
+    expect(rankQuickOpenFiles(nodes, '', 20, '/notes', recent)[0].node.name).toBe('z.md');
+    expect(rankQuickOpenFiles(nodes, 'md', 20, '/notes', recent)[0].node.name).toBe('z.md');
+  });
 });

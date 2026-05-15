@@ -32,8 +32,13 @@ describe('export templates', () => {
           templateId: 'business',
           pdfPaper: 'letter',
           pdfMargin: 'wide',
+          pdfPageNumbers: true,
+          pageHeaderFooter: true,
+          pageHeaderText: '{title}',
+          pageFooterText: '{filename} · {page}/{pages}',
           pngScale: 3,
           htmlIncludeTheme: false,
+          toc: true,
           docxFontPolicy: 'preview',
         },
       }),
@@ -44,8 +49,13 @@ describe('export templates', () => {
       templateId: 'business',
       pdfPaper: 'letter',
       pdfMargin: 'wide',
+      pdfPageNumbers: true,
+      pageHeaderFooter: true,
+      pageHeaderText: '{title}',
+      pageFooterText: '{filename} · {page}/{pages}',
       pngScale: 3,
       htmlIncludeTheme: false,
+      toc: true,
       codeStyle: 'boxed',
       tableStyle: 'grid',
       docxFontPolicy: 'preview',
@@ -81,5 +91,220 @@ describe('export templates', () => {
       path: '/tmp/demo.ttf',
       format: 'ttf',
     });
+  });
+
+  it('passes citation settings into resolved export options', () => {
+    const options = resolveExportOptions({
+      content: '参考 [@doe2024]',
+      filename: 'citation.md',
+      settings: createSettings({
+        citation: {
+          bibliographyPath: '/tmp/library.bib',
+          cslStylePath: '/tmp/chinese-gb7714.csl',
+        },
+      }),
+    });
+
+    expect(options.citation).toEqual({
+      bibliographyPath: '/tmp/library.bib',
+      cslStylePath: '/tmp/chinese-gb7714.csl',
+    });
+  });
+
+  it('passes pandoc settings into resolved export options', () => {
+    const options = resolveExportOptions({
+      content: '参考 [@doe2024]',
+      filename: 'citation.md',
+      settings: createSettings({
+        pandoc: {
+          path: '/opt/homebrew/bin/pandoc',
+          detected: true,
+          version: 'pandoc 3.2.1',
+          lastCheckedAt: 123,
+          lastError: '',
+        },
+      }),
+    });
+
+    expect(options.pandoc).toEqual({
+      path: '/opt/homebrew/bin/pandoc',
+      detected: true,
+      version: 'pandoc 3.2.1',
+      lastCheckedAt: 123,
+      lastError: '',
+    });
+  });
+
+  it('keeps yaml front matter in content when overrides are disabled', () => {
+    const content = `---
+title: Export Title
+template: business
+paper: letter
+margin: wide
+---
+# Body`;
+    const options = resolveExportOptions({
+      content,
+      filename: 'demo.md',
+      settings: createSettings({
+        exportDefaults: {
+          ...DEFAULT_SETTINGS.exportDefaults,
+          frontMatterOverrides: false,
+          templateId: 'plain',
+          toc: true,
+        },
+      }),
+    });
+
+    expect(options.content).toBe(content);
+    expect(options.title).toBeUndefined();
+    expect(options.frontMatter).toBeNull();
+    expect(options.templateId).toBe('plain');
+    expect(options.pdfPaper).toBe(DEFAULT_SETTINGS.exportDefaults.pdfPaper);
+    expect(options.toc).toBe(true);
+  });
+
+  it('applies yaml front matter overrides when enabled', () => {
+    const options = resolveExportOptions({
+      content: `---
+title: Export Title
+author: Alex
+date: "2026-05-15"
+template: business
+paper: letter
+margin: wide
+toc: true
+---
+# Body`,
+      filename: 'demo.md',
+      settings: createSettings({
+        contentTheme: 'mono',
+        exportDefaults: {
+          ...DEFAULT_SETTINGS.exportDefaults,
+          frontMatterOverrides: true,
+          templateId: 'theme',
+          pdfPaper: 'a4',
+          pdfMargin: 'standard',
+        },
+      }),
+    });
+
+    expect(options).toMatchObject({
+      content: '# Body',
+      title: 'Export Title',
+      author: 'Alex',
+      date: '2026-05-15',
+      contentTheme: 'mono',
+      templateId: 'business',
+      pdfPaper: 'letter',
+      pdfMargin: 'wide',
+      codeStyle: 'boxed',
+      tableStyle: 'grid',
+      toc: true,
+      frontMatter: {
+        title: 'Export Title',
+        templateId: 'business',
+      },
+    });
+  });
+
+  it('applies yaml template defaults when front matter changes the template', () => {
+    const options = resolveExportOptions({
+      content: `---
+template: business
+---
+# Body`,
+      filename: 'demo.md',
+      settings: createSettings({
+        previewFontFamily: 'Preview Body',
+        exportDefaults: {
+          ...DEFAULT_SETTINGS.exportDefaults,
+          frontMatterOverrides: true,
+          templateId: 'theme',
+          pdfMargin: 'standard',
+          docxFontPolicy: 'theme',
+        },
+      }),
+    });
+
+    expect(options.templateId).toBe('business');
+    expect(options.pdfMargin).toBe('wide');
+    expect(options.docxFontPolicy).toBe('preview');
+    expect(options.docxFontFamily).toBe('Preview Body');
+    expect(options.codeStyle).toBe('boxed');
+    expect(options.tableStyle).toBe('grid');
+  });
+
+  it('lets yaml front matter disable the default export toc when overrides are enabled', () => {
+    const options = resolveExportOptions({
+      content: `---
+toc: false
+---
+# Body`,
+      filename: 'demo.md',
+      settings: createSettings({
+        exportDefaults: {
+          ...DEFAULT_SETTINGS.exportDefaults,
+          frontMatterOverrides: true,
+          toc: true,
+        },
+      }),
+    });
+
+    expect(options.content).toBe('# Body');
+    expect(options.toc).toBe(false);
+  });
+
+  it('ignores unsupported front matter values and keeps default export settings', () => {
+    const options = resolveExportOptions({
+      content: `---
+template: poster
+paper: legal
+margin: tiny
+toc: maybe
+---
+# Body`,
+      filename: 'demo.md',
+      settings: createSettings({
+        exportDefaults: {
+          ...DEFAULT_SETTINGS.exportDefaults,
+          frontMatterOverrides: true,
+          templateId: 'academic',
+          pdfPaper: 'letter',
+          pdfMargin: 'compact',
+          pdfPageNumbers: true,
+        },
+      }),
+    });
+
+    expect(options.content).toBe('# Body');
+    expect(options.frontMatter).toBeNull();
+    expect(options.templateId).toBe('academic');
+    expect(options.pdfPaper).toBe('letter');
+    expect(options.pdfMargin).toBe('compact');
+    expect(options.pdfPageNumbers).toBe(true);
+    expect(options.toc).toBe(false);
+  });
+
+  it('keeps invalid yaml front matter untouched', () => {
+    const content = `---
+title: [broken
+---
+# Body`;
+    const options = resolveExportOptions({
+      content,
+      filename: 'demo.md',
+      settings: createSettings({
+        exportDefaults: {
+          ...DEFAULT_SETTINGS.exportDefaults,
+          frontMatterOverrides: true,
+          templateId: 'business',
+        },
+      }),
+    });
+
+    expect(options.content).toBe(content);
+    expect(options.frontMatter).toBeNull();
+    expect(options.templateId).toBe('business');
   });
 });

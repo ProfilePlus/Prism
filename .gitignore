@@ -8,7 +8,11 @@ src-tauri/gen/
 Thumbs.db
 .claude/
 .codex-screens/
+.codex-smoke/
 .playwright-mcp/
 release-latest/
-scripts/
+scripts/*
+!scripts/generate-updater-manifest.mjs
+!scripts/generate-updater-manifest.test.ts
+!scripts/package-macos-dmg-skip-finder.sh
 src-tauri/icons_backup/

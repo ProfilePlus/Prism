@@ -19,9 +19,26 @@ const menuModel: MenuModel = {
   '文件': [
     { command: 'new' },
     { command: 'newWindow' },
+    {
+      label: '模板',
+      children: [
+        { command: 'templateReadme' },
+        { command: 'templatePrd' },
+        { command: 'templateMeeting' },
+        { command: 'templateWeekly' },
+        { command: 'templateTechnicalPlan' },
+        { command: 'templateArticle' },
+        { type: 'separator' },
+        { command: 'templatePaperDraft' },
+        { command: 'templateReadingNote' },
+        { command: 'templateResearchSummary' },
+        { command: 'templateWhitePaper' },
+      ],
+    },
     { type: 'separator' },
     { command: 'open' },
     { command: 'openFolder' },
+    { command: 'quickOpen' },
     {
       label: '打开最近文档',
       children: [
@@ -50,6 +67,9 @@ const menuModel: MenuModel = {
     {
       label: '导出',
       children: [
+        { command: 'exportWithPrevious' },
+        { command: 'exportOverwritePrevious' },
+        { type: 'separator' },
         { command: 'exportPdf' },
         { command: 'exportDocx' },
         { command: 'exportHtml' },
@@ -96,6 +116,18 @@ const menuModel: MenuModel = {
     { command: 'orderedList' },
     { command: 'unorderedList' },
     { command: 'taskList' },
+    { type: 'separator' },
+    {
+      label: '表格',
+      children: [
+        { command: 'insertTable' },
+        { command: 'formatTable' },
+        { command: 'addTableRow' },
+        { command: 'addTableColumn' },
+        { command: 'deleteTableRow' },
+        { command: 'deleteTableColumn' },
+      ],
+    },
     { type: 'separator' },
     { command: 'hr' },
     { command: 'footnote' },
@@ -174,6 +206,7 @@ const menuModel: MenuModel = {
   '帮助': [
     { command: 'commandPalette' },
     { command: 'showShortcuts' },
+    { command: 'checkUpdate' },
     { type: 'separator' },
     { command: 'mdReference' },
     { command: 'github' },

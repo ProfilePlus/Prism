@@ -70,15 +70,17 @@ It is currently best suited for:
 
 ## Download
 
-Latest release: **v0.1.1**
+Current source version: **v1.4.0**
+
+Stable builds are published through [GitHub Releases](https://github.com/AlexPlum405/Prism/releases/latest). Release asset names can vary by platform and signing status, so use the latest release page as the source of truth.
 
 | Platform | Download |
 | --- | --- |
-| macOS Apple Silicon | [Prism_0.1.1_aarch64.dmg](https://github.com/AlexPlum405/Prism/releases/latest/download/Prism_0.1.1_aarch64.dmg) |
-| Windows installer | [Prism_0.1.1_x64-setup.exe](https://github.com/AlexPlum405/Prism/releases/latest/download/Prism_0.1.1_x64-setup.exe) |
-| Windows portable | [app.exe](https://github.com/AlexPlum405/Prism/releases/latest/download/app.exe) |
+| macOS Apple Silicon | [Latest release](https://github.com/AlexPlum405/Prism/releases/latest) |
+| Windows installer | [Latest release](https://github.com/AlexPlum405/Prism/releases/latest) |
+| Windows portable | [Latest release](https://github.com/AlexPlum405/Prism/releases/latest) |
 
-macOS builds are currently unsigned. If macOS blocks the app on first launch, use **Right click -> Open**.
+Some development builds may be unsigned. Signed and notarized macOS builds should be treated as the target for stable releases.
 
 ## Screenshots
 

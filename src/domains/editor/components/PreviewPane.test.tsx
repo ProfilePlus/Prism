@@ -1,17 +1,39 @@
-import { act, render, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { markdownToHtml } from '../../../lib/markdownToHtml';
 import { useSettingsStore } from '../../settings/store';
 import { DEFAULT_SETTINGS } from '../../settings/types';
-import { PreviewPane } from './PreviewPane';
+import { __previewPaneTesting, PreviewPane } from './PreviewPane';
+
+const mermaidMock = vi.hoisted(() => ({
+  initialize: vi.fn(),
+  render: vi.fn(),
+}));
+const openerMock = vi.hoisted(() => ({
+  openUrl: vi.fn(),
+}));
 
 vi.mock('@tauri-apps/plugin-opener', () => ({
-  openUrl: vi.fn(),
+  openUrl: openerMock.openUrl,
+}));
+
+vi.mock('mermaid', () => ({
+  default: mermaidMock,
 }));
 
 vi.mock('../../../lib/markdownToHtml', () => ({
   markdownToHtml: vi.fn(() => '<p>Hello preview</p>'),
 }));
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, reject, resolve };
+}
 
 describe('PreviewPane theme switching', () => {
   beforeEach(() => {
@@ -20,7 +42,17 @@ describe('PreviewPane theme switching', () => {
       ...DEFAULT_SETTINGS,
       exportDefaults: { ...DEFAULT_SETTINGS.exportDefaults },
     });
-    vi.clearAllMocks();
+    vi.mocked(markdownToHtml).mockReset();
+    vi.mocked(markdownToHtml).mockReturnValue('<p>Hello preview</p>');
+    mermaidMock.initialize.mockReset();
+    mermaidMock.render.mockReset();
+    mermaidMock.render.mockResolvedValue({ svg: '<svg viewBox="0 0 10 10"></svg>' });
+    __previewPaneTesting.clearMermaidCache();
+    openerMock.openUrl.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('does not rerun the markdown pipeline when only the content theme changes', async () => {
@@ -50,5 +82,187 @@ describe('PreviewPane theme switching', () => {
     const write = document.querySelector<HTMLElement>('#write');
     expect(write?.style.fontFamily).toBe('Georgia, serif');
     expect(write?.style.fontSize).toBe('21px');
+  });
+
+  it('debounces expensive markdown rendering across rapid content changes', () => {
+    vi.useFakeTimers();
+    const { rerender } = render(<PreviewPane content="# First" />);
+
+    expect(markdownToHtml).toHaveBeenCalledTimes(1);
+
+    rerender(<PreviewPane content="# Second" />);
+    rerender(<PreviewPane content="# Third" />);
+
+    expect(markdownToHtml).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      vi.advanceTimersByTime(119);
+    });
+    expect(markdownToHtml).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+
+    expect(markdownToHtml).toHaveBeenCalledTimes(2);
+    expect(markdownToHtml).toHaveBeenLastCalledWith('# Third');
+  });
+
+  it('refreshes source-line anchors after debounced content changes', () => {
+    vi.useFakeTimers();
+    vi.mocked(markdownToHtml).mockImplementation((content) => (
+      content.includes('Updated')
+        ? '<h2 data-source-line="80">Updated section</h2><p data-source-line="81">Fresh preview</p>'
+        : '<h2 data-source-line="20">Initial section</h2><p data-source-line="21">Stale preview</p>'
+    ));
+
+    const { rerender } = render(<PreviewPane content="## Initial section" />);
+
+    expect(document.querySelector('[data-source-line="20"]')).toHaveTextContent('Initial section');
+
+    rerender(<PreviewPane content="## Updated section" />);
+
+    expect(document.querySelector('[data-source-line="20"]')).toHaveTextContent('Initial section');
+
+    act(() => {
+      vi.advanceTimersByTime(120);
+    });
+
+    expect(document.querySelector('[data-source-line="20"]')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-source-line="80"]')).toHaveTextContent('Updated section');
+    expect(document.querySelector('[data-source-line="81"]')).toHaveTextContent('Fresh preview');
+  });
+
+  it('renders Mermaid failures as source-locatable diagnostics', async () => {
+    vi.mocked(markdownToHtml).mockReturnValueOnce(
+      `<div class="mermaid-placeholder" data-mermaid="${encodeURIComponent('graph TD')}" data-source-line="4"></div>`,
+    );
+    mermaidMock.render.mockRejectedValueOnce(new Error('bad <graph>'));
+
+    render(<PreviewPane content="```mermaid\ngraph TD\n```" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Mermaid 渲染失败')).toBeInTheDocument();
+    });
+    expect(screen.getByText('bad <graph>')).toBeInTheDocument();
+    expect(screen.getByText('源码行 4')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '跳到源码' })).toHaveAttribute('data-preview-source-line', '4');
+  });
+
+  it('reuses cached Mermaid SVG for the same diagram and content theme', async () => {
+    const mermaidHtml = `<div class="mermaid-placeholder" data-mermaid="${encodeURIComponent('graph TD; A-->B')}" data-source-line="2"></div>`;
+    vi.mocked(markdownToHtml).mockReturnValue(mermaidHtml);
+
+    const first = render(<PreviewPane content="```mermaid\ngraph TD; A-->B\n```" />);
+
+    await waitFor(() => {
+      expect(mermaidMock.render).toHaveBeenCalledTimes(1);
+    });
+    first.unmount();
+
+    render(<PreviewPane content="```mermaid\ngraph TD; A-->B\n```" />);
+
+    await waitFor(() => {
+      expect(document.querySelector('.mermaid-placeholder svg')).toBeInTheDocument();
+    });
+    expect(mermaidMock.render).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders multiple Mermaid diagrams sequentially instead of starting them all at once', async () => {
+    const firstRender = deferred<{ svg: string }>();
+    const secondRender = deferred<{ svg: string }>();
+    vi.mocked(markdownToHtml).mockReturnValue(
+      [
+        `<div class="mermaid-placeholder" data-mermaid="${encodeURIComponent('graph TD; A-->B')}" data-source-line="2"></div>`,
+        `<div class="mermaid-placeholder" data-mermaid="${encodeURIComponent('graph TD; B-->C')}" data-source-line="6"></div>`,
+      ].join(''),
+    );
+    mermaidMock.render
+      .mockReturnValueOnce(firstRender.promise)
+      .mockReturnValueOnce(secondRender.promise);
+
+    render(<PreviewPane content="two diagrams" />);
+
+    await waitFor(() => {
+      expect(mermaidMock.render).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mermaidMock.render.mock.calls[0][1]).toBe('graph TD; A-->B');
+
+    await act(async () => {
+      firstRender.resolve({ svg: '<svg data-testid="first-mermaid"></svg>' });
+      await firstRender.promise;
+    });
+
+    await waitFor(() => {
+      expect(mermaidMock.render).toHaveBeenCalledTimes(2);
+    });
+
+    expect(mermaidMock.render.mock.calls[1][1]).toBe('graph TD; B-->C');
+
+    await act(async () => {
+      secondRender.resolve({ svg: '<svg data-testid="second-mermaid"></svg>' });
+      await secondRender.promise;
+    });
+
+    await waitFor(() => {
+      expect(document.querySelectorAll('.mermaid-placeholder svg')).toHaveLength(2);
+    });
+  });
+
+  it('enhances KaTeX errors with source navigation actions', () => {
+    vi.mocked(markdownToHtml).mockReturnValueOnce(
+      '<p data-source-line="7"><span class="katex-error" title="KaTeX parse error: bad command">\\bad</span></p>',
+    );
+
+    render(<PreviewPane content="$\\bad$" />);
+
+    expect(screen.getByText('\\bad')).toHaveClass('preview-katex-error');
+    expect(screen.getByText('\\bad')).toHaveAttribute('data-preview-source-line', '7');
+    expect(screen.getByRole('button', { name: '跳到源码' })).toHaveAttribute('data-preview-source-line', '7');
+  });
+
+  it('opens absolute http links through the system opener', async () => {
+    vi.mocked(markdownToHtml).mockReturnValueOnce('<a href="https://example.com/docs">外部链接</a>');
+
+    render(<PreviewPane content="[外部链接](https://example.com/docs)" />);
+    fireEvent.click(screen.getByText('外部链接'));
+
+    await waitFor(() => {
+      expect(openerMock.openUrl).toHaveBeenCalledWith('https://example.com/docs');
+    });
+  });
+
+  it('opens protocol-relative http links through the system opener', async () => {
+    vi.mocked(markdownToHtml).mockReturnValueOnce('<a href="//example.com/docs">协议相对外链</a>');
+
+    render(<PreviewPane content="[协议相对外链](//example.com/docs)" />);
+    fireEvent.click(screen.getByText('协议相对外链'));
+
+    await waitFor(() => {
+      expect(openerMock.openUrl).toHaveBeenCalledWith(expect.stringMatching(/^https?:\/\/example\.com\/docs$/));
+    });
+  });
+
+  it('blocks non-http preview links such as javascript urls', () => {
+    const onNotice = vi.fn();
+    vi.mocked(markdownToHtml).mockReturnValueOnce('<a href="javascript:alert(1)">危险链接</a>');
+
+    render(<PreviewPane content="[危险链接](javascript:alert(1))" onNotice={onNotice} />);
+    fireEvent.click(screen.getByText('危险链接'));
+
+    expect(openerMock.openUrl).not.toHaveBeenCalled();
+    expect(onNotice).toHaveBeenCalledWith('预览中的本地链接已拦截，请通过文件树打开');
+  });
+
+  it('blocks local preview links and reports a notice', () => {
+    const onNotice = vi.fn();
+    vi.mocked(markdownToHtml).mockReturnValueOnce('<a href="docs/local.md">本地链接</a>');
+
+    render(<PreviewPane content="[本地链接](docs/local.md)" onNotice={onNotice} />);
+    fireEvent.click(screen.getByText('本地链接'));
+
+    expect(openerMock.openUrl).not.toHaveBeenCalled();
+    expect(onNotice).toHaveBeenCalledWith('预览中的本地链接已拦截，请通过文件树打开');
   });
 });

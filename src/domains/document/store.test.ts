@@ -1,0 +1,71 @@
+import { describe, expect, it, beforeEach } from 'vitest';
+import { useDocumentStore } from './store';
+
+beforeEach(() => {
+  useDocumentStore.setState({ currentDocument: null });
+});
+
+describe('document store save status', () => {
+  it('creates template-backed new documents as dirty unsaved drafts', () => {
+    useDocumentStore.getState().createNewDocument('# Template', 'template.md');
+
+    expect(useDocumentStore.getState().currentDocument).toMatchObject({
+      path: '',
+      name: 'template.md',
+      content: '# Template',
+      isDirty: true,
+      saveStatus: 'dirty',
+      saveError: null,
+    });
+  });
+
+  it('marks opened documents as saved', () => {
+    useDocumentStore.getState().openDocument('/tmp/a.md', 'a.md', '# A', { size: 3, mtimeMs: 1000 });
+
+    expect(useDocumentStore.getState().currentDocument).toMatchObject({
+      isDirty: false,
+      lastKnownMtime: 1000,
+      lastKnownSize: 3,
+      saveStatus: 'saved',
+      saveError: null,
+      scrollState: { editorRatio: 0, previewRatio: 0 },
+    });
+  });
+
+  it('marks edited content as dirty and clears previous save errors', () => {
+    useDocumentStore.getState().openDocument('/tmp/a.md', 'a.md', '# A');
+    useDocumentStore.getState().markSaveFailed(new Error('disk full'), '/tmp/a.md');
+    useDocumentStore.getState().updateContent('# B');
+
+    expect(useDocumentStore.getState().currentDocument).toMatchObject({
+      content: '# B',
+      isDirty: true,
+      saveStatus: 'dirty',
+      saveError: null,
+    });
+  });
+
+  it('ignores stale save results for a different path', () => {
+    useDocumentStore.getState().openDocument('/tmp/a.md', 'a.md', '# A');
+    useDocumentStore.getState().updateContent('# B');
+    useDocumentStore.getState().markSaved('/tmp/other.md');
+
+    expect(useDocumentStore.getState().currentDocument).toMatchObject({
+      isDirty: true,
+      saveStatus: 'dirty',
+    });
+  });
+
+  it('remembers editor and preview scroll ratios without marking content dirty', () => {
+    useDocumentStore.getState().openDocument('/tmp/a.md', 'a.md', '# A');
+
+    useDocumentStore.getState().updateScrollState({ editorRatio: 0.25 });
+    useDocumentStore.getState().updateScrollState({ previewRatio: 0.75 });
+
+    expect(useDocumentStore.getState().currentDocument).toMatchObject({
+      isDirty: false,
+      saveStatus: 'saved',
+      scrollState: { editorRatio: 0.25, previewRatio: 0.75 },
+    });
+  });
+});

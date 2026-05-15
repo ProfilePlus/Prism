@@ -2,6 +2,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { appDataDir } from '@tauri-apps/api/path';
 import { copyFile, exists, mkdir, readFile, remove } from '@tauri-apps/plugin-fs';
 import type { CustomFont, FontSource } from './types';
+import { joinPath } from '../workspace/services/path';
 
 const FONT_EXTENSIONS = ['ttf', 'otf', 'woff', 'woff2'] as const;
 
@@ -84,7 +85,7 @@ function sanitizeFilename(filename: string) {
 }
 
 async function getFontsDir() {
-  return `${await appDataDir()}fonts`;
+  return joinPath(await appDataDir(), 'fonts');
 }
 
 function makeFontId(filename: string) {
@@ -128,7 +129,7 @@ export async function importCustomFont(): Promise<ImportedFontResult | null> {
 
   const sourceFilename = basename(selected);
   const filename = `${Date.now()}-${sanitizeFilename(sourceFilename)}`;
-  const targetPath = `${await ensureFontsDir()}/${filename}`;
+  const targetPath = joinPath(await ensureFontsDir(), filename);
   await copyFile(selected, targetPath);
 
   const displayName = stripExtension(sourceFilename);
@@ -173,3 +174,7 @@ export function resolveFontSource(
 export async function readCustomFontBytes(font: CustomFont) {
   return readFile(font.path);
 }
+
+export const __fontServiceTesting = {
+  getFontsDir,
+};

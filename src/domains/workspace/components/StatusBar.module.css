@@ -52,6 +52,8 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  max-width: calc(100% - 132px);
+  overflow: hidden;
   pointer-events: none;
   white-space: nowrap;
 }
@@ -138,6 +140,8 @@
 }
 
 .sep {
+  display: inline-block;
+  flex: 0 0 auto;
   width: 1px;
   height: 10px;
   background: var(--c-fog);
@@ -190,8 +194,12 @@
 }
 .saveStatus.saved { color: var(--c-ash); }
 .saveStatus.saving { color: var(--c-graphite); }
-.saveStatus.unsaved { color: var(--c-void); }
-.saveStatus.unsaved::before { content: '●'; margin-right: 4px; }
+.saveStatus.dirty { color: var(--c-void); }
+.saveStatus.failed,
+.saveStatus.conflict { color: var(--c-void); }
+.saveStatus.dirty::before,
+.saveStatus.failed::before,
+.saveStatus.conflict::before { content: '●'; margin-right: 4px; }
 
 .statVal {
   font-family: var(--font-mono);
@@ -201,12 +209,51 @@
   font-variant-numeric: tabular-nums;
 }
 
+.statChunk {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.statBadge {
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--c-chalk);
+  color: var(--c-void);
+  font-size: 10px;
+  font-weight: 600;
+}
+
 .statLbl {
   font-size: 10px;
   color: var(--c-ash);
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+}
+
+.diagnostic {
+  border: none;
+  background: transparent;
+  color: var(--c-void);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 0 4px;
+  pointer-events: auto;
+}
+
+.diagnostic:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 900px) {
+  .optionalStat {
+    display: none;
+  }
 }
 
 :global(html[data-content-theme='miaoyan']) .statusbar {
@@ -325,7 +372,9 @@
   letter-spacing: 0.6px;
 }
 
-:global(html[data-content-theme='miaoyan']) .saveStatus.unsaved {
+:global(html[data-content-theme='miaoyan']) .saveStatus.dirty,
+:global(html[data-content-theme='miaoyan']) .saveStatus.failed,
+:global(html[data-content-theme='miaoyan']) .saveStatus.conflict {
   color: var(--miaoyan-accent);
 }
 
@@ -335,6 +384,14 @@
   font-size: 11px;
   font-weight: 400;
   letter-spacing: 0;
+}
+
+:global(html[data-content-theme='miaoyan']) .statBadge {
+  background: var(--miaoyan-panel-secondary);
+  color: var(--miaoyan-toolbar-icon);
+  font-family: var(--miaoyan-font);
+  font-weight: 400;
+  letter-spacing: 0.6px;
 }
 
 :global(html[data-content-theme='miaoyan']) .statLbl {
@@ -528,10 +585,18 @@
   letter-spacing: 0.6px;
 }
 
-:global(html[data-content-theme='inkstone']) .saveStatus.unsaved,
-:global(html[data-content-theme='slate']) .saveStatus.unsaved,
-:global(html[data-content-theme='mono']) .saveStatus.unsaved,
-:global(html[data-content-theme='nocturne']) .saveStatus.unsaved {
+:global(html[data-content-theme='inkstone']) .saveStatus.dirty,
+:global(html[data-content-theme='inkstone']) .saveStatus.failed,
+:global(html[data-content-theme='inkstone']) .saveStatus.conflict,
+:global(html[data-content-theme='slate']) .saveStatus.dirty,
+:global(html[data-content-theme='slate']) .saveStatus.failed,
+:global(html[data-content-theme='slate']) .saveStatus.conflict,
+:global(html[data-content-theme='mono']) .saveStatus.dirty,
+:global(html[data-content-theme='mono']) .saveStatus.failed,
+:global(html[data-content-theme='mono']) .saveStatus.conflict,
+:global(html[data-content-theme='nocturne']) .saveStatus.dirty,
+:global(html[data-content-theme='nocturne']) .saveStatus.failed,
+:global(html[data-content-theme='nocturne']) .saveStatus.conflict {
   color: var(--theme-accent);
 }
 
@@ -544,6 +609,17 @@
   font-size: 11px;
   font-weight: 400;
   letter-spacing: 0;
+}
+
+:global(html[data-content-theme='inkstone']) .statBadge,
+:global(html[data-content-theme='slate']) .statBadge,
+:global(html[data-content-theme='mono']) .statBadge,
+:global(html[data-content-theme='nocturne']) .statBadge {
+  background: var(--theme-panel-secondary);
+  color: var(--theme-toolbar-icon);
+  font-family: var(--theme-font);
+  font-weight: 400;
+  letter-spacing: 0.6px;
 }
 
 :global(html[data-content-theme='inkstone']) .statLbl,

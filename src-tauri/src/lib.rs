@@ -1,75 +1,614 @@
+use serde::Serialize;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::process::{Child, Command, Output, Stdio};
 use std::sync::Mutex;
-use tauri::{Emitter, Manager, State};
+use std::thread;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use tauri::{AppHandle, Emitter, Manager, State};
+use tauri_plugin_fs::FsExt;
 
 struct PendingFiles(Mutex<Vec<String>>);
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PandocDetectionResult {
+    path: String,
+    detected: bool,
+    version: String,
+    last_checked_at: u64,
+    last_error: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PandocCitationHtmlResult {
+    html: String,
+    warnings: String,
+}
+
 #[tauri::command]
 fn get_pending_files(state: State<PendingFiles>) -> Vec<String> {
-  let mut files = state.0.lock().unwrap();
-  let result = files.clone();
-  files.clear();
-  result
+    let mut files = state.0.lock().unwrap();
+    let result = files.clone();
+    files.clear();
+    result
+}
+
+fn timestamp_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis().min(u128::from(u64::MAX)) as u64)
+        .unwrap_or(0)
+}
+
+fn first_non_empty_line(text: &[u8]) -> String {
+    String::from_utf8_lossy(text)
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or("")
+        .chars()
+        .take(240)
+        .collect()
+}
+
+fn bounded_lossy_text(text: &[u8], max_chars: usize) -> String {
+    String::from_utf8_lossy(text)
+        .trim()
+        .chars()
+        .take(max_chars)
+        .collect()
+}
+
+#[tauri::command]
+fn detect_pandoc(path: Option<String>) -> PandocDetectionResult {
+    let requested_path = path.unwrap_or_default().trim().to_string();
+    let executable = if requested_path.is_empty() {
+        "pandoc".to_string()
+    } else {
+        requested_path.clone()
+    };
+    let checked_at = timestamp_millis();
+
+    match Command::new(&executable).arg("--version").output() {
+        Ok(output) if output.status.success() => {
+            let version = first_non_empty_line(&output.stdout);
+            PandocDetectionResult {
+                path: requested_path,
+                detected: true,
+                version,
+                last_checked_at: checked_at,
+                last_error: String::new(),
+            }
+        }
+        Ok(output) => {
+            let stderr = first_non_empty_line(&output.stderr);
+            PandocDetectionResult {
+                path: requested_path,
+                detected: false,
+                version: String::new(),
+                last_checked_at: checked_at,
+                last_error: if stderr.is_empty() {
+                    format!("Pandoc --version 退出码: {}", output.status)
+                } else {
+                    stderr
+                },
+            }
+        }
+        Err(err) => PandocDetectionResult {
+            path: requested_path,
+            detected: false,
+            version: String::new(),
+            last_checked_at: checked_at,
+            last_error: format!("无法执行 pandoc: {err}"),
+        },
+    }
+}
+
+fn has_extension(path: &Path, allowed_extensions: &[&str]) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| {
+            let normalized = extension.to_ascii_lowercase();
+            allowed_extensions
+                .iter()
+                .any(|allowed| normalized == allowed.trim_start_matches('.'))
+        })
+        .unwrap_or(false)
+}
+
+fn canonicalize_supported_file(
+    path: &str,
+    label: &str,
+    allowed_extensions: &[&str],
+) -> Result<PathBuf, String> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Err(format!("{label}路径不能为空"));
+    }
+    let file_path = canonicalize_existing_path(trimmed)?;
+    if !file_path.is_file() {
+        return Err(format!("{label}路径不是文件"));
+    }
+    if !has_extension(&file_path, allowed_extensions) {
+        return Err(format!(
+            "{label}文件类型不支持，仅支持 {}",
+            allowed_extensions.join(" / ")
+        ));
+    }
+    Ok(file_path)
+}
+
+fn build_pandoc_citation_html_args(
+    bibliography_path: &Path,
+    csl_style_path: Option<&Path>,
+) -> Vec<String> {
+    let mut args = vec![
+        "--from".to_string(),
+        "markdown+tex_math_dollars+tex_math_single_backslash".to_string(),
+        "--to".to_string(),
+        "html".to_string(),
+        "--citeproc".to_string(),
+        "--bibliography".to_string(),
+        bibliography_path.to_string_lossy().to_string(),
+        "--metadata".to_string(),
+        "link-citations=true".to_string(),
+        "--wrap=none".to_string(),
+    ];
+
+    if let Some(csl_path) = csl_style_path {
+        args.push("--csl".to_string());
+        args.push(csl_path.to_string_lossy().to_string());
+    }
+
+    args
+}
+
+#[tauri::command]
+fn render_citations_with_pandoc(
+    path: Option<String>,
+    markdown: String,
+    bibliography_path: String,
+    csl_style_path: Option<String>,
+) -> Result<PandocCitationHtmlResult, String> {
+    let requested_path = path.unwrap_or_default().trim().to_string();
+    let executable = if requested_path.is_empty() {
+        "pandoc".to_string()
+    } else {
+        requested_path
+    };
+    let bibliography =
+        canonicalize_supported_file(&bibliography_path, "参考文献", &["bib", "bibtex", "json"])?;
+    let csl = match csl_style_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        Some(path) => Some(canonicalize_supported_file(path, "CSL 样式", &["csl"])?),
+        None => None,
+    };
+    let args = build_pandoc_citation_html_args(&bibliography, csl.as_deref());
+
+    let mut child = Command::new(&executable)
+        .args(&args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|err| format!("无法执行 pandoc: {err}"))?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin
+            .write_all(markdown.as_bytes())
+            .map_err(|err| format!("无法写入 pandoc 输入: {err}"))?;
+    } else {
+        return Err("无法打开 pandoc 输入流".to_string());
+    }
+
+    let output = child
+        .wait_with_output()
+        .map_err(|err| format!("无法读取 pandoc 输出: {err}"))?;
+
+    if !output.status.success() {
+        let stderr = first_non_empty_line(&output.stderr);
+        return Err(if stderr.is_empty() {
+            format!("Pandoc citeproc 退出码: {}", output.status)
+        } else {
+            stderr
+        });
+    }
+
+    Ok(PandocCitationHtmlResult {
+        html: String::from_utf8_lossy(&output.stdout).to_string(),
+        warnings: bounded_lossy_text(&output.stderr, 4000),
+    })
+}
+
+fn canonicalize_existing_path(path: &str) -> Result<PathBuf, String> {
+    PathBuf::from(path)
+        .canonicalize()
+        .map_err(|err| format!("无法访问路径: {err}"))
+}
+
+fn is_supported_markdown_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| {
+            matches!(
+                extension.to_ascii_lowercase().as_str(),
+                "md" | "markdown" | "txt"
+            )
+        })
+        .unwrap_or(false)
+}
+
+fn is_sensitive_directory(app: &AppHandle, path: &Path) -> bool {
+    if path.parent().is_none() {
+        return true;
+    }
+
+    if let Ok(home_path) = app.path().home_dir() {
+        if let Ok(home) = home_path.canonicalize() {
+            if path == home {
+                return true;
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        [
+            "/System",
+            "/Library",
+            "/Applications",
+            "/bin",
+            "/sbin",
+            "/usr",
+            "/private",
+        ]
+        .iter()
+        .any(|prefix| path.starts_with(prefix))
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let path_text = path.to_string_lossy().to_ascii_lowercase();
+        path.parent().and_then(|parent| parent.parent()).is_none()
+            || path_text.contains("\\windows")
+            || path_text.contains("\\program files")
+            || path_text.contains("\\program files (x86)")
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        [
+            "/bin", "/boot", "/dev", "/etc", "/lib", "/proc", "/root", "/run", "/sbin", "/sys",
+            "/usr",
+        ]
+        .iter()
+        .any(|prefix| path.starts_with(prefix))
+    }
+}
+
+fn wait_for_child_output_with_timeout(
+    mut child: Child,
+    timeout: Duration,
+) -> Result<Output, String> {
+    let started_at = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => {
+                return child
+                    .wait_with_output()
+                    .map_err(|err| format!("无法读取系统废纸篓命令输出: {err}"));
+            }
+            Ok(None) if started_at.elapsed() >= timeout => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("移到系统废纸篓超时（{} 秒）", timeout.as_secs()));
+            }
+            Ok(None) => thread::sleep(Duration::from_millis(100)),
+            Err(err) => return Err(format!("无法等待系统废纸篓命令: {err}")),
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+const FINDER_TRASH_SCRIPT: &str = r#"on run argv
+tell application "Finder" to delete (POSIX file (item 1 of argv) as alias)
+end run"#;
+
+#[cfg(target_os = "macos")]
+fn move_existing_path_to_trash(target_path: &Path) -> Result<(), String> {
+    const TRASH_TIMEOUT: Duration = Duration::from_secs(8);
+
+    let output = wait_for_child_output_with_timeout(
+        Command::new("osascript")
+            .arg("-e")
+            .arg(FINDER_TRASH_SCRIPT)
+            .arg("--")
+            .arg(target_path)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|err| format!("无法启动系统废纸篓命令: {err}"))?,
+        TRASH_TIMEOUT,
+    )?;
+
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stderr = first_non_empty_line(&output.stderr);
+    Err(if stderr.is_empty() {
+        format!("无法移到系统废纸篓: {}", output.status)
+    } else {
+        format!("无法移到系统废纸篓: {stderr}")
+    })
+}
+
+#[cfg(not(target_os = "macos"))]
+fn move_existing_path_to_trash(target_path: &Path) -> Result<(), String> {
+    trash::delete(target_path).map_err(|err| format!("无法移到系统废纸篓: {err}"))
+}
+
+#[tauri::command]
+fn grant_markdown_file_scope(app: AppHandle, path: String) -> Result<(), String> {
+    let file_path = canonicalize_existing_path(&path)?;
+    if !file_path.is_file() {
+        return Err("路径不是文件".to_string());
+    }
+    if !is_supported_markdown_path(&file_path) {
+        return Err("只允许授权 Markdown / Text 文档".to_string());
+    }
+
+    let scope = app.fs_scope();
+    scope
+        .allow_file(&file_path)
+        .map_err(|err| err.to_string())?;
+
+    if let Some(parent) = file_path.parent() {
+        if !is_sensitive_directory(&app, parent) {
+            scope
+                .allow_directory(parent, true)
+                .map_err(|err| err.to_string())?;
+        }
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+fn grant_workspace_directory_scope(app: AppHandle, path: String) -> Result<(), String> {
+    let directory_path = canonicalize_existing_path(&path)?;
+    if !directory_path.is_dir() {
+        return Err("路径不是文件夹".to_string());
+    }
+    if is_sensitive_directory(&app, &directory_path) {
+        return Err("不允许把系统目录或用户主目录整体授权为工作区".to_string());
+    }
+
+    app.fs_scope()
+        .allow_directory(&directory_path, true)
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+fn move_path_to_trash(path: String) -> Result<(), String> {
+    let target_path = canonicalize_existing_path(&path)?;
+    move_existing_path_to_trash(&target_path)
+}
+
+#[tauri::command]
+fn read_legacy_settings_config(app: AppHandle) -> Result<Option<String>, String> {
+    let app_data = app.path().app_data_dir().map_err(|err| err.to_string())?;
+    let config_path = app_data.join("config.json");
+    if config_path.exists() {
+        return Ok(None);
+    }
+
+    let legacy_path = PathBuf::from(format!("{}{}", app_data.to_string_lossy(), "config.json"));
+    if legacy_path == config_path || !legacy_path.is_file() {
+        return Ok(None);
+    }
+
+    std::fs::read_to_string(legacy_path)
+        .map(Some)
+        .map_err(|err| format!("无法读取旧设置文件: {err}"))
 }
 
 #[cfg(not(target_os = "macos"))]
 fn extract_file_paths_from_args() -> Vec<String> {
-  std::env::args()
-    .skip(1)
-    .filter(|arg| {
-      let lower = arg.to_lowercase();
-      lower.ends_with(".md") || lower.ends_with(".markdown")
-    })
-    .filter(|path| std::path::Path::new(path).exists())
-    .collect()
+    std::env::args()
+        .skip(1)
+        .filter(|arg| {
+            let lower = arg.to_lowercase();
+            lower.ends_with(".md") || lower.ends_with(".markdown")
+        })
+        .filter(|path| std::path::Path::new(path).exists())
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::time::Instant;
+
+    fn temp_file(name: &str, contents: &str) -> PathBuf {
+        let mut path = std::env::temp_dir();
+        path.push(format!(
+            "prism-pandoc-test-{}-{}-{}",
+            std::process::id(),
+            timestamp_millis(),
+            name
+        ));
+        fs::write(&path, contents).expect("write temp file");
+        path
+    }
+
+    #[test]
+    fn builds_pandoc_citation_html_args_with_csl() {
+        let bibliography = PathBuf::from("/tmp/library.bib");
+        let csl = PathBuf::from("/tmp/chinese-gb7714.csl");
+
+        let args = build_pandoc_citation_html_args(&bibliography, Some(&csl));
+
+        assert_eq!(args[0], "--from");
+        assert!(args.contains(&"--citeproc".to_string()));
+        assert!(args.contains(&"--bibliography".to_string()));
+        assert!(args.contains(&"/tmp/library.bib".to_string()));
+        assert!(args.contains(&"--csl".to_string()));
+        assert!(args.contains(&"/tmp/chinese-gb7714.csl".to_string()));
+        assert!(args.contains(&"--wrap=none".to_string()));
+    }
+
+    #[test]
+    fn validates_supported_citation_files() {
+        let bibliography = temp_file("library.bib", "@book{doe2024,title={Demo}}");
+        let csl = temp_file("style.csl", "<style></style>");
+
+        assert!(canonicalize_supported_file(
+            bibliography.to_str().unwrap(),
+            "参考文献",
+            &["bib", "bibtex", "json"],
+        )
+        .is_ok());
+        assert!(canonicalize_supported_file(csl.to_str().unwrap(), "CSL 样式", &["csl"]).is_ok());
+
+        let _ = fs::remove_file(bibliography);
+        let _ = fs::remove_file(csl);
+    }
+
+    #[test]
+    fn rejects_unsupported_citation_file_extension() {
+        let bibliography = temp_file("library.txt", "plain text");
+        let error = canonicalize_supported_file(
+            bibliography.to_str().unwrap(),
+            "参考文献",
+            &["bib", "bibtex", "json"],
+        )
+        .expect_err("txt should be rejected");
+
+        assert!(error.contains("参考文献文件类型不支持"));
+        let _ = fs::remove_file(bibliography);
+    }
+
+    #[test]
+    fn move_path_to_trash_rejects_missing_path() {
+        let mut missing_path = std::env::temp_dir();
+        missing_path.push(format!(
+            "prism-trash-missing-{}-{}.md",
+            std::process::id(),
+            timestamp_millis()
+        ));
+
+        let error = move_path_to_trash(missing_path.to_string_lossy().to_string())
+            .expect_err("missing path should be rejected before trashing");
+        assert!(error.contains("无法访问路径"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trash_command_wait_returns_child_output() {
+        let child = Command::new("sh")
+            .arg("-c")
+            .arg("printf ok")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn child");
+
+        let output = wait_for_child_output_with_timeout(child, Duration::from_secs(1))
+            .expect("child should finish before timeout");
+
+        assert!(output.status.success());
+        assert_eq!(String::from_utf8_lossy(&output.stdout), "ok");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trash_command_wait_times_out_and_kills_child() {
+        let child = Command::new("sh")
+            .arg("-c")
+            .arg("sleep 5")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn child");
+        let started_at = Instant::now();
+
+        let error = wait_for_child_output_with_timeout(child, Duration::from_millis(100))
+            .expect_err("slow child should time out");
+
+        assert!(error.contains("移到系统废纸篓超时"));
+        assert!(started_at.elapsed() < Duration::from_secs(2));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_finder_trash_script_resolves_posix_file_as_alias() {
+        assert!(FINDER_TRASH_SCRIPT.contains("POSIX file (item 1 of argv) as alias"));
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  let pending_files = PendingFiles(Mutex::new(Vec::new()));
+    let pending_files = PendingFiles(Mutex::new(Vec::new()));
 
-  tauri::Builder::default()
-    .manage(pending_files)
-    .setup(|app| {
-      if cfg!(debug_assertions) {
-        app.handle().plugin(
-          tauri_plugin_log::Builder::default()
-            .level(log::LevelFilter::Info)
-            .build(),
-        )?;
-      }
+    tauri::Builder::default()
+        .manage(pending_files)
+        .setup(|app| {
+            if cfg!(debug_assertions) {
+                app.handle().plugin(
+                    tauri_plugin_log::Builder::default()
+                        .level(log::LevelFilter::Info)
+                        .build(),
+                )?;
+            }
 
-      // Windows/Linux: 从命令行参数读取文件路径
-      #[cfg(not(target_os = "macos"))]
-      {
-        let paths = extract_file_paths_from_args();
-        if !paths.is_empty() {
-          let state: State<PendingFiles> = app.state();
-          state.0.lock().unwrap().extend(paths.clone());
-          let _ = app.emit("file-opened", &paths);
-        }
-      }
+            // Windows/Linux: 从命令行参数读取文件路径
+            #[cfg(not(target_os = "macos"))]
+            {
+                let paths = extract_file_paths_from_args();
+                if !paths.is_empty() {
+                    let state: State<PendingFiles> = app.state();
+                    state.0.lock().unwrap().extend(paths.clone());
+                    let _ = app.emit("file-opened", &paths);
+                }
+            }
 
-      Ok(())
-    })
-    .plugin(tauri_plugin_dialog::init())
-    .plugin(tauri_plugin_fs::init())
-    .plugin(tauri_plugin_opener::init())
-    .invoke_handler(tauri::generate_handler![get_pending_files])
-    .build(tauri::generate_context!())
-    .expect("error while building tauri application")
-    .run(|app, event| {
-      // macOS: 通过 RunEvent::Opened 接收文件路径
-      if let tauri::RunEvent::Opened { urls } = event {
-        let paths: Vec<String> = urls
-          .iter()
-          .filter_map(|u| u.to_file_path().ok())
-          .filter_map(|p| p.to_str().map(|s| s.to_string()))
-          .collect();
-        if !paths.is_empty() {
-          let state: State<PendingFiles> = app.state();
-          state.0.lock().unwrap().extend(paths.clone());
-          let _ = app.emit("file-opened", &paths);
-        }
-      }
-    });
+            Ok(())
+        })
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .invoke_handler(tauri::generate_handler![
+            get_pending_files,
+            detect_pandoc,
+            render_citations_with_pandoc,
+            grant_markdown_file_scope,
+            grant_workspace_directory_scope,
+            move_path_to_trash,
+            read_legacy_settings_config
+        ])
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            // macOS: 通过 RunEvent::Opened 接收文件路径
+            if let tauri::RunEvent::Opened { urls } = event {
+                let paths: Vec<String> = urls
+                    .iter()
+                    .filter_map(|u| u.to_file_path().ok())
+                    .filter_map(|p| p.to_str().map(|s| s.to_string()))
+                    .collect();
+                if !paths.is_empty() {
+                    let state: State<PendingFiles> = app.state();
+                    state.0.lock().unwrap().extend(paths.clone());
+                    let _ = app.emit("file-opened", &paths);
+                }
+            }
+        });
 }

@@ -1,0 +1,75 @@
+name: Export bug
+description: Report an HTML, PDF, Word, or PNG export problem.
+title: "[Export] "
+labels: ["needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Export bugs are easiest to fix when we can reproduce the source Markdown, export format, theme, and settings.
+  - type: input
+    id: version
+    attributes:
+      label: Prism version
+      placeholder: "v1.4.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Windows
+        - Linux
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: format
+    attributes:
+      label: Export format
+      options:
+        - HTML
+        - PDF
+        - Word (.docx)
+        - PNG
+    validations:
+      required: true
+  - type: input
+    id: content_theme
+    attributes:
+      label: Content theme
+      placeholder: "MiaoYan / Inkstone / Slate / Mono / Nocturne Dark"
+    validations:
+      required: true
+  - type: textarea
+    id: export_settings
+    attributes:
+      label: Export settings
+      description: Include paper size, margin, template, PNG scale, HTML theme inclusion, or DOCX font policy if relevant.
+      placeholder: "PDF, A4, standard margin, theme template..."
+    validations:
+      required: true
+  - type: textarea
+    id: markdown
+    attributes:
+      label: Minimal Markdown sample
+      description: Paste the smallest Markdown sample that reproduces the export problem.
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened?
+      description: Describe the broken output and attach screenshots or the exported file if possible.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected output
+      description: Describe what the exported file should look like.
+    validations:
+      required: true

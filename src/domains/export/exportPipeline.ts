@@ -1,4 +1,5 @@
 import { writeFile, writeTextFile } from '@tauri-apps/plugin-fs';
+import { invoke } from '@tauri-apps/api/core';
 import { readCustomFontBytes } from '../settings/fontService';
 import type {
   Paragraph as DocxParagraph,
@@ -10,6 +11,7 @@ import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import { markdownToHtml } from '../../lib/markdownToHtml';
+import { findPandocCitations } from '../editor/extensions/citations';
 import type { ContentTheme } from '../settings/types';
 import type { ExportDocumentInput } from './types';
 import {
@@ -18,13 +20,47 @@ import {
   type DocxTheme,
 } from './exportSettings';
 import { getMermaidThemeConfig } from '../themes';
+import {
+  buildExportTocHtml,
+  buildExportTocItems,
+  buildExportTocItemsFromMdast,
+  type ExportTocItem,
+} from './toc';
 
 type DocxModule = typeof import('docx');
 type DocxBlock = DocxParagraph | DocxTable;
 type DocxInline = DocxTextRun | InstanceType<DocxModule['ImageRun']>;
+type HeaderFooterTextPart =
+  | { type: 'text'; value: string }
+  | { type: 'page' }
+  | { type: 'pages' };
+type MermaidDocxImage =
+  | { type: 'png'; data: Uint8Array; width: number; height: number }
+  | { type: 'svg'; data: string; fallback: Uint8Array; width: number; height: number };
+type ExportFileLabel = 'HTML' | 'PDF' | 'PNG' | 'Word';
+interface PandocCitationHtmlResult {
+  html: string;
+  warnings: string;
+}
+type PandocCitationHtmlAttempt =
+  | { attempted: false; html: null }
+  | { attempted: true; html: string | null };
+
+const exportProgressMessages = {
+  parseMarkdown: '正在解析 Markdown',
+  renderDiagrams: '正在渲染图表',
+  applyTheme: '正在应用导出主题',
+  generateFile: (label: ExportFileLabel) => `正在生成 ${label} 文件`,
+  writeFile: (label: ExportFileLabel) => `正在写入 ${label} 文件`,
+} as const;
+type CitationPlaceholderContext = 'html' | 'builtIn';
 
 function stripMarkdownExtension(filename: string) {
   return filename.replace(/\.(md|markdown|txt)$/i, '') || 'Untitled';
+}
+
+function getExportTitle(input: Pick<ExportDocumentInput, 'filename' | 'title'>) {
+  return input.title?.trim() || stripMarkdownExtension(input.filename);
 }
 
 function nextFrame() {
@@ -39,12 +75,143 @@ function reportWarning(input: ExportDocumentInput, message: string) {
   input.onWarning?.(message);
 }
 
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message.trim()) return error.message.trim();
+  if (typeof error === 'string' && error.trim()) return error.trim();
+  return '未知错误';
+}
+
+function hasCitationExportConfig(input: ExportDocumentInput) {
+  return Boolean(input.citation?.bibliographyPath || input.citation?.cslStylePath);
+}
+
+function hasSupportedCitationPathExtension(path: string, extensions: string[]) {
+  const normalized = path.trim().toLowerCase();
+  return normalized.length === 0 || extensions.some((extension) => normalized.endsWith(extension));
+}
+
+function hasPandocCitationHtmlSupport(input: ExportDocumentInput) {
+  const bibliographyPath = input.citation?.bibliographyPath ?? '';
+  const cslStylePath = input.citation?.cslStylePath ?? '';
+  return Boolean(
+    input.pandoc?.detected &&
+    bibliographyPath &&
+    hasSupportedCitationPathExtension(bibliographyPath, ['.bib', '.bibtex', '.json']) &&
+    hasSupportedCitationPathExtension(cslStylePath, ['.csl']),
+  );
+}
+
+function getCitationPlaceholderWarning(input: ExportDocumentInput, context: CitationPlaceholderContext) {
+  const bibliographyPath = input.citation?.bibliographyPath?.trim() ?? '';
+  const cslStylePath = input.citation?.cslStylePath?.trim() ?? '';
+  const hasBibliography = bibliographyPath.length > 0;
+  const hasCslStyle = cslStylePath.length > 0;
+  const pandocError = input.pandoc?.lastError?.trim();
+
+  if (!hasSupportedCitationPathExtension(bibliographyPath, ['.bib', '.bibtex', '.json'])) {
+    return '参考文献文件后缀需要是 .bib、.bibtex 或 .json；当前导出已回退内置管线，citekey 会以占位形式保留。';
+  }
+  if (!hasSupportedCitationPathExtension(cslStylePath, ['.csl'])) {
+    return 'CSL 样式文件后缀需要是 .csl；当前导出已回退内置管线，citekey 会以占位形式保留。';
+  }
+  if (!hasBibliography && hasCslStyle) {
+    return '已配置 CSL 样式，但缺少参考文献文件；当前导出会保留 citekey 占位。';
+  }
+  if (context === 'html' && hasBibliography && !input.pandoc?.detected) {
+    return pandocError
+      ? `已配置参考文献，但 Pandoc 未检测成功：${pandocError}；HTML 导出已回退内置管线，citekey 会以占位形式保留。`
+      : '已配置参考文献，但 Pandoc 未检测成功；HTML 导出已回退内置管线，citekey 会以占位形式保留。请在设置中心检测 Pandoc。';
+  }
+  return '当前导出格式使用内置管线，不生成完整参考文献；citekey 会以占位形式保留。';
+}
+
+function reportCitationPlaceholderWarning(input: ExportDocumentInput, context: CitationPlaceholderContext = 'builtIn') {
+  if (!hasCitationExportConfig(input)) return;
+  if (findPandocCitations(input.content).length === 0) return;
+  reportWarning(input, getCitationPlaceholderWarning(input, context));
+}
+
+async function renderPandocCitationHtml(input: ExportDocumentInput): Promise<PandocCitationHtmlAttempt> {
+  if (!hasPandocCitationHtmlSupport(input)) return { attempted: false, html: null };
+  if (findPandocCitations(input.content).length === 0) return { attempted: false, html: null };
+
+  try {
+    const result = await invoke<PandocCitationHtmlResult>('render_citations_with_pandoc', {
+      path: input.pandoc?.path || null,
+      markdown: input.content,
+      bibliographyPath: input.citation?.bibliographyPath ?? '',
+      cslStylePath: input.citation?.cslStylePath || null,
+    });
+    const warnings = result.warnings.trim();
+    if (warnings) reportWarning(input, warnings);
+    return { attempted: true, html: result.html };
+  } catch (error) {
+    reportWarning(
+      input,
+      `Pandoc 引用导出失败，已回退内置导出，citekey 会以占位形式保留：${getErrorMessage(error)}`,
+    );
+    return { attempted: true, html: null };
+  }
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function isUnsafeExportUrl(value: unknown, allowedProtocols: Set<string>) {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (
+    trimmed.startsWith('#')
+    || trimmed.startsWith('//')
+    || trimmed.startsWith('/')
+    || trimmed.startsWith('./')
+    || trimmed.startsWith('../')
+    || trimmed.startsWith('?')
+  ) {
+    return false;
+  }
+
+  const protocolCandidate = trimmed.replace(/[\u0000-\u001F\u007F]+/g, '');
+  const protocol = /^[a-zA-Z][a-zA-Z\d+.-]*:/.exec(protocolCandidate)?.[0].toLowerCase();
+  return Boolean(protocol && !allowedProtocols.has(protocol));
+}
+
+function sanitizeExportHtmlFragment(html: string) {
+  const template = document.createElement('template');
+  template.innerHTML = html;
+  template.content.querySelectorAll('script, iframe, object, embed, base, link, meta').forEach((node) => {
+    node.remove();
+  });
+
+  const linkProtocols = new Set(['http:', 'https:', 'mailto:']);
+  const mediaProtocols = new Set(['http:', 'https:']);
+
+  template.content.querySelectorAll<HTMLElement>('*').forEach((element) => {
+    Array.from(element.attributes).forEach((attribute) => {
+      const name = attribute.name.toLowerCase();
+      if (name.startsWith('on') || name === 'style') {
+        element.removeAttribute(attribute.name);
+        return;
+      }
+
+      if ((name === 'href' || name.endsWith(':href')) && isUnsafeExportUrl(attribute.value, linkProtocols)) {
+        element.removeAttribute(attribute.name);
+        return;
+      }
+
+      if (name === 'src' && isUnsafeExportUrl(attribute.value, mediaProtocols)) {
+        element.removeAttribute(attribute.name);
+      }
+    });
+  });
+
+  return template.innerHTML;
 }
 
 const pdfPaperCss = {
@@ -80,6 +247,133 @@ const docxPageMarginsTwips = {
   wide: { top: 1418, right: 1418, bottom: 1588, left: 1418 },
 } as const;
 
+function getPdfPageNumberLabel(pageIndex: number, pageCount: number) {
+  return `${pageIndex + 1} / ${pageCount}`;
+}
+
+function getPdfPageNumberY(marginBottom: number) {
+  return Math.max(12, Math.min(28, marginBottom * 0.35));
+}
+
+function getPdfHeaderY(pageHeight: number, marginTop: number, imageHeight: number) {
+  return pageHeight - Math.max(18, marginTop * 0.5) - imageHeight / 2;
+}
+
+function getPdfFooterY(marginBottom: number) {
+  return getPdfPageNumberY(marginBottom);
+}
+
+function normalizePdfChromeText(value: string) {
+  return value.replace(/\s+/g, ' ').trim().slice(0, 160);
+}
+
+function formatPdfHeaderFooterText(
+  template: string | undefined,
+  input: Pick<ExportDocumentInput, 'filename' | 'title' | 'author' | 'date'>,
+  pageIndex: number,
+  pageCount: number,
+) {
+  const normalized = normalizePdfChromeText(template ?? '');
+  if (!normalized) return '';
+  const values: Record<string, string> = {
+    title: getExportTitle(input),
+    filename: input.filename,
+    author: input.author?.trim() ?? '',
+    date: input.date?.trim() ?? '',
+    page: String(pageIndex + 1),
+    pages: String(pageCount),
+  };
+  return normalizePdfChromeText(normalized.replace(/\{(title|filename|author|date|page|pages)\}/g, (_, token: string) => values[token] ?? ''));
+}
+
+function buildHeaderFooterTextParts(
+  template: string | undefined,
+  input: Pick<ExportDocumentInput, 'filename' | 'title' | 'author' | 'date'>,
+): HeaderFooterTextPart[] {
+  const normalized = normalizePdfChromeText(template ?? '');
+  if (!normalized) return [];
+  const values: Record<string, string> = {
+    title: getExportTitle(input),
+    filename: input.filename,
+    author: input.author?.trim() ?? '',
+    date: input.date?.trim() ?? '',
+  };
+  const resolved = normalizePdfChromeText(
+    normalized.replace(/\{(title|filename|author|date)\}/g, (_, token: string) => values[token] ?? ''),
+  );
+  const parts: HeaderFooterTextPart[] = [];
+  const pattern = /\{(page|pages)\}/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(resolved)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({ type: 'text', value: resolved.slice(lastIndex, match.index) });
+    }
+    parts.push({ type: match[1] === 'pages' ? 'pages' : 'page' });
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < resolved.length) {
+    parts.push({ type: 'text', value: resolved.slice(lastIndex) });
+  }
+
+  return parts.filter((part) => part.type !== 'text' || part.value.length > 0);
+}
+
+function hasHeaderFooterPageToken(template: string | undefined) {
+  return /\{(?:page|pages)\}/.test(template ?? '');
+}
+
+function clipPdfChromeText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  const suffix = '...';
+  const suffixWidth = ctx.measureText(suffix).width;
+  if (suffixWidth >= maxWidth) return '';
+
+  let low = 0;
+  let high = text.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (ctx.measureText(text.slice(0, mid)).width + suffixWidth <= maxWidth) {
+      low = mid;
+    } else {
+      high = mid - 1;
+    }
+  }
+
+  return `${text.slice(0, low)}${suffix}`;
+}
+
+function createPdfChromeTextImage(text: string, maxWidth: number) {
+  const normalized = normalizePdfChromeText(text);
+  if (!normalized || maxWidth <= 0) return null;
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  const scale = 2;
+  const fontSize = 8.5;
+  const height = 14;
+  const paddingX = 3;
+  const font = `500 ${fontSize}px Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif`;
+  ctx.font = font;
+  const clipped = clipPdfChromeText(ctx, normalized, Math.max(0, maxWidth - paddingX * 2));
+  if (!clipped) return null;
+
+  const width = Math.min(maxWidth, Math.ceil(ctx.measureText(clipped).width + paddingX * 2));
+  canvas.width = Math.ceil(width * scale);
+  canvas.height = Math.ceil(height * scale);
+  ctx.scale(scale, scale);
+  ctx.font = font;
+  ctx.fillStyle = '#737373';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(clipped, paddingX, height / 2);
+
+  return { dataUrl: canvas.toDataURL('image/png'), width, height };
+}
+
 function dataUrlToBytes(dataUrl: string) {
   const [, base64 = ''] = dataUrl.split(',');
   const binary = atob(base64);
@@ -88,6 +382,33 @@ function dataUrlToBytes(dataUrl: string) {
     bytes[index] = binary.charCodeAt(index);
   }
   return bytes;
+}
+
+const TRANSPARENT_PNG_DATA_URL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
+
+function svgToDataUrl(svg: string) {
+  const bytes = new TextEncoder().encode(svg);
+  let binary = '';
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return `data:image/svg+xml;base64,${btoa(binary)}`;
+}
+
+function getSvgSize(svg: string) {
+  const document = new DOMParser().parseFromString(svg, 'image/svg+xml');
+  const element = document.documentElement;
+  const width = Number.parseFloat(element.getAttribute('width') ?? '');
+  const height = Number.parseFloat(element.getAttribute('height') ?? '');
+  const viewBox = (element.getAttribute('viewBox') ?? '')
+    .split(/[\s,]+/)
+    .map((value) => Number.parseFloat(value));
+
+  return {
+    width: Math.max(80, Math.round(Number.isFinite(width) ? width : viewBox[2] || 640)),
+    height: Math.max(40, Math.round(Number.isFinite(height) ? height : viewBox[3] || 360)),
+  };
 }
 
 function getImageSize(dataUrl: string) {
@@ -177,6 +498,46 @@ async function collectExportCss(options: Pick<ExportDocumentInput, 'pdfPaper' | 
       padding-top: 44px !important;
       padding-bottom: 56px !important;
     }
+    .prism-export-toc {
+      margin: 0 0 36px;
+      padding: 18px 0 20px;
+      border-top: 1px solid var(--theme-divider, var(--c-fog, #e5e7eb));
+      border-bottom: 1px solid var(--theme-divider, var(--c-fog, #e5e7eb));
+      break-inside: avoid;
+    }
+    .prism-export-toc-title {
+      margin: 0 0 12px;
+      color: var(--theme-muted, var(--c-ash, #8f8f8f));
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      line-height: 1;
+    }
+    .prism-export-toc-list {
+      display: grid;
+      gap: 7px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .prism-export-toc-item {
+      margin: 0;
+      padding-left: var(--toc-indent, 0);
+    }
+    .prism-export-toc-item a {
+      display: flex;
+      min-width: 0;
+      color: var(--theme-text, var(--c-void, #000));
+      text-decoration: none;
+      line-height: 1.35;
+    }
+    .prism-export-toc-item span {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+    .prism-export-heading-anchor {
+      scroll-margin-top: 28px;
+    }
     .prism-export-template--plain pre,
     .prism-export-template--plain code {
       background: transparent !important;
@@ -208,7 +569,7 @@ async function collectExportCss(options: Pick<ExportDocumentInput, 'pdfPaper' | 
         max-width: none !important;
         padding: 0 !important;
       }
-      pre, blockquote, table, figure, .mermaid-placeholder { break-inside: avoid; }
+      pre, blockquote, table, figure, .mermaid-placeholder, .prism-export-toc { break-inside: avoid; }
     }
   `;
 
@@ -356,8 +717,22 @@ async function renderMermaidImage(source: string, contentTheme: ContentTheme) {
           `prism-docx-mermaid-${Date.now()}-${configIndex}-${sourceIndex}-${Math.random().toString(36).slice(2)}`,
           candidate,
         );
-        const image = await svgToPngDataUrl(svg);
-        if (image) return image;
+        const image = await svgToPngDataUrl(svg).catch(() => null);
+        if (image) {
+          return {
+            type: 'png',
+            data: dataUrlToBytes(image.dataUrl),
+            width: image.width,
+            height: image.height,
+          } satisfies MermaidDocxImage;
+        }
+
+        return {
+          type: 'svg',
+          data: svgToDataUrl(svg),
+          fallback: dataUrlToBytes(TRANSPARENT_PNG_DATA_URL),
+          ...getSvgSize(svg),
+        } satisfies MermaidDocxImage;
       } catch {
         // Try the next Mermaid rendering variant before falling back.
       }
@@ -381,8 +756,33 @@ async function inlineImages(root: HTMLElement) {
   }));
 }
 
-async function createRenderedExportNode(input: ExportDocumentInput) {
-  const html = markdownToHtml(input.content);
+function applyExportToc(root: HTMLElement, input: ExportDocumentInput) {
+  if (!input.toc) return;
+  const write = root.querySelector<HTMLElement>('#write');
+  if (!write) return;
+  const headingElements = Array.from(write.querySelectorAll<HTMLHeadingElement>('h1, h2, h3, h4, h5, h6'));
+  const headings = headingElements
+    .map((element) => ({
+      element,
+      level: Number(element.tagName.slice(1)),
+      text: (element.textContent ?? '').trim(),
+    }))
+    .filter((heading) => heading.text.length > 0);
+  const items = buildExportTocItems(headings);
+  if (items.length === 0) return;
+
+  headings.forEach((heading, index) => {
+    heading.element.id = items[index].anchor;
+    heading.element.classList.add('prism-export-heading-anchor');
+  });
+
+  write.insertAdjacentHTML('afterbegin', buildExportTocHtml(items));
+}
+
+async function createRenderedExportNode(input: ExportDocumentInput, options: { html?: string | null } = {}) {
+  reportProgress(input, exportProgressMessages.parseMarkdown);
+  const html = options.html ? sanitizeExportHtmlFragment(options.html) : markdownToHtml(input.content);
+  reportProgress(input, exportProgressMessages.applyTheme);
   const root = document.createElement('div');
   root.className = [
     'prism-export-document',
@@ -397,9 +797,11 @@ async function createRenderedExportNode(input: ExportDocumentInput) {
   root.style.pointerEvents = 'none';
   root.style.opacity = '0';
   root.innerHTML = `<div id="write" class="${writeClassByTheme[input.contentTheme]}">${html}</div>`;
+  applyExportToc(root, input);
   document.body.appendChild(root);
 
   try {
+    reportProgress(input, exportProgressMessages.renderDiagrams);
     await renderMermaidPlaceholders(root, input.contentTheme);
     await inlineImages(root);
     if ('fonts' in document) {
@@ -436,7 +838,9 @@ async function buildStandaloneHtml(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(stripMarkdownExtension(input.filename))}</title>
+  <title>${escapeHtml(getExportTitle(input))}</title>
+  ${input.author ? `<meta name="author" content="${escapeHtml(input.author)}">` : ''}
+  ${input.date ? `<meta name="date" content="${escapeHtml(input.date)}">` : ''}
   ${css ? `<style>${css}</style>` : ''}
 </head>
 <body class="${document.body.classList.contains('dark') ? 'dark' : ''}">
@@ -501,12 +905,16 @@ export async function exportHtml(input: ExportDocumentInput, outputPath?: string
   const targetPath = await getExportOutputPath(outputPath);
   if (!targetPath) return false;
 
-  reportProgress(input, '正在生成 HTML');
-  const node = await createRenderedExportNode(input);
+  const pandocCitation = await renderPandocCitationHtml(input);
+  if (!pandocCitation.attempted) reportCitationPlaceholderWarning(input, 'html');
+  const node = await createRenderedExportNode(input, { html: pandocCitation.html });
   try {
-    await writeTextFile(targetPath, await buildStandaloneHtml(input, node, {
+    reportProgress(input, exportProgressMessages.generateFile('HTML'));
+    const html = await buildStandaloneHtml(input, node, {
       includeTheme: input.htmlIncludeTheme !== false,
-    }));
+    });
+    reportProgress(input, exportProgressMessages.writeFile('HTML'));
+    await writeTextFile(targetPath, html);
   } finally {
     node.remove();
   }
@@ -517,12 +925,15 @@ export async function exportPdf(input: ExportDocumentInput, outputPath?: string)
   const targetPath = await getExportOutputPath(outputPath);
   if (!targetPath) return false;
 
-  reportProgress(input, '正在渲染 PDF 页面');
-  const { PDFDocument } = await import('pdf-lib');
+  reportCitationPlaceholderWarning(input);
+  const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
   const image = await createRenderedPng(input, { scale: 1.25 });
-  reportProgress(input, '正在写入 PDF 文件');
+  reportProgress(input, exportProgressMessages.generateFile('PDF'));
   const pdf = await PDFDocument.create();
   const embedded = await pdf.embedPng(dataUrlToBytes(image.dataUrl));
+  const pageNumberFont = input.pdfPageNumbers
+    ? await pdf.embedFont(StandardFonts.Helvetica)
+    : null;
 
   const paper = pdfPageSizePoints[input.pdfPaper ?? 'a4'];
   const margins = pdfPageMarginsPoints[input.pdfMargin ?? 'standard'];
@@ -532,6 +943,23 @@ export async function exportPdf(input: ExportDocumentInput, outputPath?: string)
   const contentHeight = pageHeight - margins.top - margins.bottom;
   const scaledHeight = contentWidth * (image.height / image.width);
   const pageCount = Math.max(1, Math.ceil(scaledHeight / contentHeight));
+  const drawChromeText = async (
+    page: any,
+    text: string,
+    maxWidth: number,
+    x: number,
+    y: number,
+  ) => {
+    const rendered = createPdfChromeTextImage(text, maxWidth);
+    if (!rendered) return;
+    const embeddedChrome = await pdf.embedPng(dataUrlToBytes(rendered.dataUrl));
+    page.drawImage(embeddedChrome, {
+      x,
+      y,
+      width: rendered.width,
+      height: rendered.height,
+    });
+  };
 
   for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
     const page = pdf.addPage([pageWidth, pageHeight]);
@@ -541,9 +969,46 @@ export async function exportPdf(input: ExportDocumentInput, outputPath?: string)
       width: contentWidth,
       height: scaledHeight,
     });
+
+    if (input.pageHeaderFooter) {
+      const headerText = formatPdfHeaderFooterText(input.pageHeaderText, input, pageIndex, pageCount);
+      const footerText = formatPdfHeaderFooterText(input.pageFooterText, input, pageIndex, pageCount);
+      const headerImage = createPdfChromeTextImage(headerText, contentWidth);
+      if (headerImage) {
+        const embeddedHeader = await pdf.embedPng(dataUrlToBytes(headerImage.dataUrl));
+        page.drawImage(embeddedHeader, {
+          x: (pageWidth - headerImage.width) / 2,
+          y: getPdfHeaderY(pageHeight, margins.top, headerImage.height),
+          width: headerImage.width,
+          height: headerImage.height,
+        });
+      }
+      await drawChromeText(
+        page,
+        footerText,
+        input.pdfPageNumbers ? contentWidth * 0.42 : contentWidth,
+        margins.left,
+        getPdfFooterY(margins.bottom),
+      );
+    }
+
+    if (pageNumberFont) {
+      const label = getPdfPageNumberLabel(pageIndex, pageCount);
+      const size = 8;
+      const textWidth = pageNumberFont.widthOfTextAtSize(label, size);
+      page.drawText(label, {
+        x: (pageWidth - textWidth) / 2,
+        y: getPdfPageNumberY(margins.bottom),
+        size,
+        font: pageNumberFont,
+        color: rgb(0.45, 0.45, 0.45),
+      });
+    }
   }
 
-  await writeFile(targetPath, await pdf.save());
+  const bytes = await pdf.save();
+  reportProgress(input, exportProgressMessages.writeFile('PDF'));
+  await writeFile(targetPath, bytes);
   return true;
 }
 
@@ -593,9 +1058,10 @@ export async function exportPng(input: ExportDocumentInput, outputPath?: string)
   const targetPath = await getExportOutputPath(outputPath);
   if (!targetPath) return false;
 
-  reportProgress(input, '正在渲染 PNG 图像');
+  reportCitationPlaceholderWarning(input);
   const image = await createRenderedPng(input, { scale: input.pngScale });
-  reportProgress(input, '正在写入 PNG 文件');
+  reportProgress(input, exportProgressMessages.generateFile('PNG'));
+  reportProgress(input, exportProgressMessages.writeFile('PNG'));
   await writeFile(targetPath, dataUrlToBytes(image.dataUrl));
   return true;
 }
@@ -777,6 +1243,118 @@ function codeBlockToDocxTable(docx: DocxModule, value: string, theme: DocxTheme)
   });
 }
 
+function createDocxTocBlocks(docx: DocxModule, items: ExportTocItem[], theme: DocxTheme): DocxBlock[] {
+  if (items.length === 0) return [];
+  const { BorderStyle, Paragraph, TextRun } = docx;
+  return [
+    new Paragraph({
+      children: [new TextRun({
+        text: '目录',
+        color: theme.accent,
+        size: 22,
+        bold: true,
+      })],
+      border: {
+        bottom: { style: BorderStyle.SINGLE, size: 4, color: theme.border },
+      },
+      spacing: { before: 0, after: 160 },
+    }),
+    ...items.map((item) => new Paragraph({
+      children: [new TextRun({
+        text: item.text,
+        color: theme.text,
+        size: 22,
+      })],
+      indent: { left: Math.max(0, item.level - 1) * 240 },
+      spacing: { before: 0, after: 80, line: 300 },
+    })),
+    new Paragraph({
+      children: [new TextRun({ text: '' })],
+      spacing: { before: 0, after: 180 },
+    }),
+  ];
+}
+
+function createDocxHeaderFooterRuns(
+  docx: DocxModule,
+  parts: HeaderFooterTextPart[],
+  theme: DocxTheme,
+): DocxTextRun[] {
+  const { PageNumber, TextRun } = docx;
+  return parts.map((part) => {
+    const base = {
+      color: '737373',
+      font: theme.font,
+      size: 18,
+    };
+    if (part.type === 'page') {
+      return new TextRun({ ...base, children: [PageNumber.CURRENT] });
+    }
+    if (part.type === 'pages') {
+      return new TextRun({ ...base, children: [PageNumber.TOTAL_PAGES] });
+    }
+    return new TextRun({ ...base, text: part.value });
+  });
+}
+
+function createDocxHeaderFooter(docx: DocxModule, input: ExportDocumentInput, theme: DocxTheme) {
+  const { AlignmentType, Footer, Header, Paragraph, TextRun } = docx;
+  const headerParts = input.pageHeaderFooter
+    ? buildHeaderFooterTextParts(input.pageHeaderText, input)
+    : [];
+  const footerParts = input.pageHeaderFooter
+    ? buildHeaderFooterTextParts(input.pageFooterText, input)
+    : [];
+  const footerHasPageToken = input.pageHeaderFooter && hasHeaderFooterPageToken(input.pageFooterText);
+  const footerParagraphs: DocxParagraph[] = [];
+  const header = headerParts.length > 0
+    ? new Header({
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: createDocxHeaderFooterRuns(docx, headerParts, theme),
+            spacing: { after: 80 },
+          }),
+        ],
+      })
+    : undefined;
+
+  if (footerParts.length > 0) {
+    footerParagraphs.push(new Paragraph({
+      alignment: AlignmentType.LEFT,
+      children: createDocxHeaderFooterRuns(docx, footerParts, theme),
+      spacing: { before: 80, after: 0 },
+    }));
+  }
+
+  if (input.pdfPageNumbers && !footerHasPageToken) {
+    footerParagraphs.push(new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [
+        new TextRun({ color: '737373', font: theme.font, size: 18, children: [docx.PageNumber.CURRENT] }),
+        new TextRun({ color: '737373', font: theme.font, size: 18, text: ' / ' }),
+        new TextRun({ color: '737373', font: theme.font, size: 18, children: [docx.PageNumber.TOTAL_PAGES] }),
+      ],
+      spacing: { before: footerParts.length > 0 ? 40 : 80, after: 0 },
+    }));
+  }
+
+  return {
+    header,
+    footer: footerParagraphs.length > 0
+      ? new Footer({ children: footerParagraphs })
+      : undefined,
+  };
+}
+
+function getDocxListMarker(node: any, item: any, index: number) {
+  if (typeof item.checked === 'boolean') {
+    return item.checked ? '☑ ' : '☐ ';
+  }
+
+  return node.ordered ? `${(node.start ?? 1) + index}. ` : '• ';
+}
+
 async function mdastToDocxBlocks(
   docx: DocxModule,
   nodes: any[],
@@ -854,8 +1432,11 @@ async function mdastToDocxBlocks(
             spacing: { before: 180, after: 220 },
             children: [
               new ImageRun({
-                type: 'png',
-                data: dataUrlToBytes(image.dataUrl),
+                type: image.type,
+                data: image.data,
+                ...(image.type === 'svg'
+                  ? { fallback: { type: 'png', data: image.fallback } }
+                  : {}),
                 transformation: { width, height },
                 altText: {
                   title: 'Mermaid diagram',
@@ -887,7 +1468,7 @@ async function mdastToDocxBlocks(
 
     if (node.type === 'list') {
       for (const [index, item] of (node.children ?? []).entries()) {
-        const marker = node.ordered ? `${(node.start ?? 1) + index}. ` : '• ';
+        const marker = getDocxListMarker(node, item, index);
         const paragraphChild = (item.children ?? []).find((child: any) => child.type === 'paragraph');
         const runs = paragraphChild
           ? (await Promise.all((paragraphChild.children ?? []).map((child: any) => inlineToRuns(docx, child, theme)))).flat()
@@ -963,9 +1544,11 @@ export async function exportDocx(input: ExportDocumentInput, outputPath?: string
   const targetPath = await getExportOutputPath(outputPath);
   if (!targetPath) return false;
 
-  reportProgress(input, '正在生成 Word 文档');
+  reportCitationPlaceholderWarning(input);
+  reportProgress(input, exportProgressMessages.parseMarkdown);
   const processor = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
   const tree = processor.runSync(processor.parse(input.content)) as any;
+  reportProgress(input, exportProgressMessages.applyTheme);
   const baseTheme = docxThemeByContentTheme[input.contentTheme];
   const theme: DocxTheme = {
     ...baseTheme,
@@ -973,11 +1556,17 @@ export async function exportDocx(input: ExportDocumentInput, outputPath?: string
     fill: input.codeStyle === 'plain' ? 'FFFFFF' : baseTheme.fill,
     border: input.tableStyle === 'minimal' ? 'D8D2C8' : baseTheme.border,
   };
-  const blocks = await mdastToDocxBlocks(docx, tree.children ?? [], theme, input.contentTheme);
+  const tocBlocks = input.toc
+    ? createDocxTocBlocks(docx, buildExportTocItemsFromMdast(tree.children ?? []), theme)
+    : [];
+  reportProgress(input, exportProgressMessages.renderDiagrams);
+  const bodyBlocks = await mdastToDocxBlocks(docx, tree.children ?? [], theme, input.contentTheme);
+  const blocks = [...tocBlocks, ...bodyBlocks];
   const { Document, Packer, Paragraph } = docx;
   const fonts = [];
   const pageSize = docxPageSizeTwips[input.pdfPaper ?? 'a4'];
   const pageMargin = docxPageMarginsTwips[input.pdfMargin ?? 'standard'];
+  const { header, footer } = createDocxHeaderFooter(docx, input, theme);
 
   if (input.docxFontFile) {
     try {
@@ -1000,6 +1589,7 @@ export async function exportDocx(input: ExportDocumentInput, outputPath?: string
     }
   }
 
+  reportProgress(input, exportProgressMessages.generateFile('Word'));
   const document = new Document({
     fonts,
     styles: {
@@ -1040,6 +1630,8 @@ export async function exportDocx(input: ExportDocumentInput, outputPath?: string
       ],
     },
     sections: [{
+      headers: header ? { default: header } : undefined,
+      footers: footer ? { default: footer } : undefined,
       properties: {
         page: {
           size: pageSize,
@@ -1051,6 +1643,16 @@ export async function exportDocx(input: ExportDocumentInput, outputPath?: string
   });
 
   const blob = await Packer.toBlob(document);
+  reportProgress(input, exportProgressMessages.writeFile('Word'));
   await writeFile(targetPath, new Uint8Array(await blob.arrayBuffer()));
   return true;
 }
+
+export const __exportPipelineTesting = {
+  formatPdfHeaderFooterText,
+  getPdfFooterY,
+  getPdfHeaderY,
+  getPdfPageNumberLabel,
+  getPdfPageNumberY,
+  normalizePdfChromeText,
+};

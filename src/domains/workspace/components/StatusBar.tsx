@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import styles from './StatusBar.module.css';
 import { useWorkspaceStore } from '../../workspace/store';
 import { useDocumentStore } from '../../document/store';
+import type { DocumentSaveStatus } from '../../document/types';
+import type { WritingStats } from '../services';
 
 const IconFocus = () => (
   <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false">
@@ -45,8 +47,17 @@ const IconList = () => (
   </svg>
 );
 
+const saveStatusLabels: Record<DocumentSaveStatus, string> = {
+  saved: '已保存',
+  dirty: '未保存',
+  saving: '保存中...',
+  failed: '保存失败',
+  conflict: '文件冲突',
+};
+
 interface StatusBarProps {
-  wordCount: number;
+  writingStats: WritingStats;
+  selectionStats?: WritingStats | null;
   cursor: { line: number; column: number };
   sidebarVisible: boolean;
   isSidebarHovered: boolean;
@@ -58,10 +69,17 @@ interface StatusBarProps {
   onFolderContextMenu?: (e: React.MouseEvent) => void;
   onNewFile?: () => void;
   onToggleFileTreeMode?: () => void;
+  linkIssueCount?: number;
+  linkIssueTitle?: string;
+  onLinkDiagnosticsClick?: () => void;
+  typographyIssueCount?: number;
+  typographyIssueTitle?: string;
+  onTypographyDiagnosticsClick?: () => void;
 }
 
 export function StatusBar({
-  wordCount,
+  writingStats,
+  selectionStats,
   cursor,
   sidebarVisible,
   isSidebarHovered,
@@ -73,27 +91,26 @@ export function StatusBar({
   onFolderContextMenu,
   onNewFile,
   onToggleFileTreeMode,
+  linkIssueCount = 0,
+  linkIssueTitle,
+  onLinkDiagnosticsClick,
+  typographyIssueCount = 0,
+  typographyIssueTitle,
+  onTypographyDiagnosticsClick,
 }: StatusBarProps) {
   const rootPath = useWorkspaceStore((s) => s.rootPath);
   const fileTreeMode = useWorkspaceStore((s) => s.fileTreeMode);
   const focusMode = useWorkspaceStore((s) => s.focusMode);
   const currentDocument = useDocumentStore((s) => s.currentDocument);
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
+  const saveStatus = currentDocument?.saveStatus ?? 'saved';
+  const activeStats = selectionStats && selectionStats.characters > 0 ? selectionStats : writingStats;
+  const isSelectionStats = activeStats === selectionStats;
+  const statsTitle = `${isSelectionStats ? '选区：' : ''}中文字数 ${activeStats.chineseChars}，英文词数 ${activeStats.englishWords}，字符数 ${activeStats.characters}，预计阅读 ${activeStats.readingMinutes} 分钟`;
 
   const rootName = useMemo(() => {
     if (!rootPath) return 'Documents';
     return rootPath.split(/[\\/]/).pop() || rootPath;
   }, [rootPath]);
-
-  useEffect(() => {
-    if (!currentDocument) { setSaveStatus('saved'); return; }
-    if (currentDocument.isDirty) {
-      setSaveStatus('unsaved');
-      const timer = setTimeout(() => setSaveStatus('saving'), 1500);
-      return () => clearTimeout(timer);
-    }
-    setSaveStatus('saved');
-  }, [currentDocument?.isDirty, currentDocument?.lastSavedAt]);
 
   return (
     <div className={styles.statusbar}>
@@ -135,21 +152,70 @@ export function StatusBar({
           </button>
         </div>
 
-        <div className={styles.center}>
-          <span className={`${styles.saveStatus} ${styles[saveStatus]}`}>
-            {saveStatus === 'saved' && '已保存'}
-            {saveStatus === 'saving' && '保存中…'}
-            {saveStatus === 'unsaved' && '未保存'}
+        <div className={styles.center} title={statsTitle}>
+          <span
+            className={`${styles.saveStatus} ${styles[saveStatus]}`}
+            title={currentDocument?.saveError ?? undefined}
+          >
+            {saveStatusLabels[saveStatus]}
           </span>
-          <div className={styles.sep} />
-          <span className={styles.statVal}>{wordCount}</span>
-          <span className={styles.statLbl}>词</span>
-          <div className={styles.sep} />
-          <span className={styles.statLbl}>LN</span>
-          <span className={styles.statVal}>{cursor.line}</span>
-          <div className={styles.sep} />
-          <span className={styles.statLbl}>COL</span>
-          <span className={styles.statVal}>{cursor.column}</span>
+          {isSelectionStats && (
+            <span className={styles.statBadge}>选区</span>
+          )}
+          <span className={styles.statChunk}>
+            <span className={styles.sep} />
+            <span className={styles.statLbl}>中</span>
+            <span className={styles.statVal}>{activeStats.chineseChars}</span>
+          </span>
+          <span className={styles.statChunk}>
+            <span className={styles.sep} />
+            <span className={styles.statLbl}>EN</span>
+            <span className={styles.statVal}>{activeStats.englishWords}</span>
+          </span>
+          <span className={`${styles.statChunk} ${styles.optionalStat}`}>
+            <span className={styles.sep} />
+            <span className={styles.statLbl}>字符</span>
+            <span className={styles.statVal}>{activeStats.characters}</span>
+          </span>
+          <span className={`${styles.statChunk} ${styles.optionalStat}`}>
+            <span className={styles.sep} />
+            <span className={styles.statVal}>{activeStats.readingMinutes}</span>
+            <span className={styles.statLbl}>分钟</span>
+          </span>
+          <span className={styles.statChunk}>
+            <span className={styles.sep} />
+            <span className={styles.statLbl}>LN</span>
+            <span className={styles.statVal}>{cursor.line}</span>
+          </span>
+          <span className={styles.statChunk}>
+            <span className={styles.sep} />
+            <span className={styles.statLbl}>COL</span>
+            <span className={styles.statVal}>{cursor.column}</span>
+          </span>
+          {linkIssueCount > 0 && (
+            <>
+              <span className={styles.sep} />
+              <button
+                className={styles.diagnostic}
+                title={linkIssueTitle ?? '链接诊断'}
+                onClick={onLinkDiagnosticsClick}
+              >
+                LINK {linkIssueCount}
+              </button>
+            </>
+          )}
+          {typographyIssueCount > 0 && (
+            <>
+              <span className={styles.sep} />
+              <button
+                className={styles.diagnostic}
+                title={typographyIssueTitle ?? '排版提示'}
+                onClick={onTypographyDiagnosticsClick}
+              >
+                TYPO {typographyIssueCount}
+              </button>
+            </>
+          )}
         </div>
 
         <div className={styles.right}>

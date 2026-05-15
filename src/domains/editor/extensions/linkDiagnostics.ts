@@ -1,0 +1,153 @@
+import { getMarkdownHeadingSlug } from './headingSlug';
+
+export type LinkDiagnosticKind = 'empty-target' | 'missing-heading' | 'missing-file';
+
+export interface LinkDiagnostic {
+  column: number;
+  kind: LinkDiagnosticKind;
+  line: number;
+  message: string;
+  target: string;
+}
+
+interface LinkScanContext {
+  currentPath?: string;
+  workspaceFiles?: string[];
+  workspaceRoot?: string | null;
+}
+
+const MARKDOWN_LINK_RE = /!?\[[^\]\n]*\]\(([^)\n]*)\)/g;
+const URL_SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
+
+function dirname(path: string): string {
+  const parts = path.split(/[\\/]/);
+  parts.pop();
+  return parts.join(path.includes('\\') ? '\\' : '/');
+}
+
+function joinPath(base: string, target: string): string {
+  const trimmedBase = base.replace(/[\\/]+$/, '');
+  const sep = base.includes('\\') ? '\\' : '/';
+  return `${trimmedBase}${sep}${target}`;
+}
+
+function normalizePath(path: string): string {
+  const parts: string[] = [];
+  path.replace(/\\/g, '/').split('/').forEach((part) => {
+    if (!part || part === '.') return;
+    if (part === '..') {
+      parts.pop();
+      return;
+    }
+    parts.push(part);
+  });
+  return parts.join('/').toLowerCase();
+}
+
+export { getMarkdownHeadingSlug };
+
+function collectHeadingSlugs(content: string): Set<string> {
+  const slugs = new Set<string>();
+  content.split('\n').forEach((line) => {
+    const match = line.match(/^(#{1,6})\s+(.+)$/);
+    if (!match) return;
+    const slug = getMarkdownHeadingSlug(match[2]);
+    if (slug) slugs.add(slug);
+  });
+  return slugs;
+}
+
+function extractTarget(rawTarget: string): string {
+  const trimmed = rawTarget.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('<') && trimmed.includes('>')) {
+    return trimmed.slice(1, trimmed.indexOf('>'));
+  }
+  return trimmed.split(/\s+/)[0];
+}
+
+function stripTargetMetadata(target: string) {
+  const [withoutHash, hash = ''] = target.split('#');
+  const [path] = withoutHash.split('?');
+  return {
+    path,
+    hash,
+  };
+}
+
+function safeDecodeURIComponent(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function isExternalTarget(target: string): boolean {
+  return URL_SCHEME_RE.test(target) || target.startsWith('//');
+}
+
+function targetExists(targetPath: string, context: LinkScanContext): boolean {
+  if (!context.workspaceFiles?.length) return true;
+
+  const candidates = new Set<string>();
+  candidates.add(normalizePath(targetPath));
+  if (context.currentPath) candidates.add(normalizePath(joinPath(dirname(context.currentPath), targetPath)));
+  if (context.workspaceRoot) candidates.add(normalizePath(joinPath(context.workspaceRoot, targetPath)));
+
+  const workspaceFiles = new Set(context.workspaceFiles.map(normalizePath));
+  return [...candidates].some((candidate) => workspaceFiles.has(candidate));
+}
+
+export function scanMarkdownLinks(content: string, context: LinkScanContext = {}): LinkDiagnostic[] {
+  const diagnostics: LinkDiagnostic[] = [];
+  const headingSlugs = collectHeadingSlugs(content);
+  const lines = content.split('\n');
+
+  lines.forEach((lineText, lineIndex) => {
+    for (const match of lineText.matchAll(MARKDOWN_LINK_RE)) {
+      const target = extractTarget(match[1]);
+      const column = (match.index ?? 0) + 1;
+
+      if (!target) {
+        diagnostics.push({
+          column,
+          kind: 'empty-target',
+          line: lineIndex + 1,
+          message: '链接目标为空',
+          target,
+        });
+        continue;
+      }
+
+      if (isExternalTarget(target)) continue;
+
+      const { path, hash } = stripTargetMetadata(target);
+      if (!path && hash) {
+        const slug = safeDecodeURIComponent(hash).replace(/^#/, '');
+        if (!headingSlugs.has(slug)) {
+          diagnostics.push({
+            column,
+            kind: 'missing-heading',
+            line: lineIndex + 1,
+            message: `未找到标题锚点 #${slug}`,
+            target,
+          });
+        }
+        continue;
+      }
+
+      if (path && !targetExists(safeDecodeURIComponent(path), context)) {
+        diagnostics.push({
+          column,
+          kind: 'missing-file',
+          line: lineIndex + 1,
+          message: `未找到链接文件 ${path}`,
+          target,
+        });
+      }
+    }
+  });
+
+  return diagnostics;
+}

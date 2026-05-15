@@ -5,6 +5,8 @@ import { useWorkspaceStore } from '../../workspace/store';
 import { loadFolderTree } from '../../workspace/lib/loadFolderTree';
 import { MARKDOWN_FILE_FILTERS, basename, dirname } from '../../workspace/services';
 import { openPrismWindow } from '../../../lib/openWindow';
+import { getFileSnapshotOrNull } from '../fileSnapshot';
+import { grantMarkdownFileScope } from '../../../lib/fileSystemScope';
 
 export function OpenFileButton() {
   const currentDocument = useDocumentStore((s) => s.currentDocument);
@@ -19,18 +21,18 @@ export function OpenFileButton() {
       });
 
       if (typeof selected !== 'string') return;
+      await grantMarkdownFileScope(selected);
 
       if (!currentDocument) {
-        console.log('[OpenFileButton] Loading in current window');
+        const snapshot = await getFileSnapshotOrNull(selected);
         const content = await readTextFile(selected);
-        openDocument(selected, basename(selected), content);
+        openDocument(selected, basename(selected), content, snapshot);
 
         const parentDir = dirname(selected);
         setRootPath(parentDir);
         const tree = await loadFolderTree(parentDir);
         setFileTree(tree);
       } else {
-        console.log('[OpenFileButton] Opening new window');
         await openPrismWindow({ filePath: selected });
       }
     } catch (err) {

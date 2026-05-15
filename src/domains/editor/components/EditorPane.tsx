@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -13,17 +14,32 @@ import { markdown } from '@codemirror/lang-markdown';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { history, historyKeymap, defaultKeymap, indentWithTab, undo, redo } from '@codemirror/commands';
 import { indentOnInput, bracketMatching, foldGutter, foldKeymap } from '@codemirror/language';
-import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
+import { autocompletion, closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { SearchQuery, setSearchQuery, findNext, findPrevious, replaceNext, replaceAll, search, selectMatches } from '@codemirror/search';
+import { useDocumentStore } from '../../document/store';
 import { useSettingsStore } from '../../settings/store';
 import type { ContentTheme } from '../../settings/types';
 import { useWorkspaceStore } from '../../workspace/store';
+import { flattenFiles } from '../../workspace/services';
 import type { SearchAction, SearchParams } from './SearchPanel';
 import { ContextMenu } from '../../../components/shell/ContextMenu';
 import { markdownToHtml } from '../../../lib/markdownToHtml';
 import { isCommandId } from '../../commands';
 import { getEditorContextMenuItems } from '../extensions/contextMenu';
 import { getEditorFormatResult, type EditorFormat } from '../extensions/formatting';
+import { createMarkdownLinkCompletionSource } from '../extensions/linkCompletion';
+import {
+  getMarkdownImageForPath,
+  getNativeImageFilePath,
+  isSupportedImageFile,
+  saveClipboardImage,
+} from '../extensions/imagePaste';
+import { markdownListKeymap } from '../extensions/markdownLists';
+import { getMarkdownTableCommandEdit, type MarkdownTableCommand } from '../extensions/tables';
+import {
+  getMarkdownTemplateInsertEdit,
+  isMarkdownTemplateId,
+} from '../extensions/templates';
 import {
   MIAOYAN_CODE_BLOCK_HIGHLIGHT_LIMIT,
   compatibilityMarkdownPlugin,
@@ -41,6 +57,7 @@ const editorLineWrappingCompartment = new Compartment();
 const editorDarkThemeCompartment = new Compartment();
 const editorContentThemeCompartment = new Compartment();
 const editorTypographyCompartment = new Compartment();
+const editorLinkCompletionCompartment = new Compartment();
 const editorDarkThemeExtension = [
   oneDark,
   EditorView.theme(
@@ -125,6 +142,19 @@ function getTypographyExtension(fontSize: number, lineHeight: number, fontFamily
   });
 }
 
+function getLinkCompletionExtension(input: {
+  currentDocumentPath?: string;
+  workspaceFiles: Array<{ name: string; path: string }>;
+  workspaceRootPath?: string | null;
+}) {
+  return autocompletion({
+    activateOnTyping: true,
+    override: [
+      createMarkdownLinkCompletionSource(() => input),
+    ],
+  });
+}
+
 export interface EditorPaneHandle {
   focus: () => void;
   jumpToLine: (line: number) => void;
@@ -139,6 +169,8 @@ interface EditorPaneProps {
   content: string;
   onChange: (content: string) => void;
   onCursorChange?: (cursor: { line: number; column: number }) => void;
+  onSelectionTextChange?: (text: string) => void;
+  onNotice?: (message: string) => void;
   onScrollRatioChange?: (ratio: number) => void;
   onTopLineChange?: (line: number) => void;
   onScroll?: () => void;
@@ -151,6 +183,17 @@ function getCursorPosition(view: EditorView) {
     line: line.number,
     column: pos - line.from + 1,
   };
+}
+
+function getSelectedText(view: EditorView) {
+  const selection = view.state.selection.main;
+  if (selection.from === selection.to) return '';
+  return view.state.doc.sliceString(selection.from, selection.to);
+}
+
+function formatEditorError(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  return String(error);
 }
 
 export const __editorPaneTesting = {
@@ -166,17 +209,31 @@ export const __editorPaneTesting = {
 
 export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
   function EditorPane(
-    { content, onChange, onCursorChange, onScrollRatioChange, onTopLineChange, onScroll },
+    {
+      content,
+      onChange,
+      onCursorChange,
+      onSelectionTextChange,
+      onNotice,
+      onScrollRatioChange,
+      onTopLineChange,
+      onScroll,
+    },
     ref,
   ) {
     const editorRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
     const onChangeRef = useRef(onChange);
     const onCursorChangeRef = useRef(onCursorChange);
+    const onSelectionTextChangeRef = useRef(onSelectionTextChange);
+    const onNoticeRef = useRef(onNotice);
     const onScrollRatioChangeRef = useRef(onScrollRatioChange);
     const onTopLineChangeRef = useRef(onTopLineChange);
     const onScrollRef = useRef(onScroll);
     const contentTheme = useSettingsStore((s) => s.contentTheme);
+    const currentDocumentPath = useDocumentStore((s) => s.currentDocument?.path || undefined);
+    const workspaceRootPath = useWorkspaceStore((s) => s.rootPath);
+    const workspaceFileTree = useWorkspaceStore((s) => s.fileTree);
     const isEditorDark = useSettingsStore((s) => shouldUseDarkEditor(s.contentTheme, s.theme));
     const showLineNumbers = useSettingsStore((s) => s.showLineNumbers);
     const wordWrap = useSettingsStore((s) => s.wordWrap);
@@ -187,6 +244,13 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     const shortcutStyle = useSettingsStore((s) => s.shortcutStyle);
     const typewriterMode = useWorkspaceStore((s) => s.typewriterMode);
     const typewriterModeRef = useRef(typewriterMode);
+    const workspaceLinkFiles = useMemo(
+      () => flattenFiles(workspaceFileTree, workspaceRootPath).map(({ node }) => ({
+        name: node.name,
+        path: node.path,
+      })),
+      [workspaceFileTree, workspaceRootPath],
+    );
     
     // 关键标记：用于拦截因同步内容触发的 onChange
     const isUpdatingFromPropsRef = useRef(false);
@@ -204,6 +268,14 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     useEffect(() => {
       onCursorChangeRef.current = onCursorChange;
     }, [onCursorChange]);
+
+    useEffect(() => {
+      onSelectionTextChangeRef.current = onSelectionTextChange;
+    }, [onSelectionTextChange]);
+
+    useEffect(() => {
+      onNoticeRef.current = onNotice;
+    }, [onNotice]);
 
     useEffect(() => {
       onScrollRatioChangeRef.current = onScrollRatioChange;
@@ -334,10 +406,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       },
       getSelectedText: () => {
         const view = viewRef.current;
-        if (!view) return '';
-        const selection = view.state.selection.main;
-        if (selection.from === selection.to) return '';
-        return view.state.doc.sliceString(selection.from, selection.to);
+        return view ? getSelectedText(view) : '';
       },
     }));
 
@@ -379,6 +448,147 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       view.focus();
     }, []);
 
+    const handleTableCommand = useCallback((command: MarkdownTableCommand) => {
+      const view = viewRef.current;
+      if (!view) return false;
+
+      const selection = view.state.selection.main;
+      const result = getMarkdownTableCommandEdit(
+        view.state.doc.toString(),
+        selection.from,
+        selection.to,
+        command,
+      );
+      if (!result) return false;
+
+      view.dispatch({
+        changes: {
+          from: result.from,
+          to: result.to,
+          insert: result.insert,
+        },
+        selection: { anchor: result.selectionFrom, head: result.selectionTo },
+        scrollIntoView: true,
+      });
+      view.focus();
+      return true;
+    }, []);
+
+    const handleTemplateInsert = useCallback((templateId: unknown) => {
+      const view = viewRef.current;
+      if (!view || !isMarkdownTemplateId(templateId)) return false;
+
+      const selection = view.state.selection.main;
+      const result = getMarkdownTemplateInsertEdit(
+        view.state.doc.toString(),
+        selection.from,
+        selection.to,
+        templateId,
+      );
+
+      view.dispatch({
+        changes: {
+          from: result.from,
+          to: result.to,
+          insert: result.insert,
+        },
+        selection: { anchor: result.selectionFrom, head: result.selectionTo },
+        scrollIntoView: true,
+      });
+      view.focus();
+      return true;
+    }, []);
+
+    const handleClipboardImagePaste = useCallback(async (event: ClipboardEvent, view: EditorView) => {
+      const imageItem = Array.from(event.clipboardData?.items ?? []).find((item) => item.type.startsWith('image/'));
+      if (!imageItem) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const imageFile = imageItem.getAsFile();
+      const document = useDocumentStore.getState().currentDocument;
+      if (!imageFile) {
+        onNoticeRef.current?.('剪贴板图片不可读取');
+        return;
+      }
+      if (!document?.path) {
+        onNoticeRef.current?.('请先保存 Markdown 文档，再粘贴图片');
+        return;
+      }
+
+      try {
+        const markdownImage = await saveClipboardImage({
+          documentName: document.name,
+          documentPath: document.path,
+          file: imageFile,
+        });
+        const selection = view.state.selection.main;
+        view.dispatch({
+          changes: { from: selection.from, to: selection.to, insert: markdownImage },
+          selection: { anchor: selection.from + markdownImage.length },
+          scrollIntoView: true,
+        });
+      } catch (error) {
+        onNoticeRef.current?.(`图片粘贴失败: ${formatEditorError(error)}`);
+      }
+    }, []);
+
+    const insertAtSelection = useCallback((view: EditorView, text: string) => {
+      const selection = view.state.selection.main;
+      view.dispatch({
+        changes: { from: selection.from, to: selection.to, insert: text },
+        selection: { anchor: selection.from + text.length },
+        scrollIntoView: true,
+      });
+      view.focus();
+    }, []);
+
+    const handleImageDrop = useCallback(async (event: DragEvent, view: EditorView) => {
+      const imageFiles = Array.from(event.dataTransfer?.files ?? []).filter(isSupportedImageFile);
+      if (imageFiles.length === 0) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (event.altKey) {
+        const markdownLinks = imageFiles
+          .map((file) => {
+            const nativePath = getNativeImageFilePath(file);
+            return nativePath ? getMarkdownImageForPath(nativePath, file.name) : null;
+          })
+          .filter((link): link is string => Boolean(link));
+
+        if (markdownLinks.length === 0) {
+          onNoticeRef.current?.('当前运行环境无法读取拖拽文件原始路径');
+          return;
+        }
+
+        insertAtSelection(view, markdownLinks.join('\n'));
+        return;
+      }
+
+      const document = useDocumentStore.getState().currentDocument;
+      if (!document?.path) {
+        onNoticeRef.current?.('请先保存 Markdown 文档，再拖入图片');
+        return;
+      }
+
+      try {
+        const markdownImages: string[] = [];
+        for (const file of imageFiles) {
+          markdownImages.push(await saveClipboardImage({
+            documentName: document.name,
+            documentPath: document.path,
+            file,
+          }));
+        }
+        insertAtSelection(view, markdownImages.join('\n'));
+      } catch (error) {
+        onNoticeRef.current?.(`图片拖拽失败: ${formatEditorError(error)}`);
+      }
+    }, [insertAtSelection]);
+
     // 监听菜单格式化事件
     useEffect(() => {
       const onFormat = (e: Event) => {
@@ -389,7 +599,9 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         const view = viewRef.current;
         if (!view) return;
         const detail = (e as CustomEvent).detail;
-        const level = parseInt(detail.level.replace('h', ''), 10);
+        const levelValue = typeof detail?.level === 'string' ? detail.level : '';
+        if (!/^h[1-6]$/.test(levelValue)) return;
+        const level = Number(levelValue.slice(1));
         const prefix = '#'.repeat(level) + ' ';
         const cursor = view.state.selection.main.head;
         const line = view.state.doc.lineAt(cursor);
@@ -404,7 +616,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         const view = viewRef.current;
         if (!view) return;
         const detail = (e as CustomEvent).detail;
-        const fmt: string = detail.format;
+        const fmt = typeof detail?.format === 'string' ? detail.format : '';
+        if (!fmt) return;
         const cursor = view.state.selection.main.head;
         const line = view.state.doc.lineAt(cursor);
         const lineText = view.state.doc.sliceString(line.from, line.to);
@@ -490,7 +703,9 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       const onEditorCommand = (e: Event) => {
         const view = viewRef.current;
         if (!view) return;
-        const { command } = (e as CustomEvent).detail;
+        const detail = (e as CustomEvent).detail;
+        const command = typeof detail?.command === 'string' ? detail.command : '';
+        if (!command) return;
 
         switch (command) {
           case 'undo':
@@ -534,6 +749,27 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             view.dispatch({ changes: { from: sel3.from, to: sel3.to, insert: cleaned } });
             break;
           }
+          case 'insertTable':
+            handleTableCommand('insert');
+            break;
+          case 'formatTable':
+            handleTableCommand('format');
+            break;
+          case 'addTableRow':
+            handleTableCommand('addRow');
+            break;
+          case 'addTableColumn':
+            handleTableCommand('addColumn');
+            break;
+          case 'deleteTableRow':
+            handleTableCommand('deleteRow');
+            break;
+          case 'deleteTableColumn':
+            handleTableCommand('deleteColumn');
+            break;
+          case 'insertTemplate':
+            handleTemplateInsert(detail.templateId);
+            break;
           case 'comment': {
             const sel4 = view.state.selection.main;
             const raw2 = view.state.doc.sliceString(sel4.from, sel4.to);
@@ -554,25 +790,21 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         window.removeEventListener('prism-block-format', onBlock);
         window.removeEventListener('prism-editor-command', onEditorCommand);
       };
-    }, [handleFormat]);
+    }, [handleFormat, handleTableCommand, handleTemplateInsert]);
 
     // 处理来自 Props 的内容同步（非重挂载情况）
     useEffect(() => {
       const view = viewRef.current;
       if (!view) {
-        console.log('[EditorPane] content sync skipped: no view yet, incoming len:', content.length);
         return;
       }
 
       const currentContent = view.state.doc.toString();
-      console.log('[EditorPane] content sync check currentLen:', currentContent.length, 'incomingLen:', content.length, 'same:', currentContent === content);
       if (currentContent !== content) {
-        console.log('[EditorPane] dispatching content sync');
         isUpdatingFromPropsRef.current = true;
         view.dispatch({
           changes: { from: 0, to: currentContent.length, insert: content }
         });
-        console.log('[EditorPane] after dispatch, editorLen:', view.state.doc.length, 'first200:', view.state.doc.sliceString(0, 200), '|| incomingFirst200:', content.slice(0, 200));
       }
     }, [content]);
 
@@ -608,6 +840,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             createPanel: createHiddenSearchPanel,
             scrollToMatch: (range) => EditorView.scrollIntoView(range, { y: 'center' }),
           }),
+          Prec.high(keymap.of(markdownListKeymap)),
           editorLineWrappingCompartment.of(getLineWrappingExtensions(wordWrap)),
           EditorState.allowMultipleSelections.of(true),
           indentOnInput(),
@@ -622,6 +855,11 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           editorSelectionPlugin,
           bracketMatching(),
           closeBrackets(),
+          editorLinkCompletionCompartment.of(getLinkCompletionExtension({
+            currentDocumentPath,
+            workspaceFiles: workspaceLinkFiles,
+            workspaceRootPath,
+          })),
           rectangularSelection(),
           crosshairCursor(),
           highlightActiveLine(),
@@ -664,15 +902,14 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           EditorView.updateListener.of((update: ViewUpdate) => {
             if (update.docChanged) {
               if (isUpdatingFromPropsRef.current) {
-                console.log('[EditorPane] updateListener: ignoring prop-driven docChanged');
                 isUpdatingFromPropsRef.current = false;
               } else {
-                console.log('[EditorPane] updateListener: forwarding onChange, len:', update.state.doc.length);
                 onChangeRef.current(update.state.doc.toString());
               }
             }
             if (update.docChanged || update.selectionSet) {
               onCursorChangeRef.current?.(getCursorPosition(update.view));
+              onSelectionTextChangeRef.current?.(getSelectedText(update.view));
               if (typewriterModeRef.current && update.selectionSet) {
                 scrollPrimarySelectionToCenter(update.view);
               }
@@ -713,6 +950,20 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       };
 
       view.dom.addEventListener('contextmenu', handleContextMenu);
+      const handlePaste = (event: ClipboardEvent) => {
+        void handleClipboardImagePaste(event, view);
+      };
+      view.dom.addEventListener('paste', handlePaste);
+      const handleDragOver = (event: DragEvent) => {
+        const hasImage = Array.from(event.dataTransfer?.items ?? []).some((item) => item.type.startsWith('image/'));
+        if (!hasImage) return;
+        event.preventDefault();
+      };
+      const handleDrop = (event: DragEvent) => {
+        void handleImageDrop(event, view);
+      };
+      view.dom.addEventListener('dragover', handleDragOver);
+      view.dom.addEventListener('drop', handleDrop);
       const handleScroll = () => {
         const scroller = view.scrollDOM;
         const maxScroll = scroller.scrollHeight - scroller.clientHeight;
@@ -736,6 +987,9 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
 
       return () => {
         view.dom.removeEventListener('contextmenu', handleContextMenu);
+        view.dom.removeEventListener('paste', handlePaste);
+        view.dom.removeEventListener('dragover', handleDragOver);
+        view.dom.removeEventListener('drop', handleDrop);
         view.scrollDOM.removeEventListener('scroll', handleScroll);
         view.destroy();
         viewRef.current = null;
@@ -787,6 +1041,18 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         )),
       });
     }, [editorFontFamily, editorFontSize, editorFontSource.kind, editorLineHeight]);
+
+    useEffect(() => {
+      const view = viewRef.current;
+      if (!view) return;
+      view.dispatch({
+        effects: editorLinkCompletionCompartment.reconfigure(getLinkCompletionExtension({
+          currentDocumentPath,
+          workspaceFiles: workspaceLinkFiles,
+          workspaceRootPath,
+        })),
+      });
+    }, [currentDocumentPath, workspaceLinkFiles, workspaceRootPath]);
 
     return (
       <>

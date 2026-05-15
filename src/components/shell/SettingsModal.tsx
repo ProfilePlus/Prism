@@ -1,4 +1,4 @@
-import { useEffect, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useSettingsStore } from '../../domains/settings/store';
 import type {
@@ -43,8 +43,61 @@ function getFontSourceHint(source: FontSource, resolvedFamily: string) {
   return source.kind === 'theme' ? '跟随主题' : resolvedFamily;
 }
 
+function getPandocHint(settings: ReturnType<typeof useSettingsStore.getState>['pandoc']) {
+  if (settings.detected && settings.version) return `已检测 ${settings.version}`;
+  if (settings.lastError) return settings.lastError;
+  return '留空检测系统 pandoc，也可填写完整可执行文件路径';
+}
+
+function hasSupportedPathExtension(path: string, extensions: string[]) {
+  const normalized = path.trim().toLowerCase();
+  return normalized.length === 0 || extensions.some((extension) => normalized.endsWith(extension));
+}
+
+function getBibliographyHint(path: string) {
+  if (!path.trim()) return 'BibTeX / CSL JSON 文件路径，用于 Pandoc 引用导出';
+  if (!hasSupportedPathExtension(path, ['.bib', '.bibtex', '.json'])) {
+    return '建议使用 .bib、.bibtex 或 .json 文件';
+  }
+  return '已配置，HTML 导出会在 Pandoc 可用时处理引用';
+}
+
+function getCslStyleHint(path: string) {
+  if (!path.trim()) return '可填写 .csl 路径，留空时使用 Pandoc 默认样式';
+  if (!hasSupportedPathExtension(path, ['.csl'])) {
+    return 'CSL 样式通常是 .csl 文件';
+  }
+  return '已配置，引用导出会优先使用该样式';
+}
+
+function getCitationReadinessHint(input: {
+  bibliographyPath: string;
+  bibliographyPathIsSupported: boolean;
+  cslStylePath: string;
+  cslStylePathIsSupported: boolean;
+  pandocDetected: boolean;
+}) {
+  const hasBibliography = input.bibliographyPath.trim().length > 0;
+  const hasCslStyle = input.cslStylePath.trim().length > 0;
+
+  if (!input.bibliographyPathIsSupported || !input.cslStylePathIsSupported) {
+    return '引用路径后缀需要先修正；否则导出会回退到 citekey 占位。';
+  }
+  if (!hasBibliography && hasCslStyle) {
+    return '已配置 CSL，但还需要参考文献文件才会启用引用导出。';
+  }
+  if (!hasBibliography) {
+    return '未配置参考文献文件；Markdown 预览会保留 citekey 占位。';
+  }
+  if (!input.pandocDetected) {
+    return '已配置参考文献；当前未检测到 Pandoc，导出会保留 citekey 占位并提示原因。';
+  }
+  return '引用导出已就绪；HTML 导出会优先尝试 Pandoc citeproc。';
+}
+
 export function SettingsModal({ visible, onClose }: SettingsModalProps) {
   const settings = useSettingsStore();
+  const [pandocChecking, setPandocChecking] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -79,6 +132,28 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     color: 'var(--c-void)',
     cursor: 'pointer',
   };
+  const inputStyle: CSSProperties = {
+    ...selectStyle,
+    cursor: 'text',
+    width: 220,
+  };
+  const citationPathInputStyle: CSSProperties = {
+    ...inputStyle,
+    width: 260,
+    maxWidth: 320,
+  };
+  const bibliographyPathIsSupported = hasSupportedPathExtension(
+    settings.citation.bibliographyPath,
+    ['.bib', '.bibtex', '.json'],
+  );
+  const cslStylePathIsSupported = hasSupportedPathExtension(settings.citation.cslStylePath, ['.csl']);
+  const citationReadinessHint = getCitationReadinessHint({
+    bibliographyPath: settings.citation.bibliographyPath,
+    bibliographyPathIsSupported,
+    cslStylePath: settings.citation.cslStylePath,
+    cslStylePathIsSupported,
+    pandocDetected: settings.pandoc.detected,
+  });
 
   const importFont = async () => {
     const result = await importCustomFont();
@@ -89,6 +164,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     const selected = await open({
       directory: true,
       multiple: false,
+      recursive: false,
       defaultPath: settings.exportDefaults.customDirectory || undefined,
     });
     if (!selected || Array.isArray(selected)) return;
@@ -100,6 +176,15 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     const font = settings.customFonts.find((item) => item.id === fontId);
     if (font) await deleteCustomFontFile(font);
     settings.removeCustomFont(fontId);
+  };
+
+  const detectPandoc = async () => {
+    setPandocChecking(true);
+    try {
+      await settings.detectPandoc();
+    } finally {
+      setPandocChecking(false);
+    }
   };
 
   const fontOptions = (
@@ -350,6 +435,30 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
             </div>
             <div className="settings-row">
               <div>
+                <div className="row-label">允许 Front matter 覆盖导出</div>
+                <div className="row-hint">开启后当前文件可覆盖 title / template / paper / margin / toc</div>
+              </div>
+              <div
+                className={toggleClass(settings.exportDefaults.frontMatterOverrides)}
+                onClick={() => settings.setExportFrontMatterOverrides(!settings.exportDefaults.frontMatterOverrides)}
+                role="switch"
+                aria-checked={settings.exportDefaults.frontMatterOverrides}
+              />
+            </div>
+            <div className="settings-row">
+              <div>
+                <div className="row-label">目录</div>
+                <div className="row-hint">导出 HTML / PDF / PNG / DOCX 时插入静态目录</div>
+              </div>
+              <div
+                className={toggleClass(settings.exportDefaults.toc)}
+                onClick={() => settings.setExportToc(!settings.exportDefaults.toc)}
+                role="switch"
+                aria-checked={settings.exportDefaults.toc}
+              />
+            </div>
+            <div className="settings-row">
+              <div>
                 <div className="row-label">PDF 边距</div>
                 <div className="row-hint">紧凑适合长文，宽松适合正式文档</div>
               </div>
@@ -363,6 +472,58 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                 <option value="wide">宽松</option>
               </select>
             </div>
+            <div className="settings-row">
+              <div>
+                <div className="row-label">页码</div>
+                <div className="row-hint">导出 PDF / DOCX 时在页脚居中显示页码</div>
+              </div>
+              <div
+                className={toggleClass(settings.exportDefaults.pdfPageNumbers)}
+                onClick={() => settings.setExportPdfPageNumbers(!settings.exportDefaults.pdfPageNumbers)}
+                role="switch"
+                aria-checked={settings.exportDefaults.pdfPageNumbers}
+              />
+            </div>
+            <div className="settings-row">
+              <div>
+                <div className="row-label">页眉页脚</div>
+                <div className="row-hint">导出 PDF / DOCX 时使用相同模板变量</div>
+              </div>
+              <div
+                className={toggleClass(settings.exportDefaults.pageHeaderFooter)}
+                onClick={() => settings.setExportPageHeaderFooter(!settings.exportDefaults.pageHeaderFooter)}
+                role="switch"
+                aria-checked={settings.exportDefaults.pageHeaderFooter}
+              />
+            </div>
+            {settings.exportDefaults.pageHeaderFooter && (
+              <>
+                <div className="settings-row">
+                  <div>
+                    <div className="row-label">页眉文本</div>
+                    <div className="row-hint">默认使用导出标题</div>
+                  </div>
+                  <input
+                    value={settings.exportDefaults.pageHeaderText}
+                    onChange={(e) => settings.setExportPageHeaderText(e.target.value)}
+                    maxLength={160}
+                    style={inputStyle}
+                  />
+                </div>
+                <div className="settings-row">
+                  <div>
+                    <div className="row-label">页脚文本</div>
+                    <div className="row-hint">默认使用文件名，可与页码并存</div>
+                  </div>
+                  <input
+                    value={settings.exportDefaults.pageFooterText}
+                    onChange={(e) => settings.setExportPageFooterText(e.target.value)}
+                    maxLength={160}
+                    style={inputStyle}
+                  />
+                </div>
+              </>
+            )}
             <div className="settings-row">
               <div>
                 <div className="row-label">默认导出位置</div>
@@ -419,6 +580,87 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                 </select>
               </div>
             )}
+            <div className="settings-row">
+              <div>
+                <div className="row-label">Pandoc 路径</div>
+                <div className="row-hint">{getPandocHint(settings.pandoc)}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  aria-label="Pandoc 路径"
+                  value={settings.pandoc.path}
+                  onChange={(e) => settings.setPandocPath(e.target.value)}
+                  placeholder="pandoc 或 /opt/homebrew/bin/pandoc"
+                  style={inputStyle}
+                />
+                <button
+                  type="button"
+                  style={pandocChecking ? { ...buttonStyle, opacity: 0.55, cursor: 'default' } : buttonStyle}
+                  onClick={detectPandoc}
+                  disabled={pandocChecking}
+                >
+                  {pandocChecking ? '检测中' : '检测'}
+                </button>
+              </div>
+            </div>
+            <div className="settings-row">
+              <div>
+                <div className="row-label">参考文献文件</div>
+                <div className="row-hint">{getBibliographyHint(settings.citation.bibliographyPath)}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  aria-label="参考文献文件路径"
+                  aria-invalid={!bibliographyPathIsSupported}
+                  value={settings.citation.bibliographyPath}
+                  onChange={(e) => settings.setCitationBibliographyPath(e.target.value)}
+                  placeholder="/Users/Alex/library.bib"
+                  style={citationPathInputStyle}
+                />
+                {settings.citation.bibliographyPath && (
+                  <button
+                    type="button"
+                    style={buttonStyle}
+                    onClick={() => settings.setCitationBibliographyPath('')}
+                    aria-label="清除参考文献文件"
+                  >
+                    清除
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="settings-row">
+              <div>
+                <div className="row-label">CSL 样式文件</div>
+                <div className="row-hint">{getCslStyleHint(settings.citation.cslStylePath)}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  aria-label="CSL 样式文件路径"
+                  aria-invalid={!cslStylePathIsSupported}
+                  value={settings.citation.cslStylePath}
+                  onChange={(e) => settings.setCitationCslStylePath(e.target.value)}
+                  placeholder="/Users/Alex/styles/chinese-gb7714.csl"
+                  style={citationPathInputStyle}
+                />
+                {settings.citation.cslStylePath && (
+                  <button
+                    type="button"
+                    style={buttonStyle}
+                    onClick={() => settings.setCitationCslStylePath('')}
+                    aria-label="清除 CSL 样式"
+                  >
+                    清除
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="settings-row">
+              <div>
+                <div className="row-label">引用导出状态</div>
+                <div className="row-hint" aria-live="polite">{citationReadinessHint}</div>
+              </div>
+            </div>
             <div className="settings-row">
               <div>
                 <div className="row-label">HTML 包含主题</div>

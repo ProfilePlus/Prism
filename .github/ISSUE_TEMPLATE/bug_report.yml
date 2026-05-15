@@ -6,12 +6,12 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for helping improve Prism. Screenshots and small Markdown samples are especially useful.
+        Thanks for helping improve Prism. Screenshots, the current view mode, content theme, and small Markdown samples are especially useful.
   - type: input
     id: version
     attributes:
       label: Prism version
-      placeholder: "v0.1.1"
+      placeholder: "v1.4.0"
     validations:
       required: true
   - type: dropdown
@@ -39,6 +39,24 @@ body:
         - File tree
         - Build / install
         - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: view_mode
+    attributes:
+      label: View mode
+      options:
+        - Edit
+        - Split
+        - Preview
+        - Not applicable
+    validations:
+      required: true
+  - type: input
+    id: content_theme
+    attributes:
+      label: Content theme
+      placeholder: "MiaoYan / Inkstone / Slate / Mono / Nocturne Dark"
     validations:
       required: true
   - type: textarea
@@ -70,4 +88,3 @@ body:
     attributes:
       label: Screenshots or screen recordings
       description: Drag images or videos here if they help explain the issue.
-

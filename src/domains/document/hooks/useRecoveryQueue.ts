@@ -1,0 +1,90 @@
+import { useCallback, useEffect, useState } from 'react';
+import {
+  deleteRecoverySnapshot,
+  listRecoverySnapshots,
+  restoreRecoverySnapshot,
+  type RecoverySnapshot,
+} from '../services/recovery';
+
+export type RecoveryAction = 'restore' | 'discard';
+
+interface UseRecoveryQueueOptions {
+  showToast: (message: string) => void;
+}
+
+interface UseRecoveryQueueResult {
+  activeRecoverySnapshot: RecoverySnapshot | null;
+  recoveryAction: RecoveryAction | null;
+  handleRestoreRecovery: () => Promise<void>;
+  handleDiscardRecovery: () => Promise<void>;
+}
+
+function formatRecoveryError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error instanceof Event) return error.type || '未知事件错误';
+  return String(error);
+}
+
+export function useRecoveryQueue({ showToast }: UseRecoveryQueueOptions): UseRecoveryQueueResult {
+  const [recoverySnapshots, setRecoverySnapshots] = useState<RecoverySnapshot[]>([]);
+  const [recoveryAction, setRecoveryAction] = useState<RecoveryAction | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    listRecoverySnapshots()
+      .then((snapshots) => {
+        if (!cancelled) setRecoverySnapshots(snapshots);
+      })
+      .catch(() => {
+        if (!cancelled) setRecoverySnapshots([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const removeRecoverySnapshotFromList = useCallback((snapshot: RecoverySnapshot) => {
+    setRecoverySnapshots((snapshots) => snapshots.filter((item) => item.id !== snapshot.id));
+  }, []);
+
+  const handleRestoreRecovery = useCallback(async () => {
+    const snapshot = recoverySnapshots[0];
+    if (!snapshot || recoveryAction) return;
+
+    setRecoveryAction('restore');
+    try {
+      await restoreRecoverySnapshot(snapshot);
+      removeRecoverySnapshotFromList(snapshot);
+      showToast('已恢复本地快照');
+    } catch (error) {
+      showToast(`恢复失败: ${formatRecoveryError(error)}`);
+    } finally {
+      setRecoveryAction(null);
+    }
+  }, [recoveryAction, recoverySnapshots, removeRecoverySnapshotFromList, showToast]);
+
+  const handleDiscardRecovery = useCallback(async () => {
+    const snapshot = recoverySnapshots[0];
+    if (!snapshot || recoveryAction) return;
+
+    setRecoveryAction('discard');
+    try {
+      await deleteRecoverySnapshot(snapshot);
+      removeRecoverySnapshotFromList(snapshot);
+      showToast('已丢弃恢复快照');
+    } catch (error) {
+      showToast(`丢弃失败: ${formatRecoveryError(error)}`);
+    } finally {
+      setRecoveryAction(null);
+    }
+  }, [recoveryAction, recoverySnapshots, removeRecoverySnapshotFromList, showToast]);
+
+  return {
+    activeRecoverySnapshot: recoverySnapshots[0] ?? null,
+    recoveryAction,
+    handleRestoreRecovery,
+    handleDiscardRecovery,
+  };
+}

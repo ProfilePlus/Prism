@@ -7,6 +7,7 @@ import rehypeKatex from 'rehype-katex';
 import rehypeStringify from 'rehype-stringify';
 import rehypeHighlight from 'rehype-highlight';
 import { visit } from 'unist-util-visit';
+import { findPandocCitations } from '../domains/editor/extensions/citations';
 
 function remarkMermaid() {
   return (tree: any) => {
@@ -15,10 +16,85 @@ function remarkMermaid() {
       if (index === undefined || !parent) return;
 
       const encoded = encodeURIComponent(node.value);
+      const line = node.position?.start?.line;
       parent.children[index] = {
-        type: 'html',
-        value: `<div class="mermaid-placeholder" data-mermaid="${encoded}"></div>`,
+        type: 'mermaid',
+        data: {
+          hName: 'div',
+          hProperties: {
+            className: ['mermaid-placeholder'],
+            dataMermaid: encoded,
+            ...(Number.isFinite(line)
+              ? {
+                  'data-source-line': String(line),
+                  'data-line': String(line),
+                  dataLine: String(line),
+                }
+              : {}),
+          },
+        },
+        children: [],
       };
+    });
+  };
+}
+
+function remarkCollectMathLines(mathLines: number[]) {
+  return (tree: any) => {
+    visit(tree, 'math', (node: any) => {
+      const line = node.position?.start?.line;
+      if (Number.isFinite(line)) mathLines.push(line);
+    });
+  };
+}
+
+function rehypeDisplayMathLines(mathLines: number[]) {
+  return (tree: any) => {
+    visit(tree, 'element', (node: any) => {
+      const className = node.properties?.className;
+      if (!Array.isArray(className) || !className.includes('katex-display')) return;
+      const line = mathLines.shift();
+      if (!Number.isFinite(line)) return;
+      node.properties = node.properties || {};
+      node.properties['data-source-line'] = String(line);
+      node.properties['data-line'] = String(line);
+    });
+  };
+}
+
+function isUnsafePreviewUrl(value: unknown, allowedProtocols: Set<string>) {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (
+    trimmed.startsWith('#')
+    || trimmed.startsWith('//')
+    || trimmed.startsWith('/')
+    || trimmed.startsWith('./')
+    || trimmed.startsWith('../')
+    || trimmed.startsWith('?')
+  ) {
+    return false;
+  }
+
+  const protocolCandidate = trimmed.replace(/[\u0000-\u001F\u007F]+/g, '');
+  const protocol = /^[a-zA-Z][a-zA-Z\d+.-]*:/.exec(protocolCandidate)?.[0].toLowerCase();
+  return Boolean(protocol && !allowedProtocols.has(protocol));
+}
+
+function rehypePreviewUrlSafety() {
+  const linkProtocols = new Set(['http:', 'https:', 'mailto:']);
+  const mediaProtocols = new Set(['http:', 'https:']);
+
+  return (tree: any) => {
+    visit(tree, 'element', (node: any) => {
+      if (!node.properties) return;
+      if (node.tagName === 'a' && isUnsafePreviewUrl(node.properties.href, linkProtocols)) {
+        delete node.properties.href;
+      }
+      if ((node.tagName === 'img' || node.tagName === 'source') && isUnsafePreviewUrl(node.properties.src, mediaProtocols)) {
+        delete node.properties.src;
+      }
     });
   };
 }
@@ -30,6 +106,7 @@ function remarkBlockLines() {
     'blockquote',
     'list',
     'listItem',
+    'math',
     'code',
     'table',
     'thematicBreak',
@@ -41,6 +118,9 @@ function remarkBlockLines() {
       node.data = node.data || {};
       node.data.hProperties = node.data.hProperties || {};
       const line = node.position.start.line;
+      if (node.data.hProperties['data-source-line'] === undefined) {
+        node.data.hProperties['data-source-line'] = String(line);
+      }
       if (node.data.hProperties['data-line'] === undefined) {
         node.data.hProperties['data-line'] = String(line);
       }
@@ -68,8 +148,12 @@ function remarkMark() {
           children.push({ type: 'text', value: value.slice(lastIndex, match.index) });
         }
         children.push({
-          type: 'html',
-          value: `<mark>${match[1]}</mark>`,
+          type: 'mark',
+          data: {
+            hName: 'mark',
+            hChildren: [{ type: 'text', value: match[1] }],
+          },
+          children: [{ type: 'text', value: match[1] }],
         });
         lastIndex = match.index + match[0].length;
       }
@@ -83,25 +167,70 @@ function remarkMark() {
   };
 }
 
+function remarkCitations() {
+  return (tree: any) => {
+    visit(tree, 'text', (node: any, index, parent) => {
+      if (index === undefined || !parent) return;
+      if (parent.type === 'link' || parent.type === 'linkReference') return;
+
+      const value: string = node.value;
+      const citations = findPandocCitations(value);
+      if (citations.length === 0) return;
+
+      const children: any[] = [];
+      let lastIndex = 0;
+      citations.forEach((citation) => {
+        if (citation.index > lastIndex) {
+          children.push({ type: 'text', value: value.slice(lastIndex, citation.index) });
+        }
+        children.push({
+          type: 'citation',
+          data: {
+            hName: 'span',
+            hProperties: {
+              className: ['prism-citation'],
+              dataCitekeys: citation.keys.join(' '),
+              title: `引用占位：${citation.keys.map((key) => `@${key}`).join(', ')}`,
+            },
+            hChildren: [{ type: 'text', value: citation.raw }],
+          },
+          children: [{ type: 'text', value: citation.raw }],
+        });
+        lastIndex = citation.index + citation.raw.length;
+      });
+
+      if (lastIndex < value.length) {
+        children.push({ type: 'text', value: value.slice(lastIndex) });
+      }
+      parent.children.splice(index, 1, ...children);
+    });
+  };
+}
+
 interface MarkdownToHtmlOptions {
   compatibilityMode?: 'miaoyan' | 'inkstone' | 'slate' | 'mono' | 'nocturne';
 }
 
 export function markdownToHtml(content: string, _options: MarkdownToHtmlOptions = {}): string {
+  const displayMathLines: number[] = [];
   const processor = unified()
     .use(remarkParse)
     .use(remarkGfm)
     .use(remarkMath)
+    .use(() => remarkCollectMathLines(displayMathLines))
     .use(remarkMark)
+    .use(remarkCitations)
     .use(remarkBlockLines)
     .use(remarkMermaid)
-    .use(remarkRehype, { allowDangerousHtml: true })
+    .use(remarkRehype)
     // MiaoYan hands unlabeled fenced blocks to Highlightr for auto detection.
     .use(rehypeHighlight as any, { ignoreMissing: true, detect: true });
 
   const result = processor
     .use(rehypeKatex)
-    .use(rehypeStringify, { allowDangerousHtml: true })
+    .use(() => rehypeDisplayMathLines(displayMathLines))
+    .use(rehypePreviewUrlSafety)
+    .use(rehypeStringify)
     .processSync(content);
 
   return String(result);

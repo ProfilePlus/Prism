@@ -11,6 +11,7 @@ export type DocxFontPolicy = 'theme' | 'preview' | 'custom';
 export type FontSourceKind = 'theme' | 'builtin' | 'system' | 'custom';
 
 export const CONTENT_THEMES = ['miaoyan', 'inkstone', 'slate', 'mono', 'nocturne'] as const;
+export const CURRENT_SETTINGS_VERSION = 1;
 
 export type ContentTheme = (typeof CONTENT_THEMES)[number];
 
@@ -43,12 +44,57 @@ export interface LastSessionState {
   filePath?: string;
   folderPath?: string;
   viewMode?: DefaultViewMode;
+  scrollState?: {
+    editorRatio: number;
+    previewRatio: number;
+  };
   sidebarVisible?: boolean;
   sidebarTab?: 'files' | 'outline' | 'search';
   updatedAt: number;
 }
 
+export interface ExportHistorySettings {
+  contentTheme: ContentTheme;
+  htmlIncludeTheme: boolean;
+  pngScale: number;
+  pdfPaper: PdfPaper;
+  pdfMargin: PdfMargin;
+  pdfPageNumbers: boolean;
+  pageHeaderFooter: boolean;
+  pageHeaderText: string;
+  pageFooterText: string;
+  templateId: ExportTemplateId;
+  frontMatterOverrides: boolean;
+  toc: boolean;
+  defaultLocation: ExportDefaultLocation;
+  docxFontPolicy: DocxFontPolicy;
+  docxCustomFontId: string;
+}
+
+export interface ExportHistoryEntry {
+  documentPath: string;
+  documentName: string;
+  format: ExportDefaultFormat;
+  outputPath: string;
+  settings: ExportHistorySettings;
+  exportedAt: number;
+}
+
+export interface PandocSettings {
+  path: string;
+  detected: boolean;
+  version: string;
+  lastCheckedAt: number | null;
+  lastError: string;
+}
+
+export interface CitationSettings {
+  bibliographyPath: string;
+  cslStylePath: string;
+}
+
 export interface SettingsState {
+  settingsVersion: number;
   theme: AppearanceMode;
   contentTheme: ContentTheme;
   fontSize: number;
@@ -63,7 +109,13 @@ export interface SettingsState {
     htmlIncludeTheme: boolean;
     pdfPaper: PdfPaper;
     pdfMargin: PdfMargin;
+    pdfPageNumbers: boolean;
+    pageHeaderFooter: boolean;
+    pageHeaderText: string;
+    pageFooterText: string;
     templateId: ExportTemplateId;
+    frontMatterOverrides: boolean;
+    toc: boolean;
     defaultLocation: ExportDefaultLocation;
     customDirectory: string;
     docxFontPolicy: DocxFontPolicy;
@@ -80,6 +132,9 @@ export interface SettingsState {
   previewFontSource: FontSource;
   recentFiles: RecentFileEntry[];
   recentFilesLimit: number;
+  exportHistory: ExportHistoryEntry[];
+  pandoc: PandocSettings;
+  citation: CitationSettings;
   restoreLastSession: boolean;
   lastSession: LastSessionState | null;
   windowState: {
@@ -91,6 +146,7 @@ export interface SettingsState {
 }
 
 export const DEFAULT_SETTINGS: SettingsState = {
+  settingsVersion: CURRENT_SETTINGS_VERSION,
   theme: 'auto',
   contentTheme: 'miaoyan',
   fontSize: 16,
@@ -105,7 +161,13 @@ export const DEFAULT_SETTINGS: SettingsState = {
     htmlIncludeTheme: true,
     pdfPaper: 'a4',
     pdfMargin: 'standard',
+    pdfPageNumbers: false,
+    pageHeaderFooter: false,
+    pageHeaderText: '{title}',
+    pageFooterText: '{filename}',
     templateId: 'theme',
+    frontMatterOverrides: false,
+    toc: false,
     defaultLocation: 'document',
     customDirectory: '',
     docxFontPolicy: 'theme',
@@ -122,6 +184,18 @@ export const DEFAULT_SETTINGS: SettingsState = {
   previewFontSource: { kind: 'theme', value: '' },
   recentFiles: [],
   recentFilesLimit: 10,
+  exportHistory: [],
+  pandoc: {
+    path: '',
+    detected: false,
+    version: '',
+    lastCheckedAt: null,
+    lastError: '',
+  },
+  citation: {
+    bibliographyPath: '',
+    cslStylePath: '',
+  },
   restoreLastSession: true,
   lastSession: null,
   windowState: {

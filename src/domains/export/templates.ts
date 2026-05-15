@@ -6,6 +6,7 @@ import type {
   SettingsState,
 } from '../settings/types';
 import { docxThemeByContentTheme } from './exportSettings';
+import { parseExportFrontMatter } from './frontMatter';
 import type { ExportDocumentInput } from './types';
 
 export interface ExportTemplate {
@@ -63,9 +64,8 @@ export interface ResolvedExportOptions extends ExportDocumentInput {
   tableStyle: ExportTemplate['tableStyle'];
 }
 
-function resolveDocxFont(settings: SettingsState) {
+function resolveDocxFont(settings: SettingsState, policy: DocxFontPolicy = settings.exportDefaults.docxFontPolicy) {
   const themeFont = docxThemeByContentTheme[settings.contentTheme].font;
-  const policy = settings.exportDefaults.docxFontPolicy;
   let customFont: CustomFont | undefined;
 
   if (policy === 'preview') {
@@ -97,20 +97,44 @@ export function resolveExportOptions(input: {
   onProgress?: (message: string) => void;
   onWarning?: (message: string) => void;
 }): ResolvedExportOptions {
-  const template = EXPORT_TEMPLATES[input.settings.exportDefaults.templateId] ?? EXPORT_TEMPLATES.theme;
-  const docxFont = resolveDocxFont(input.settings);
+  const parsed = input.settings.exportDefaults.frontMatterOverrides
+    ? parseExportFrontMatter(input.content)
+    : { content: input.content, frontMatter: null };
+  const frontMatter = parsed.frontMatter;
+  const templateId = frontMatter?.templateId ?? input.settings.exportDefaults.templateId;
+  const template = EXPORT_TEMPLATES[templateId] ?? EXPORT_TEMPLATES.theme;
+  const useFrontMatterTemplateDefaults = Boolean(frontMatter?.templateId);
+  const docxFontPolicy = useFrontMatterTemplateDefaults
+    ? template.docxFontPolicy
+    : input.settings.exportDefaults.docxFontPolicy || template.docxFontPolicy;
+  const docxFont = resolveDocxFont(input.settings, docxFontPolicy);
 
   return {
-    content: input.content,
+    content: parsed.content,
     filename: input.filename,
+    title: frontMatter?.title,
+    author: frontMatter?.author,
+    date: frontMatter?.date,
     contentTheme: input.settings.contentTheme,
     htmlIncludeTheme: input.settings.exportDefaults.htmlIncludeTheme,
     pngScale: input.settings.exportDefaults.pngScale,
-    pdfPaper: input.settings.exportDefaults.pdfPaper,
-    pdfMargin: input.settings.exportDefaults.pdfMargin || template.pdfMargin,
+    pdfPaper: frontMatter?.pdfPaper ?? input.settings.exportDefaults.pdfPaper,
+    pdfMargin: frontMatter?.pdfMargin ?? (
+      useFrontMatterTemplateDefaults
+        ? template.pdfMargin
+        : input.settings.exportDefaults.pdfMargin || template.pdfMargin
+    ),
+    pdfPageNumbers: input.settings.exportDefaults.pdfPageNumbers,
+    pageHeaderFooter: input.settings.exportDefaults.pageHeaderFooter,
+    pageHeaderText: input.settings.exportDefaults.pageHeaderText,
+    pageFooterText: input.settings.exportDefaults.pageFooterText,
+    toc: frontMatter?.toc ?? input.settings.exportDefaults.toc,
+    frontMatter,
     templateId: template.id,
     codeStyle: template.codeStyle,
     tableStyle: template.tableStyle,
+    citation: input.settings.citation,
+    pandoc: input.settings.pandoc,
     docxFontFamily: docxFont.family,
     docxFontFile: docxFont.customFont
       ? {
@@ -119,7 +143,7 @@ export function resolveExportOptions(input: {
           format: docxFont.customFont.format,
         }
       : undefined,
-    docxFontPolicy: input.settings.exportDefaults.docxFontPolicy || template.docxFontPolicy,
+    docxFontPolicy,
     onProgress: input.onProgress,
     onWarning: input.onWarning,
   };

@@ -135,8 +135,5 @@ async function readFolderChildren(folderPath: string, depth: number): Promise<Fi
 }
 
 export async function loadFolderTree(folderPath: string): Promise<FileNode[]> {
-  console.log('[loadFolderTree] Starting for:', folderPath);
-  const nodes = await readFolderChildren(folderPath, 0);
-  console.log(`[loadFolderTree] Loaded ${nodes.length} root nodes`);
-  return nodes;
+  return readFolderChildren(folderPath, 0);
 }

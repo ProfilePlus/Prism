@@ -4,6 +4,7 @@ import { PreviewPane } from './PreviewPane';
 import { buildSearchPattern, countMatches, SearchAction, SearchMode, SearchPanel, SearchParams } from './SearchPanel';
 import { ContextMenu, type ContextMenuItem } from '../../../components/shell/ContextMenu';
 import { useDocumentStore } from '../../document/store';
+import type { DocumentScrollState } from '../../document/types';
 import { useSettingsStore } from '../../settings/store';
 import { useWorkspaceStore } from '../../workspace/store';
 import { markdownToHtml } from '../../../lib/markdownToHtml';
@@ -11,9 +12,13 @@ import { getCommandMenuItems, type CommandContext } from '../../commands';
 
 interface SplitViewProps {
   content: string;
+  scrollState?: DocumentScrollState;
   viewMode: 'edit' | 'split' | 'preview';
   onChange: (content: string) => void;
   onCursorChange?: (cursor: { line: number; column: number }) => void;
+  onSelectionTextChange?: (text: string) => void;
+  onNotice?: (message: string) => void;
+  onScrollStateChange?: (scrollState: Partial<DocumentScrollState>) => void;
 }
 
 const DEFAULT_SEARCH_PARAMS: SearchParams = {
@@ -61,19 +66,53 @@ function createReadonlyCommandContext(): CommandContext {
 // 借鉴 VSCode markdown preview scroll-sync 算法
 // 参考：https://github.com/microsoft/vscode/blob/main/extensions/markdown-language-features/preview-src/scroll-sync.ts
 
-interface CodeLineElement {
+export interface CodeLineElement {
   element: HTMLElement;
   line: number;
   endLine?: number;
 }
 
-function collectCodeLineElements(preview: HTMLElement): CodeLineElement[] {
+function readSourceLine(element: HTMLElement): number | null {
+  const raw = element.getAttribute('data-source-line') ?? element.getAttribute('data-line');
+  const line = raw ? Number(raw) : NaN;
+  return Number.isFinite(line) ? line : null;
+}
+
+function findSourceLineElement(target: Element | null): { element: HTMLElement; line: number } | null {
+  const element = target?.closest<HTMLElement>('[data-source-line], [data-line]');
+  if (!element) return null;
+  const line = readSourceLine(element);
+  return line === null ? null : { element, line };
+}
+
+function isInteractivePreviewTarget(target: Element | null): boolean {
+  return Boolean(target?.closest('a, button, input, textarea, select, summary, [contenteditable="true"]'));
+}
+
+function findPreviewSourceAction(target: Element | null): number | null {
+  const action = target?.closest<HTMLElement>('[data-preview-source-line]');
+  if (!action) return null;
+  const raw = action.getAttribute('data-preview-source-line');
+  const line = raw ? Number(raw) : NaN;
+  return Number.isFinite(line) ? line : null;
+}
+
+function getScrollRatio(element: HTMLElement): number {
+  const maxScroll = element.scrollHeight - element.clientHeight;
+  return maxScroll > 0 ? element.scrollTop / maxScroll : 0;
+}
+
+function setScrollRatio(element: HTMLElement, ratio: number) {
+  const maxScroll = element.scrollHeight - element.clientHeight;
+  element.scrollTop = Math.max(0, Math.min(1, ratio)) * Math.max(0, maxScroll);
+}
+
+export function collectCodeLineElements(preview: HTMLElement): CodeLineElement[] {
   const elements: CodeLineElement[] = [];
-  const nodes = preview.querySelectorAll<HTMLElement>('[data-line]');
+  const nodes = preview.querySelectorAll<HTMLElement>('[data-source-line], [data-line]');
   nodes.forEach((el) => {
-    const raw = el.getAttribute('data-line');
-    const line = raw ? Number(raw) : NaN;
-    if (!Number.isFinite(line)) return;
+    const line = readSourceLine(el);
+    if (line === null) return;
 
     // 代码块特殊处理：计算 endLine
     if (el.tagName === 'PRE') {
@@ -99,7 +138,7 @@ function getElementTop(element: HTMLElement, preview: HTMLElement): number {
 }
 
 // 源码行号 → 预览 scrollTop
-function lineToPreviewScrollTop(line: number, elements: CodeLineElement[], preview: HTMLElement): number | null {
+export function lineToPreviewScrollTop(line: number, elements: CodeLineElement[], preview: HTMLElement): number | null {
   if (elements.length === 0) return null;
   if (line <= elements[0].line) return 0;
 
@@ -145,32 +184,33 @@ function lineToPreviewScrollTop(line: number, elements: CodeLineElement[], previ
 }
 
 // 预览 scrollTop → 源码行号（二分查找）
-function pageOffsetToLine(scrollTop: number, elements: CodeLineElement[], preview: HTMLElement): number | null {
+export function pageOffsetToLine(scrollTop: number, elements: CodeLineElement[], preview: HTMLElement): number | null {
   if (elements.length === 0) return null;
 
-  // 过滤可见元素
+  // 过滤掉不参与布局的元素。这里不调用 getComputedStyle，避免长文预览滚动时
+  // 每次 scroll 都触发布局样式读取；display:none 的 block 会表现为 0 高度。
   const visible = elements.filter((e) => {
-    const style = window.getComputedStyle(e.element);
-    return style.display !== 'none' && style.visibility !== 'hidden' && e.element.offsetHeight > 0;
+    return e.element.offsetHeight > 0;
   });
   if (visible.length === 0) return null;
 
-  // 二分查找：scrollTop 落在哪个元素里
-  let lo = -1;
+  // 二分查找：找到 top <= scrollTop 的最后一个元素
+  let previousIndex = 0;
+  let lo = 0;
   let hi = visible.length - 1;
-  while (lo + 1 < hi) {
+  while (lo <= hi) {
     const mid = Math.floor((lo + hi) / 2);
     const top = getElementTop(visible[mid].element, preview);
-    const height = visible[mid].element.offsetHeight;
-    if (top + height >= scrollTop) {
-      hi = mid;
+    if (top <= scrollTop) {
+      previousIndex = mid;
+      lo = mid + 1;
     } else {
-      lo = mid;
+      hi = mid - 1;
     }
   }
 
-  const previous = lo >= 0 ? visible[lo] : visible[0];
-  const next = hi < visible.length ? visible[hi] : undefined;
+  const previous = visible[previousIndex];
+  const next = visible[previousIndex + 1];
 
   const previousTop = getElementTop(previous.element, preview);
   const previousHeight = previous.element.offsetHeight;
@@ -308,7 +348,16 @@ function applyPreviewSearch(
 }
 
 export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
-  function SplitView({ content, viewMode, onChange, onCursorChange }, ref) {
+  function SplitView({
+    content,
+    scrollState,
+    viewMode,
+    onChange,
+    onCursorChange,
+    onSelectionTextChange,
+    onNotice,
+    onScrollStateChange,
+  }, ref) {
     const previewContainerRef = useRef<HTMLDivElement>(null);
     const editorRef = useRef<EditorPaneHandle>(null);
     const [searchVisible, setSearchVisible] = useState(false);
@@ -327,6 +376,7 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
     const searchCurrentMatchRef = useRef(searchCurrentMatch);
     const contentRef = useRef(content);
     const viewModeRef = useRef(viewMode);
+    const scrollStateRef = useRef(scrollState);
     // 同步方向锁：防止反馈循环
     const syncingRef = useRef<'editor' | 'preview' | null>(null);
     const syncingTimerRef = useRef<number | null>(null);
@@ -347,13 +397,35 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
       viewModeRef.current = viewMode;
     }, [viewMode]);
 
+    useEffect(() => {
+      scrollStateRef.current = scrollState;
+    }, [scrollState]);
+
+    useEffect(() => {
+      const frame = requestAnimationFrame(() => {
+        const remembered = scrollStateRef.current;
+        if (!remembered) return;
+
+        if (viewModeRef.current !== 'preview') {
+          editorRef.current?.setScrollRatio(remembered.editorRatio);
+        }
+
+        if (viewModeRef.current !== 'edit') {
+          const preview = previewContainerRef.current;
+          if (preview) setScrollRatio(preview, remembered.previewRatio);
+        }
+      });
+
+      return () => cancelAnimationFrame(frame);
+    }, [viewMode]);
+
     useImperativeHandle(ref, () => ({
       focus: () => editorRef.current?.focus(),
       jumpToLine: (line) => {
         editorRef.current?.jumpToLine(line);
         const preview = previewContainerRef.current;
         if (preview) {
-          const target = preview.querySelector(`[data-line="${line}"]`);
+          const target = preview.querySelector(`[data-source-line="${line}"], [data-line="${line}"]`);
           if (target) {
             target.scrollIntoView({ behavior: 'smooth', block: 'center' });
             target.classList.add('preview-line-flash');
@@ -392,7 +464,7 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
 
     const getPreviewContextMenuItems = useCallback((hasSelection: boolean, line: number | null): ContextMenuItem[] => {
       const exportItems = getCommandMenuItems(
-        ['exportPdf', 'exportDocx', 'exportHtml', 'exportPng'],
+        ['exportWithPrevious', 'exportOverwritePrevious', 'exportPdf', 'exportDocx', 'exportHtml', 'exportPng'],
         createReadonlyCommandContext(),
       ) as ContextMenuItem[];
 
@@ -417,22 +489,60 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
       ];
     }, []);
 
+    const jumpToSourceLine = useCallback((line: number) => {
+      if (viewModeRef.current === 'preview') {
+        useDocumentStore.getState().setViewMode('split');
+        requestAnimationFrame(() => editorRef.current?.jumpToLine(line));
+        return;
+      }
+      editorRef.current?.jumpToLine(line);
+    }, []);
+
     const handlePreviewContextMenu = useCallback((event: React.MouseEvent) => {
       event.preventDefault();
       event.stopPropagation();
 
       const target = event.target instanceof Element ? event.target : null;
-      const lineElement = target?.closest<HTMLElement>('[data-line]');
-      const rawLine = lineElement?.getAttribute('data-line');
-      const line = rawLine ? Number(rawLine) : NaN;
+      const sourceLine = findSourceLineElement(target);
 
       setPreviewContextMenu({
         x: event.clientX,
         y: event.clientY,
         hasSelection: Boolean(normalizeSelectionSeed(getPreviewRawSelectedText())),
-        line: Number.isFinite(line) ? line : null,
+        line: sourceLine?.line ?? null,
       });
     }, [getPreviewRawSelectedText]);
+
+    const handlePreviewClick = useCallback((event: React.MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+
+      const target = event.target instanceof Element ? event.target : null;
+      const explicitSourceLine = findPreviewSourceAction(target);
+      if (explicitSourceLine !== null) {
+        event.preventDefault();
+        jumpToSourceLine(explicitSourceLine);
+        return;
+      }
+
+      if (isInteractivePreviewTarget(target)) return;
+
+      const preview = previewContainerRef.current?.querySelector<HTMLElement>('#write');
+      const selection = window.getSelection();
+      if (
+        selection &&
+        !selection.isCollapsed &&
+        preview &&
+        selection.anchorNode &&
+        preview.contains(selection.anchorNode)
+      ) {
+        return;
+      }
+
+      const sourceLine = findSourceLineElement(target);
+      if (!sourceLine) return;
+      jumpToSourceLine(sourceLine.line);
+    }, [jumpToSourceLine]);
 
     const handlePreviewContextMenuAction = useCallback(async (action: string) => {
       const preview = previewContainerRef.current?.querySelector<HTMLElement>('#write') ?? null;
@@ -467,20 +577,19 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
         case 'locateSource': {
           const line = previewContextMenu?.line;
           if (line === null || line === undefined) break;
-          if (viewModeRef.current === 'preview') {
-            useDocumentStore.getState().setViewMode('split');
-          }
-          requestAnimationFrame(() => editorRef.current?.jumpToLine(line));
+          jumpToSourceLine(line);
           break;
         }
         case 'exportPdf':
         case 'exportDocx':
         case 'exportHtml':
         case 'exportPng':
+        case 'exportWithPrevious':
+        case 'exportOverwritePrevious':
           dispatchCommand(action);
           break;
       }
-    }, [getPreviewRawSelectedText, previewContextMenu?.line]);
+    }, [getPreviewRawSelectedText, jumpToSourceLine, previewContextMenu?.line]);
 
     const getSearchSeed = useCallback(() => {
       if (viewModeRef.current !== 'preview') {
@@ -655,11 +764,16 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
       preview.scrollTop = Math.max(0, targetScroll);
     };
 
+    const handleEditorScrollRatioChange = (ratio: number) => {
+      onScrollStateChange?.({ editorRatio: Math.max(0, Math.min(1, ratio)) });
+    };
+
     // 预览 → 编辑器
     const handlePreviewScroll = () => {
-      if (syncingRef.current === 'editor') return; // 编辑器正在驱动预览，忽略
       const preview = previewContainerRef.current;
       if (!preview) return;
+      onScrollStateChange?.({ previewRatio: getScrollRatio(preview) });
+      if (syncingRef.current === 'editor') return; // 编辑器正在驱动预览，忽略
       const elements = collectCodeLineElements(preview);
       const line = pageOffsetToLine(preview.scrollTop, elements, preview);
       if (line === null) return;
@@ -691,6 +805,9 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
               content={content}
               onChange={onChange}
               onCursorChange={onCursorChange}
+              onSelectionTextChange={onSelectionTextChange}
+              onNotice={onNotice}
+              onScrollRatioChange={handleEditorScrollRatioChange}
               onTopLineChange={isSplit ? syncPreviewByEditor : undefined}
             />
           </div>
@@ -700,6 +817,7 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
           <div
             ref={previewContainerRef}
             onScroll={handlePreviewScroll}
+            onClick={handlePreviewClick}
             onContextMenu={handlePreviewContextMenu}
             style={{
               flex: 1,
@@ -711,7 +829,7 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
             }}
           >
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-              <PreviewPane content={content} />
+              <PreviewPane content={content} onNotice={onNotice} />
             </div>
           </div>
         )}

@@ -1,4 +1,52 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const exportMock = vi.hoisted(() => ({
+  exportDocument: vi.fn(async (_input?: any) => true),
+  resolveExportOptions: vi.fn((input: any) => ({
+    content: input.content,
+    filename: input.filename,
+    contentTheme: input.settings.contentTheme,
+    templateId: input.settings.exportDefaults.templateId,
+    frontMatterOverrides: input.settings.exportDefaults.frontMatterOverrides,
+    pdfPaper: input.settings.exportDefaults.pdfPaper,
+    pdfMargin: input.settings.exportDefaults.pdfMargin,
+    pdfPageNumbers: input.settings.exportDefaults.pdfPageNumbers,
+    pageHeaderFooter: input.settings.exportDefaults.pageHeaderFooter,
+    pageHeaderText: input.settings.exportDefaults.pageHeaderText,
+    pageFooterText: input.settings.exportDefaults.pageFooterText,
+    toc: input.settings.exportDefaults.toc,
+    pngScale: input.settings.exportDefaults.pngScale,
+    htmlIncludeTheme: input.settings.exportDefaults.htmlIncludeTheme,
+    docxFontPolicy: input.settings.exportDefaults.docxFontPolicy,
+    onProgress: input.onProgress,
+    onWarning: input.onWarning,
+  })),
+}));
+
+const fsMock = vi.hoisted(() => ({
+  readTextFile: vi.fn(),
+  stat: vi.fn(),
+  writeTextFile: vi.fn(),
+}));
+
+const recoveryMock = vi.hoisted(() => ({
+  clearRecoverySnapshotsForDocument: vi.fn(),
+  createRecoverySnapshot: vi.fn(),
+}));
+
+vi.mock('@tauri-apps/plugin-fs', () => fsMock);
+
+vi.mock('../document/services/recovery', () => recoveryMock);
+
+vi.mock('../export', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../export')>();
+  return {
+    ...actual,
+    exportDocument: exportMock.exportDocument,
+    resolveExportOptions: exportMock.resolveExportOptions,
+  };
+});
+
 import {
   commandRegistry,
   commandRegistryById,
@@ -18,8 +66,13 @@ function createCommandContext(overrides: Partial<CommandContext> = {}): CommandC
       closeDocument: vi.fn(),
       updateContent: vi.fn(),
       updateDocumentPath: vi.fn(),
+      updateScrollState: vi.fn(),
       setViewMode: vi.fn(),
+      updateFileSnapshot: vi.fn(),
+      markSaving: vi.fn(),
       markSaved: vi.fn(),
+      markSaveFailed: vi.fn(),
+      markSaveConflict: vi.fn(),
     },
     settingsStore: {
       ...DEFAULT_SETTINGS,
@@ -40,11 +93,23 @@ function createCommandContext(overrides: Partial<CommandContext> = {}): CommandC
       setExportHtmlIncludeTheme: vi.fn(),
       setExportPdfPaper: vi.fn(),
       setExportPdfMargin: vi.fn(),
+      setExportPdfPageNumbers: vi.fn(),
+      setExportPageHeaderFooter: vi.fn(),
+      setExportPageHeaderText: vi.fn(),
+      setExportPageFooterText: vi.fn(),
       setExportTemplateId: vi.fn(),
+      setExportFrontMatterOverrides: vi.fn(),
+      setExportToc: vi.fn(),
       setExportDefaultLocation: vi.fn(),
       setExportCustomDirectory: vi.fn(),
       setExportDocxFontPolicy: vi.fn(),
       setExportDocxCustomFontId: vi.fn(),
+      setPandocPath: vi.fn(),
+      setPandocDetection: vi.fn(),
+      detectPandoc: vi.fn(),
+      setCitationBibliographyPath: vi.fn(),
+      setCitationCslStylePath: vi.fn(),
+      setCitationSettings: vi.fn(),
       setShortcutStyle: vi.fn(),
       setAutoSaveEnabled: vi.fn(),
       setAutoSaveInterval: vi.fn(),
@@ -54,6 +119,7 @@ function createCommandContext(overrides: Partial<CommandContext> = {}): CommandC
       addRecentFile: vi.fn(),
       clearRecentFiles: vi.fn(),
       setRecentFilesLimit: vi.fn(),
+      recordExportHistory: vi.fn(),
       setRestoreLastSession: vi.fn(),
       setLastSession: vi.fn(),
       loadSettings: vi.fn(),
@@ -90,6 +156,21 @@ function createCommandContext(overrides: Partial<CommandContext> = {}): CommandC
 }
 
 describe('command registry', () => {
+  beforeEach(() => {
+    exportMock.exportDocument.mockClear();
+    exportMock.exportDocument.mockResolvedValue(true);
+    exportMock.resolveExportOptions.mockClear();
+    fsMock.readTextFile.mockReset();
+    fsMock.stat.mockReset();
+    fsMock.stat.mockResolvedValue({ size: 3, mtime: new Date(1000) });
+    fsMock.writeTextFile.mockReset();
+    fsMock.writeTextFile.mockResolvedValue(undefined);
+    recoveryMock.clearRecoverySnapshotsForDocument.mockReset();
+    recoveryMock.clearRecoverySnapshotsForDocument.mockResolvedValue(undefined);
+    recoveryMock.createRecoverySnapshot.mockReset();
+    recoveryMock.createRecoverySnapshot.mockResolvedValue(null);
+  });
+
   it('defines each command id once', () => {
     const ids = commandRegistry.map((command) => command.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -120,7 +201,104 @@ describe('command registry', () => {
 
     expect(Object.keys(sections)).not.toContain('Prism');
     expect(fileActions).toContain('preferences');
-    expect(helpActions).toEqual(expect.arrayContaining(['commandPalette', 'showShortcuts', 'about']));
+    expect(helpActions).toEqual(expect.arrayContaining(['commandPalette', 'showShortcuts', 'checkUpdate', 'about']));
+  });
+
+  it('does not expose deferred platform features in menus or the command palette', () => {
+    const context = createCommandContext({
+      documentStore: {
+        ...createCommandContext().documentStore,
+        currentDocument: {
+          path: '/tmp/report.md',
+          name: 'report.md',
+          content: '# Report',
+          isDirty: false,
+          lastKnownMtime: null,
+          lastKnownSize: null,
+          lastSavedAt: 0,
+          saveError: null,
+          viewMode: 'split',
+          scrollState: { editorRatio: 0, previewRatio: 0 },
+          saveStatus: 'saved',
+        },
+      },
+      settingsStore: {
+        ...createCommandContext().settingsStore,
+        exportHistory: [{
+          documentPath: '/tmp/report.md',
+          documentName: 'report.md',
+          format: 'pdf',
+          outputPath: '/tmp/report.pdf',
+          settings: {
+            contentTheme: 'miaoyan',
+            htmlIncludeTheme: true,
+            pngScale: 2,
+            pdfPaper: 'a4',
+            pdfMargin: 'standard',
+            pdfPageNumbers: false,
+            pageHeaderFooter: false,
+            pageHeaderText: '{title}',
+            pageFooterText: '{filename}',
+            templateId: 'theme',
+            frontMatterOverrides: false,
+            toc: false,
+            defaultLocation: 'document',
+            docxFontPolicy: 'theme',
+            docxCustomFontId: '',
+          },
+          exportedAt: 1,
+        }],
+      },
+      workspaceStore: {
+        ...createCommandContext().workspaceStore,
+        rootPath: '/notes',
+        fileTree: [
+          { path: '/notes/a.md', name: 'a.md', kind: 'file', modifiedAt: 1 },
+        ],
+      },
+    });
+    const visibleText: string[] = [];
+    const collectMenuText = (items: Array<{ action?: string; label?: string; children?: unknown }>) => {
+      for (const item of items) {
+        if (item.action) visibleText.push(item.action);
+        if (item.label) visibleText.push(item.label);
+        if (Array.isArray(item.children)) {
+          collectMenuText(item.children as Array<{ action?: string; label?: string; children?: unknown }>);
+        }
+      }
+    };
+
+    Object.values(getMenuSections(context)).forEach(collectMenuText);
+    getCommandPaletteItems(context).forEach((item) => {
+      visibleText.push(item.id, item.label, item.category, ...(item.keywords ?? []));
+    });
+
+    expect(visibleText.join('\n')).not.toMatch(/插件市场|插件 API|plugin marketplace|marketplace|prism:\/\/|deep\s*link|deeplink|云同步|移动端|实时协作|图谱|知识图谱|WYSIWYG/i);
+  });
+
+  it('opens quick-open from the File menu when a workspace has markdown files', async () => {
+    const openQuickOpen = vi.fn();
+    const context = createCommandContext({
+      openQuickOpen,
+      workspaceStore: {
+        ...createCommandContext().workspaceStore,
+        rootPath: '/notes',
+        fileTree: [
+          { path: '/notes/a.md', name: 'a.md', kind: 'file', modifiedAt: 1 },
+        ],
+      },
+    });
+    const fileActions = getMenuSections(context)['文件'].flatMap((item) => item.type === 'separator' ? [] : [item.action]);
+    const paletteIds = getCommandPaletteItems(context).map((item) => item.id);
+
+    expect(fileActions).toContain('quickOpen');
+    expect(paletteIds).toContain('quickOpen');
+
+    await runCommand('quickOpen', context);
+
+    expect(openQuickOpen).toHaveBeenCalledTimes(1);
+    expect(commandRegistryById.get('quickOpen')?.shortcuts).toEqual([{ code: 'KeyP', mod: true }]);
+    expect(commandRegistryById.get('print')?.shortcuts).toBeUndefined();
   });
 
   it('places automatic line wrapping in the View menu and toggles the persisted editor setting', async () => {
@@ -139,6 +317,125 @@ describe('command registry', () => {
 
     await runCommand('wordWrap', context);
     expect(setWordWrap).toHaveBeenCalledWith(false);
+  });
+
+  it('exposes source-only table helpers from the Insert menu and command palette', () => {
+    const context = createCommandContext({
+      documentStore: {
+        ...createCommandContext().documentStore,
+        currentDocument: {
+          path: '/tmp/doc.md',
+          name: 'doc.md',
+          content: '',
+          isDirty: false,
+          lastKnownMtime: null,
+          lastKnownSize: null,
+          lastSavedAt: 0,
+          saveError: null,
+          viewMode: 'edit',
+          scrollState: { editorRatio: 0, previewRatio: 0 },
+          saveStatus: 'saved',
+        },
+      },
+    });
+    const insertMenu = getMenuSections(context)['插入'];
+    const tableMenu = insertMenu.find((item) => item.type !== 'separator' && item.label === '表格');
+    const paletteIds = getCommandPaletteItems(context).map((item) => item.id);
+
+    expect(tableMenu).toMatchObject({
+      submenu: true,
+      children: expect.arrayContaining([
+        expect.objectContaining({ action: 'insertTable' }),
+        expect.objectContaining({ action: 'formatTable' }),
+        expect.objectContaining({ action: 'addTableRow' }),
+        expect.objectContaining({ action: 'addTableColumn' }),
+        expect.objectContaining({ action: 'deleteTableRow' }),
+        expect.objectContaining({ action: 'deleteTableColumn' }),
+      ]),
+    });
+    expect(paletteIds).toEqual(expect.arrayContaining(['insertTable', 'formatTable']));
+  });
+
+  it('exposes markdown templates from the File menu and command palette', async () => {
+    const createNewDocument = vi.fn();
+    const showToast = vi.fn();
+    const context = createCommandContext({
+      documentStore: {
+        ...createCommandContext().documentStore,
+        createNewDocument,
+      },
+      showToast,
+    });
+    const fileMenu = getMenuSections(context)['文件'];
+    const templateMenu = fileMenu.find((item) => item.type !== 'separator' && item.label === '模板');
+    const paletteIds = getCommandPaletteItems(context).map((item) => item.id);
+
+    expect(templateMenu).toMatchObject({
+      submenu: true,
+      children: expect.arrayContaining([
+        expect.objectContaining({ action: 'templateReadme' }),
+        expect.objectContaining({ action: 'templatePrd' }),
+        expect.objectContaining({ action: 'templateMeeting' }),
+        expect.objectContaining({ action: 'templateWeekly' }),
+        expect.objectContaining({ action: 'templateTechnicalPlan' }),
+        expect.objectContaining({ action: 'templateArticle' }),
+        expect.objectContaining({ action: 'templatePaperDraft' }),
+        expect.objectContaining({ action: 'templateReadingNote' }),
+        expect.objectContaining({ action: 'templateResearchSummary' }),
+        expect.objectContaining({ action: 'templateWhitePaper' }),
+      ]),
+    });
+    expect(paletteIds).toEqual(expect.arrayContaining([
+      'templateReadme',
+      'templatePrd',
+      'templateWeekly',
+      'templatePaperDraft',
+      'templateReadingNote',
+      'templateResearchSummary',
+      'templateWhitePaper',
+    ]));
+
+    await runCommand('templatePrd', context);
+    expect(createNewDocument).toHaveBeenCalledWith(expect.stringContaining('# PRD：功能名称'), 'prd.md');
+    expect(showToast).toHaveBeenCalledWith('已创建 PRD 模板');
+
+    await runCommand('templatePaperDraft', context);
+    expect(createNewDocument).toHaveBeenCalledWith(expect.stringContaining('# 论文题目'), 'paper-draft.md');
+    expect(showToast).toHaveBeenCalledWith('已创建 论文草稿 模板');
+  });
+
+  it('dispatches template insertion to the active editor when a document is open', async () => {
+    const listener = vi.fn();
+    window.addEventListener('prism-editor-command', listener);
+    const context = createCommandContext({
+      documentStore: {
+        ...createCommandContext().documentStore,
+        currentDocument: {
+          path: '/tmp/doc.md',
+          name: 'doc.md',
+          content: 'Draft',
+          isDirty: false,
+          lastKnownMtime: null,
+          lastKnownSize: null,
+          lastSavedAt: 0,
+          saveError: null,
+          viewMode: 'edit',
+          scrollState: { editorRatio: 0, previewRatio: 0 },
+          saveStatus: 'saved',
+        },
+      },
+    });
+
+    await runCommand('templateWeekly', context);
+    window.removeEventListener('prism-editor-command', listener);
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener.mock.calls[0][0]).toMatchObject({
+      detail: {
+        command: 'insertTemplate',
+        templateId: 'weekly',
+      },
+    });
   });
 
   it('builds recent document menu items from settings', () => {
@@ -171,6 +468,448 @@ describe('command registry', () => {
     expect(ids).not.toContain('exportPdf');
   });
 
+  it('exposes previous export commands only when the current document has export history', () => {
+    const baseContext = createCommandContext();
+    const context = createCommandContext({
+      documentStore: {
+        ...baseContext.documentStore,
+        currentDocument: {
+          path: '/tmp/report.md',
+          name: 'report.md',
+          content: '# Report',
+          isDirty: false,
+          lastKnownMtime: null,
+          lastKnownSize: null,
+          lastSavedAt: 0,
+          saveError: null,
+          viewMode: 'edit',
+          scrollState: { editorRatio: 0, previewRatio: 0 },
+          saveStatus: 'saved',
+        },
+      },
+      settingsStore: {
+        ...baseContext.settingsStore,
+        exportHistory: [{
+          documentPath: '/tmp/report.md',
+          documentName: 'report.md',
+          format: 'pdf',
+          outputPath: '/tmp/report.pdf',
+          settings: {
+            contentTheme: 'slate',
+            htmlIncludeTheme: true,
+            pngScale: 2,
+            pdfPaper: 'letter',
+            pdfMargin: 'wide',
+            pdfPageNumbers: false,
+            pageHeaderFooter: false,
+            pageHeaderText: '{title}',
+            pageFooterText: '{filename}',
+            templateId: 'business',
+            frontMatterOverrides: false,
+            toc: false,
+            defaultLocation: 'document',
+            docxFontPolicy: 'preview',
+            docxCustomFontId: '',
+          },
+          exportedAt: 1,
+        }],
+      },
+    });
+
+    const paletteIds = getCommandPaletteItems(context).map((item) => item.id);
+    const exportMenu = getMenuSections(context)['文件']
+      .find((item) => item.type !== 'separator' && item.label === '导出');
+
+    expect(paletteIds).toEqual(expect.arrayContaining(['exportWithPrevious', 'exportOverwritePrevious']));
+    expect(exportMenu).toMatchObject({
+      submenu: true,
+      children: expect.arrayContaining([
+        expect.objectContaining({ action: 'exportWithPrevious', disabled: false }),
+        expect.objectContaining({ action: 'exportOverwritePrevious', disabled: false }),
+      ]),
+    });
+
+    const noHistoryIds = getCommandPaletteItems(createCommandContext({
+      documentStore: context.documentStore,
+    })).map((item) => item.id);
+    expect(noHistoryIds).not.toContain('exportWithPrevious');
+    expect(noHistoryIds).not.toContain('exportOverwritePrevious');
+  });
+
+  it('reuses the previous export settings and lets the user choose a new path', async () => {
+    const baseContext = createCommandContext();
+    const requestExportPath = vi.fn().mockResolvedValue('/tmp/report-copy.pdf');
+    const recordExportHistory = vi.fn();
+    const showToast = vi.fn();
+    const context = createCommandContext({
+      documentStore: {
+        ...baseContext.documentStore,
+        currentDocument: {
+          path: '/tmp/report.md',
+          name: 'report.md',
+          content: '# Report',
+          isDirty: false,
+          lastKnownMtime: null,
+          lastKnownSize: null,
+          lastSavedAt: 0,
+          saveError: null,
+          viewMode: 'edit',
+          scrollState: { editorRatio: 0, previewRatio: 0 },
+          saveStatus: 'saved',
+        },
+      },
+      settingsStore: {
+        ...baseContext.settingsStore,
+        contentTheme: 'miaoyan',
+        exportHistory: [{
+          documentPath: '/tmp/report.md',
+          documentName: 'report.md',
+          format: 'pdf',
+          outputPath: '/tmp/report.pdf',
+          settings: {
+            contentTheme: 'slate',
+            htmlIncludeTheme: false,
+            pngScale: 3,
+            pdfPaper: 'letter',
+            pdfMargin: 'wide',
+            pdfPageNumbers: true,
+            pageHeaderFooter: true,
+            pageHeaderText: '{title}',
+            pageFooterText: '{filename} · {page}/{pages}',
+            templateId: 'business',
+            frontMatterOverrides: true,
+            toc: true,
+            defaultLocation: 'document',
+            docxFontPolicy: 'preview',
+            docxCustomFontId: '',
+          },
+          exportedAt: 1,
+        }],
+        recordExportHistory,
+      },
+      requestExportPath,
+      showToast,
+    });
+
+    await runCommand('exportWithPrevious', context);
+
+    expect(requestExportPath).toHaveBeenCalledWith({
+      format: 'pdf',
+      filename: 'report.md',
+      documentPath: '/tmp/report.md',
+      suggestedPath: '/tmp/report.pdf',
+    });
+    expect(exportMock.resolveExportOptions).toHaveBeenCalledWith(expect.objectContaining({
+      content: '# Report',
+      filename: 'report.md',
+      settings: expect.objectContaining({
+        contentTheme: 'slate',
+        exportDefaults: expect.objectContaining({
+          htmlIncludeTheme: false,
+          pngScale: 3,
+          pdfPaper: 'letter',
+          pdfMargin: 'wide',
+          pdfPageNumbers: true,
+          pageHeaderFooter: true,
+          pageHeaderText: '{title}',
+          pageFooterText: '{filename} · {page}/{pages}',
+          templateId: 'business',
+          frontMatterOverrides: true,
+          toc: true,
+          docxFontPolicy: 'preview',
+        }),
+      }),
+    }));
+    expect(exportMock.exportDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ contentTheme: 'slate', templateId: 'business' }),
+      'pdf',
+      '/tmp/report-copy.pdf',
+    );
+    expect(recordExportHistory).toHaveBeenCalledWith(expect.objectContaining({
+      documentPath: '/tmp/report.md',
+      documentName: 'report.md',
+      format: 'pdf',
+      outputPath: '/tmp/report-copy.pdf',
+      settings: expect.objectContaining({
+        contentTheme: 'slate',
+        templateId: 'business',
+        pdfMargin: 'wide',
+        pdfPageNumbers: true,
+        pageHeaderFooter: true,
+        pageHeaderText: '{title}',
+        pageFooterText: '{filename} · {page}/{pages}',
+        frontMatterOverrides: true,
+        toc: true,
+      }),
+    }));
+    expect(showToast).toHaveBeenCalledWith('PDF 导出完成');
+  });
+
+  it('overwrites the previous export path without reopening the save dialog', async () => {
+    const baseContext = createCommandContext();
+    const requestExportPath = vi.fn();
+    const recordExportHistory = vi.fn();
+    const context = createCommandContext({
+      documentStore: {
+        ...baseContext.documentStore,
+        currentDocument: {
+          path: '/tmp/report.md',
+          name: 'report.md',
+          content: '# Report',
+          isDirty: false,
+          lastKnownMtime: null,
+          lastKnownSize: null,
+          lastSavedAt: 0,
+          saveError: null,
+          viewMode: 'edit',
+          scrollState: { editorRatio: 0, previewRatio: 0 },
+          saveStatus: 'saved',
+        },
+      },
+      settingsStore: {
+        ...baseContext.settingsStore,
+        exportHistory: [{
+          documentPath: '/tmp/report.md',
+          documentName: 'report.md',
+          format: 'docx',
+          outputPath: '/tmp/report.docx',
+          settings: {
+            contentTheme: 'inkstone',
+            htmlIncludeTheme: true,
+            pngScale: 2,
+            pdfPaper: 'a4',
+            pdfMargin: 'standard',
+            pdfPageNumbers: false,
+            pageHeaderFooter: false,
+            pageHeaderText: '{title}',
+            pageFooterText: '{filename}',
+            templateId: 'academic',
+            frontMatterOverrides: false,
+            toc: false,
+            defaultLocation: 'document',
+            docxFontPolicy: 'theme',
+            docxCustomFontId: '',
+          },
+          exportedAt: 1,
+        }],
+        recordExportHistory,
+      },
+      requestExportPath,
+    });
+
+    await runCommand('exportOverwritePrevious', context);
+
+    expect(requestExportPath).not.toHaveBeenCalled();
+    expect(exportMock.exportDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ contentTheme: 'inkstone', templateId: 'academic' }),
+      'docx',
+      '/tmp/report.docx',
+    );
+    expect(recordExportHistory).toHaveBeenCalledWith(expect.objectContaining({
+      format: 'docx',
+      outputPath: '/tmp/report.docx',
+    }));
+  });
+
+  it('emits export progress events and clears progress after success', async () => {
+    const baseContext = createCommandContext();
+    const progressListener = vi.fn();
+    const requestExportPath = vi.fn().mockResolvedValue('/tmp/report.pdf');
+    exportMock.exportDocument.mockImplementationOnce(async (input: any) => {
+      input.onProgress?.('正在解析 Markdown');
+      input.onProgress?.('正在写入 PDF 文件');
+      return true;
+    });
+    window.addEventListener('prism-export-progress', progressListener);
+
+    const context = createCommandContext({
+      documentStore: {
+        ...baseContext.documentStore,
+        currentDocument: {
+          path: '/tmp/report.md',
+          name: 'report.md',
+          content: '# Report',
+          isDirty: false,
+          lastKnownMtime: null,
+          lastKnownSize: null,
+          lastSavedAt: 0,
+          saveError: null,
+          viewMode: 'edit',
+          scrollState: { editorRatio: 0, previewRatio: 0 },
+          saveStatus: 'saved',
+        },
+      },
+      settingsStore: baseContext.settingsStore,
+      requestExportPath,
+    });
+
+    await runCommand('exportPdf', context);
+    window.removeEventListener('prism-export-progress', progressListener);
+
+    expect(progressListener.mock.calls.map(([event]) => event.detail)).toEqual([
+      { visible: true, message: '正在解析 Markdown' },
+      { visible: true, message: '正在写入 PDF 文件' },
+      { visible: false },
+    ]);
+  });
+
+  it('emits copyable diagnostics when export fails', async () => {
+    const baseContext = createCommandContext();
+    const requestExportPath = vi.fn().mockResolvedValue('/tmp/report.pdf');
+    const recordExportHistory = vi.fn();
+    const showToast = vi.fn();
+    const failureListener = vi.fn();
+    const progressListener = vi.fn();
+    exportMock.exportDocument.mockImplementationOnce(async (input: any) => {
+      input.onProgress?.('正在写入 PDF 文件');
+      input.onWarning?.('Pandoc 未检测成功；HTML 导出已回退内置管线');
+      input.onWarning?.('CSL 样式文件后缀需要是 .csl');
+      throw new Error('disk full');
+    });
+    window.addEventListener('prism-export-failure', failureListener);
+    window.addEventListener('prism-export-progress', progressListener);
+
+    const context = createCommandContext({
+      documentStore: {
+        ...baseContext.documentStore,
+        currentDocument: {
+          path: '/tmp/report.md',
+          name: 'report.md',
+          content: '# Report',
+          isDirty: false,
+          lastKnownMtime: null,
+          lastKnownSize: null,
+          lastSavedAt: 0,
+          saveError: null,
+          viewMode: 'edit',
+          scrollState: { editorRatio: 0, previewRatio: 0 },
+          saveStatus: 'saved',
+        },
+      },
+      settingsStore: {
+        ...baseContext.settingsStore,
+        contentTheme: 'slate',
+        exportDefaults: {
+          ...baseContext.settingsStore.exportDefaults,
+          templateId: 'business',
+          pdfPaper: 'letter',
+          pdfMargin: 'wide',
+          pdfPageNumbers: false,
+          toc: true,
+          pageHeaderFooter: true,
+          pageHeaderText: '{title}',
+          pageFooterText: '{filename}',
+          defaultLocation: 'custom',
+          docxCustomFontId: 'font-1',
+        },
+        pandoc: {
+          path: '/opt/homebrew/bin/pandoc',
+          detected: false,
+          version: '',
+          lastCheckedAt: 123,
+          lastError: 'not installed',
+        },
+        citation: {
+          bibliographyPath: '/tmp/library.bib',
+          cslStylePath: '/tmp/chinese-gb7714.csl',
+        },
+        recordExportHistory,
+      },
+      requestExportPath,
+      showToast,
+    });
+
+    await runCommand('exportPdf', context);
+    window.removeEventListener('prism-export-failure', failureListener);
+    window.removeEventListener('prism-export-progress', progressListener);
+
+    expect(recordExportHistory).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith('PDF 导出失败，已生成诊断文本');
+    expect(progressListener.mock.calls.map(([event]) => event.detail)).toEqual([
+      { visible: true, message: '正在写入 PDF 文件' },
+      { visible: false },
+    ]);
+    expect(failureListener).toHaveBeenCalledTimes(1);
+    const detail = failureListener.mock.calls[0][0].detail;
+    expect(detail.title).toBe('PDF 导出失败');
+    expect(detail.diagnostic).toContain('Prism 导出失败诊断');
+    expect(detail.diagnostic).toContain('格式: PDF (pdf)');
+    expect(detail.diagnostic).toContain('阶段: 正在写入 PDF 文件');
+    expect(detail.diagnostic).toContain('文档路径: /tmp/report.md');
+    expect(detail.diagnostic).toContain('输出路径: /tmp/report.pdf');
+    expect(detail.diagnostic).toContain('内容主题: slate');
+    expect(detail.diagnostic).toContain('导出模板: business');
+    expect(detail.diagnostic).toContain('Front matter 覆盖: 关闭');
+    expect(detail.diagnostic).toContain('目录: 开启');
+    expect(detail.diagnostic).toContain('默认导出位置: custom');
+    expect(detail.diagnostic).toContain('页码: 关闭');
+    expect(detail.diagnostic).toContain('页眉页脚: 开启');
+    expect(detail.diagnostic).toContain('页眉文本: {title}');
+    expect(detail.diagnostic).toContain('页脚文本: {filename}');
+    expect(detail.diagnostic).toContain('DOCX 自定义字体: font-1');
+    expect(detail.diagnostic).toContain('参考文献文件: /tmp/library.bib');
+    expect(detail.diagnostic).toContain('CSL 样式文件: /tmp/chinese-gb7714.csl');
+    expect(detail.diagnostic).toContain('引用路径校验: 通过');
+    expect(detail.diagnostic).toContain('Pandoc 引用条件: 未满足');
+    expect(detail.diagnostic).toContain('Pandoc 状态: 不可用');
+    expect(detail.diagnostic).toContain('Pandoc 路径: /opt/homebrew/bin/pandoc');
+    expect(detail.diagnostic).toContain('Pandoc 错误: not installed');
+    expect(detail.diagnostic).toContain('导出警告:');
+    expect(detail.diagnostic).toContain('- Pandoc 未检测成功；HTML 导出已回退内置管线');
+    expect(detail.diagnostic).toContain('- CSL 样式文件后缀需要是 .csl');
+    expect(detail.diagnostic).toContain('错误: disk full');
+  });
+
+  it('keeps pandoc citation condition unmet when citation paths fail validation', async () => {
+    exportMock.exportDocument.mockRejectedValueOnce(new Error('broken citation path'));
+    const failureListener = vi.fn();
+    window.addEventListener('prism-export-failure', failureListener);
+    const requestExportPath = vi.fn(async () => '/tmp/report.html');
+    const context = createCommandContext({
+      documentStore: {
+        ...createCommandContext().documentStore,
+        currentDocument: {
+          path: '/tmp/report.md',
+          name: 'report.md',
+          content: '引用 [@doe2024]',
+          isDirty: false,
+          lastKnownMtime: null,
+          lastKnownSize: null,
+          lastSavedAt: 0,
+          saveError: null,
+          viewMode: 'edit',
+          scrollState: { editorRatio: 0, previewRatio: 0 },
+          saveStatus: 'saved',
+        },
+      },
+      settingsStore: {
+        ...createCommandContext().settingsStore,
+        pandoc: {
+          path: '/opt/homebrew/bin/pandoc',
+          detected: true,
+          version: 'pandoc 3.2.1',
+          lastCheckedAt: 123,
+          lastError: '',
+        },
+        citation: {
+          bibliographyPath: '/tmp/references.txt',
+          cslStylePath: '/tmp/style.json',
+        },
+      },
+      requestExportPath,
+      showToast: vi.fn(),
+    });
+
+    await runCommand('exportHtml', context);
+    window.removeEventListener('prism-export-failure', failureListener);
+
+    expect(failureListener).toHaveBeenCalledTimes(1);
+    const detail = failureListener.mock.calls[0][0].detail;
+    expect(detail.diagnostic).toContain('Pandoc 状态: 可用');
+    expect(detail.diagnostic).toContain('引用路径校验: 参考文献文件后缀需为 .bib / .bibtex / .json；CSL 样式文件后缀需为 .csl');
+    expect(detail.diagnostic).toContain('Pandoc 引用条件: 未满足');
+  });
+
   it('runs enabled commands and skips disabled commands', async () => {
     const createNewDocument = vi.fn();
     const requestSavePath = vi.fn();
@@ -187,5 +926,91 @@ describe('command registry', () => {
 
     expect(createNewDocument).toHaveBeenCalledTimes(1);
     expect(requestSavePath).not.toHaveBeenCalled();
+  });
+
+  it('creates and clears recovery snapshots around manual save', async () => {
+    const markSaving = vi.fn();
+    const markSaved = vi.fn();
+    const markSaveFailed = vi.fn();
+    const context = createCommandContext({
+      documentStore: {
+        ...createCommandContext().documentStore,
+        currentDocument: {
+          path: '/tmp/a.md',
+          name: 'a.md',
+          content: '# B',
+          isDirty: true,
+          lastSavedAt: 0,
+          lastKnownMtime: 1000,
+          lastKnownSize: 3,
+          saveStatus: 'dirty',
+          saveError: null,
+          viewMode: 'edit',
+          scrollState: { editorRatio: 0, previewRatio: 0 },
+        },
+        markSaving,
+        markSaved,
+        markSaveFailed,
+      },
+    });
+
+    await runCommand('save', context);
+
+    expect(markSaving).toHaveBeenCalledWith('/tmp/a.md');
+    expect(recoveryMock.createRecoverySnapshot).toHaveBeenCalledWith({
+      documentPath: '/tmp/a.md',
+      documentName: 'a.md',
+      content: '# B',
+      reason: 'manual-save',
+    });
+    expect(fsMock.writeTextFile).toHaveBeenCalledWith('/tmp/a.md', '# B');
+    expect(markSaved).toHaveBeenCalledWith('/tmp/a.md', { mtimeMs: 1000, size: 3 });
+    expect(recoveryMock.clearRecoverySnapshotsForDocument).toHaveBeenCalledWith('/tmp/a.md');
+    expect(markSaveFailed).not.toHaveBeenCalled();
+  });
+
+  it('keeps recovery snapshots when manual save detects an external change', async () => {
+    fsMock.stat.mockResolvedValue({ size: 9, mtime: new Date(2000) });
+    const markSaveConflict = vi.fn();
+    const markSaveFailed = vi.fn();
+    const showToast = vi.fn();
+    const context = createCommandContext({
+      documentStore: {
+        ...createCommandContext().documentStore,
+        currentDocument: {
+          path: '/tmp/a.md',
+          name: 'a.md',
+          content: '# B',
+          isDirty: true,
+          lastSavedAt: 0,
+          lastKnownMtime: 1000,
+          lastKnownSize: 3,
+          saveStatus: 'dirty',
+          saveError: null,
+          viewMode: 'edit',
+          scrollState: { editorRatio: 0, previewRatio: 0 },
+        },
+        markSaveConflict,
+        markSaveFailed,
+      },
+      showToast,
+    });
+
+    await runCommand('save', context);
+
+    expect(recoveryMock.createRecoverySnapshot).toHaveBeenCalledWith({
+      documentPath: '/tmp/a.md',
+      documentName: 'a.md',
+      content: '# B',
+      reason: 'manual-save',
+    });
+    expect(markSaveConflict).toHaveBeenCalledWith(
+      '文件已在磁盘上被外部修改，请先重新加载或另存为。',
+      '/tmp/a.md',
+    );
+    expect(fsMock.writeTextFile).not.toHaveBeenCalled();
+    expect(recoveryMock.clearRecoverySnapshotsForDocument).not.toHaveBeenCalled();
+    expect(markSaveFailed).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith('操作失败: 文件已在磁盘上被外部修改，请先重新加载或另存为。');
   });
 });

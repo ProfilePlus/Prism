@@ -7,11 +7,107 @@ import { getMermaidThemeConfig, getThemeContract } from '../../themes';
 
 interface PreviewPaneProps {
   content: string;
+  onNotice?: (message: string) => void;
 }
+
+const PREVIEW_RENDER_DEBOUNCE_MS = 120;
+const mermaidSvgCache = new Map<string, string>();
 
 function getCurrentContentTheme(): ContentTheme {
   const theme = document.documentElement.getAttribute('data-content-theme');
   return isContentTheme(theme) ? theme : DEFAULT_SETTINGS.contentTheme;
+}
+
+function getExternalHttpUrl(rawHref: string, resolvedHref: string) {
+  if (/^https?:\/\//i.test(rawHref)) return rawHref;
+  if (rawHref.startsWith('//') && /^https?:\/\//i.test(resolvedHref)) return resolvedHref;
+  return null;
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatRenderError(error: unknown) {
+  if (error instanceof Error && error.message) return error.message;
+  return String(error);
+}
+
+function getMermaidCacheKey(contentTheme: ContentTheme, code: string) {
+  let hash = 0;
+  for (let index = 0; index < code.length; index += 1) {
+    hash = Math.imul(31, hash) + code.charCodeAt(index) | 0;
+  }
+  return `${contentTheme}:${hash.toString(36)}:${code.length}`;
+}
+
+function renderMermaidSvg(container: HTMLElement, svg: string) {
+  container.classList.remove('mermaid-placeholder--failed');
+  container.innerHTML = svg;
+  container.style.display = 'flex';
+  container.style.justifyContent = 'center';
+  container.style.margin = '1.5em 0';
+  const svgEl = container.querySelector('svg');
+  if (svgEl) {
+    requestAnimationFrame(() => normalizeMermaidSvg(svgEl));
+  }
+}
+
+function renderMermaidError(container: HTMLElement, error: unknown) {
+  const sourceLine = container.getAttribute('data-source-line') ?? container.getAttribute('data-line') ?? '';
+  const sourceAction = sourceLine
+    ? `<button type="button" data-preview-source-line="${escapeHtml(sourceLine)}">跳到源码</button>`
+    : '';
+
+  container.classList.add('mermaid-placeholder--failed');
+  container.innerHTML = `
+    <div class="preview-render-error" role="note" data-render-kind="mermaid">
+      <div class="preview-render-error-main">
+        <div class="preview-render-error-title">Mermaid 渲染失败</div>
+        <div class="preview-render-error-message">${escapeHtml(formatRenderError(error))}</div>
+      </div>
+      <div class="preview-render-error-actions">
+        ${sourceLine ? `<span>源码行 ${escapeHtml(sourceLine)}</span>` : ''}
+        ${sourceAction}
+      </div>
+    </div>
+  `;
+}
+
+export const __previewPaneTesting = {
+  clearMermaidCache: () => mermaidSvgCache.clear(),
+};
+
+function readClosestSourceLine(element: Element) {
+  const sourceElement = element.closest<HTMLElement>('[data-source-line], [data-line]');
+  return sourceElement?.getAttribute('data-source-line') ?? sourceElement?.getAttribute('data-line') ?? '';
+}
+
+function enhanceKatexErrors(container: HTMLElement) {
+  container.querySelectorAll<HTMLElement>('.katex-error').forEach((errorElement) => {
+    if (errorElement.dataset.previewKatexEnhanced === 'true') return;
+
+    const sourceLine = readClosestSourceLine(errorElement);
+    const message = errorElement.getAttribute('title') || 'KaTeX 渲染失败';
+    errorElement.dataset.previewKatexEnhanced = 'true';
+    errorElement.classList.add('preview-katex-error');
+    errorElement.setAttribute('title', message);
+
+    if (!sourceLine) return;
+
+    errorElement.setAttribute('data-preview-source-line', sourceLine);
+    const action = document.createElement('button');
+    action.type = 'button';
+    action.className = 'preview-katex-error-action';
+    action.dataset.previewSourceLine = sourceLine;
+    action.textContent = '跳到源码';
+    errorElement.insertAdjacentElement('afterend', action);
+  });
 }
 
 async function waitForDiagramFont(contentTheme: ContentTheme) {
@@ -25,6 +121,21 @@ async function waitForDiagramFont(contentTheme: ContentTheme) {
   } catch {
     // Font loading is a visual enhancement; Mermaid can still render with fallbacks.
   }
+}
+
+function waitForPreviewRenderSlot() {
+  return new Promise<void>((resolve) => {
+    const idleWindow = window as Window & typeof globalThis & {
+      requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+    };
+
+    if (typeof idleWindow.requestIdleCallback === 'function') {
+      idleWindow.requestIdleCallback(() => resolve(), { timeout: 300 });
+      return;
+    }
+
+    window.setTimeout(resolve, 0);
+  });
 }
 
 function normalizeMermaidSvg(svg: SVGSVGElement) {
@@ -62,19 +173,28 @@ function normalizeMermaidSvg(svg: SVGSVGElement) {
   }
 }
 
-export function PreviewPane({ content }: PreviewPaneProps) {
+export function PreviewPane({ content, onNotice }: PreviewPaneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [contentTheme, setContentTheme] = useState<ContentTheme>(getCurrentContentTheme);
+  const [renderContent, setRenderContent] = useState(content);
   const previewFontFamily = useSettingsStore((s) => s.previewFontFamily);
   const previewFontSize = useSettingsStore((s) => s.previewFontSize);
 
+  useEffect(() => {
+    if (content === renderContent) return;
+    const timer = window.setTimeout(() => {
+      setRenderContent(content);
+    }, PREVIEW_RENDER_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [content, renderContent]);
+
   const html = useMemo(() => {
     try {
-      return markdownToHtml(content);
+      return markdownToHtml(renderContent);
     } catch {
       return '<p>渲染失败</p>';
     }
-  }, [content]);
+  }, [renderContent]);
 
   useEffect(() => {
     const observer = new MutationObserver(() => {
@@ -89,6 +209,11 @@ export function PreviewPane({ content }: PreviewPaneProps) {
   }, []);
 
   useEffect(() => {
+    const write = containerRef.current?.querySelector<HTMLElement>('#write');
+    if (write) enhanceKatexErrors(write);
+  }, [html]);
+
+  useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
@@ -96,18 +221,28 @@ export function PreviewPane({ content }: PreviewPaneProps) {
       const target = e.target as HTMLElement;
       const anchor = target.closest('a');
       if (anchor && anchor.href) {
-        const url = anchor.href;
-        if (url.startsWith('http')) {
+        const rawHref = anchor.getAttribute('href')?.trim() ?? '';
+        if (!rawHref || rawHref.startsWith('#')) return;
+
+        const externalUrl = getExternalHttpUrl(rawHref, anchor.href);
+        if (externalUrl) {
           e.preventDefault();
-          try { await openUrl(url); }
-          catch (err) { console.error('[PreviewPane] Failed to open URL:', err); }
+          try {
+            await openUrl(externalUrl);
+          } catch {
+            onNotice?.('打开外部链接失败');
+          }
+          return;
         }
+
+        e.preventDefault();
+        onNotice?.('预览中的本地链接已拦截，请通过文件树打开');
       }
     };
 
     container.addEventListener('click', handleLinkClick);
     return () => container.removeEventListener('click', handleLinkClick);
-  }, [html]);
+  }, [html, onNotice]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -137,31 +272,40 @@ export function PreviewPane({ content }: PreviewPaneProps) {
           ...mermaidConfig,
         });
 
-        placeholders.forEach(async (placeholder, i) => {
-          const el = placeholder as HTMLElement;
-          const encoded = el.getAttribute('data-mermaid');
-          if (!encoded) return;
+        const placeholderList = Array.from(placeholders);
+        void (async () => {
+          await waitForDiagramFont(contentTheme);
 
-          const code = decodeURIComponent(encoded);
-          const id = `mermaid-${Date.now()}-${i}`;
+          for (const [i, placeholder] of placeholderList.entries()) {
+            if (cancelled) return;
+            const el = placeholder as HTMLElement;
+            const encoded = el.getAttribute('data-mermaid');
+            if (!encoded) continue;
 
-          try {
-            await waitForDiagramFont(contentTheme);
-            if (cancelled) return;
-            const { svg } = await mermaid.render(id, code);
-            if (cancelled) return;
-            el.innerHTML = svg;
-            el.style.display = 'flex';
-            el.style.justifyContent = 'center';
-            el.style.margin = '1.5em 0';
-            const svgEl = el.querySelector('svg');
-            if (svgEl) {
-              requestAnimationFrame(() => normalizeMermaidSvg(svgEl));
+            const code = decodeURIComponent(encoded);
+            const cacheKey = getMermaidCacheKey(contentTheme, code);
+            const cachedSvg = mermaidSvgCache.get(cacheKey);
+            if (cachedSvg) {
+              renderMermaidSvg(el, cachedSvg);
+              await waitForPreviewRenderSlot();
+              continue;
             }
-          } catch (err) {
-            el.innerHTML = `<pre style="color: var(--c-ash); font-size: 12px;">Mermaid 渲染失败: ${err}</pre>`;
+
+            const id = `mermaid-${Date.now()}-${i}`;
+
+            try {
+              const { svg } = await mermaid.render(id, code);
+              if (cancelled) return;
+              mermaidSvgCache.set(cacheKey, svg);
+              renderMermaidSvg(el, svg);
+            } catch (err) {
+              if (cancelled) return;
+              renderMermaidError(el, err);
+            }
+
+            await waitForPreviewRenderSlot();
           }
-        });
+        })();
       });
     });
 

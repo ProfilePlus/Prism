@@ -1,11 +1,23 @@
+export type DocumentSaveStatus = 'saved' | 'dirty' | 'saving' | 'failed' | 'conflict';
+
 export interface OpenDocument {
   path: string;
   name: string;
   content: string;
   isDirty: boolean;
   lastSavedAt: number;
+  lastKnownMtime: number | null;
+  lastKnownSize: number | null;
+  saveStatus: DocumentSaveStatus;
+  saveError: string | null;
   viewMode: 'edit' | 'split' | 'preview';
+  scrollState: DocumentScrollState;
   cursor?: { line: number; column: number };
+}
+
+export interface DocumentScrollState {
+  editorRatio: number;
+  previewRatio: number;
 }
 
 export interface DocumentState {

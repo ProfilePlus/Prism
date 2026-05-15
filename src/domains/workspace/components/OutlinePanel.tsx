@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 interface HeadingItem {
   level: number;
@@ -30,7 +30,13 @@ function extractHeadings(content: string): HeadingItem[] {
 }
 
 export function OutlinePanel({ content, onHeadingClick }: OutlinePanelProps) {
+  const [query, setQuery] = useState('');
   const headings = useMemo(() => extractHeadings(content), [content]);
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleHeadings = useMemo(() => {
+    if (!normalizedQuery) return headings;
+    return headings.filter((heading) => heading.text.toLowerCase().includes(normalizedQuery));
+  }, [headings, normalizedQuery]);
 
   if (headings.length === 0) {
     return (
@@ -41,29 +47,62 @@ export function OutlinePanel({ content, onHeadingClick }: OutlinePanelProps) {
   }
 
   return (
-    <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: '1px' }}>
-      {headings.map((h, i) => (
-        <div
-          key={i}
-          onClick={() => onHeadingClick?.(h.line)}
-          className="outline-item"
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div style={{ padding: '8px 12px 6px' }}>
+        <input
+          type="search"
+          aria-label="搜索大纲标题"
+          value={query}
+          onChange={(event) => setQuery(event.currentTarget.value)}
+          placeholder="搜索标题"
           style={{
-            padding: '6px 12px',
-            paddingLeft: `${16 + (h.level - 1) * 12}px`,
-            cursor: 'pointer',
-            fontSize: '13px',
-            color: 'var(--text-secondary)',
+            width: '100%',
+            height: '30px',
+            border: '1px solid var(--theme-divider, var(--border-color))',
             borderRadius: 'var(--radius-md)',
-            margin: '0 8px',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            transition: 'all var(--duration-fast) var(--ease-out)',
+            background: 'var(--bg-surface-solid)',
+            color: 'var(--text-primary)',
+            padding: '0 10px',
+            fontSize: '12px',
+            outline: 'none',
           }}
-        >
-          {h.text}
+        />
+      </div>
+
+      {visibleHeadings.length === 0 ? (
+        <div style={{ padding: '12px 16px', fontSize: '13px', opacity: 0.6 }}>
+          没有匹配标题
         </div>
-      ))}
+      ) : (
+        <div style={{ padding: '0 0 8px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+          {visibleHeadings.map((h) => (
+            <button
+              key={`${h.line}-${h.text}`}
+              type="button"
+              onClick={() => onHeadingClick?.(h.line)}
+              className="outline-item"
+              style={{
+                border: 'none',
+                padding: '6px 12px',
+                paddingLeft: `${16 + (h.level - 1) * 12}px`,
+                background: 'transparent',
+                cursor: 'pointer',
+                fontSize: '13px',
+                color: 'var(--text-secondary)',
+                borderRadius: 'var(--radius-md)',
+                margin: '0 8px',
+                textAlign: 'left',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                transition: 'all var(--duration-fast) var(--ease-out)',
+              }}
+            >
+              {h.text}
+            </button>
+          ))}
+        </div>
+      )}
       <style>{`
         .outline-item:hover {
           background: var(--bg-hover);

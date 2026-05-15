@@ -7,6 +7,7 @@ import {
   stat,
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
+import { invoke } from '@tauri-apps/api/core';
 import { confirm, message } from '@tauri-apps/plugin-dialog';
 import { openPath, revealItemInDir } from '@tauri-apps/plugin-opener';
 import { useDocumentStore } from '../domains/document/store';
@@ -21,15 +22,16 @@ import {
   joinPath,
   replacePathPrefix,
 } from '../domains/workspace/services';
+import { getFileSnapshotOrNull } from '../domains/document/fileSnapshot';
 import { openPrismWindow } from './openWindow';
+import { grantMarkdownFileScope, grantWorkspaceDirectoryScope } from './fileSystemScope';
+import {
+  getUnsupportedFileActionMessage,
+  parseFileAction,
+  type FileActionInput,
+} from './fileActionCommands';
 
-export type FileActionInput =
-  | string
-  | {
-      action: string;
-      path?: string;
-      name?: string;
-    };
+export type { FileActionInput } from './fileActionCommands';
 
 interface FileActionContext {
   documentStore: ReturnType<typeof useDocumentStore.getState>;
@@ -37,39 +39,21 @@ interface FileActionContext {
   showToast?: (message: string) => void;
 }
 
-interface ParsedFileAction {
-  command: string;
-  path?: string;
-  name?: string;
+type DeletePathMode = 'cancelled' | 'permanent' | 'trash';
+
+interface DeletePathWithTrashFallbackInput {
+  confirmDialog: typeof confirm;
+  displayName: string;
+  isDirectory: boolean;
+  moveToTrash: (path: string) => Promise<void>;
+  path: string;
+  permanentDelete: (path: string, options: { recursive: boolean }) => Promise<void>;
 }
 
-function parseAction(input: FileActionInput): ParsedFileAction {
-  if (typeof input !== 'string') {
-    const separatorIndex = input.action.indexOf(':');
-    if (separatorIndex === -1) {
-      return {
-        command: input.action,
-        path: input.path,
-        name: input.name,
-      };
-    }
-
-    return {
-      command: input.action.slice(0, separatorIndex),
-      path: input.path ?? input.action.slice(separatorIndex + 1),
-      name: input.name,
-    };
-  }
-
-  const separatorIndex = input.indexOf(':');
-  if (separatorIndex === -1) {
-    return { command: input };
-  }
-
-  return {
-    command: input.slice(0, separatorIndex),
-    path: input.slice(separatorIndex + 1),
-  };
+interface DeletePathWithTrashFallbackResult {
+  deleted: boolean;
+  error?: string;
+  mode: DeletePathMode;
 }
 
 function splitName(name: string): { stem: string; ext: string } {
@@ -81,6 +65,52 @@ function splitName(name: string): { stem: string; ext: string } {
 function formatError(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+async function movePathToTrash(path: string): Promise<void> {
+  await invoke('move_path_to_trash', { path });
+}
+
+export async function deletePathWithTrashFallback({
+  confirmDialog,
+  displayName,
+  isDirectory,
+  moveToTrash,
+  path,
+  permanentDelete,
+}: DeletePathWithTrashFallbackInput): Promise<DeletePathWithTrashFallbackResult> {
+  const confirmed = await confirmDialog(
+    `确定要将“${displayName}”移到系统废纸篓吗？`,
+    {
+      title: '移到废纸篓',
+      kind: 'warning',
+      okLabel: '移到废纸篓',
+      cancelLabel: '取消',
+    },
+  );
+
+  if (!confirmed) return { deleted: false, mode: 'cancelled' };
+
+  try {
+    await moveToTrash(path);
+    return { deleted: true, mode: 'trash' };
+  } catch (err) {
+    const error = formatError(err);
+    const permanentConfirmed = await confirmDialog(
+      `无法移到系统废纸篓：${error}\n\n是否永久删除“${displayName}”？此操作不可撤销。`,
+      {
+        title: '永久删除确认',
+        kind: 'warning',
+        okLabel: '永久删除',
+        cancelLabel: '取消',
+      },
+    );
+
+    if (!permanentConfirmed) return { deleted: false, mode: 'cancelled', error };
+
+    await permanentDelete(path, { recursive: isDirectory });
+    return { deleted: true, mode: 'permanent', error };
+  }
 }
 
 function formatBytes(bytes: number): string {
@@ -166,8 +196,10 @@ function getWorkspaceTargetDir(context: FileActionContext, requestedPath?: strin
 }
 
 async function handleOpenFile(path: string, context: FileActionContext): Promise<void> {
+  await grantMarkdownFileScope(path);
+  const snapshot = await getFileSnapshotOrNull(path);
   const content = await readTextFile(path);
-  context.documentStore.openDocument(path, basename(path), content);
+  context.documentStore.openDocument(path, basename(path), content, snapshot);
   addRecentFile(path, basename(path));
 
   if (!context.workspaceStore.rootPath) {
@@ -180,6 +212,11 @@ async function handleOpenFile(path: string, context: FileActionContext): Promise
 async function handleOpenNewWindow(path: string | undefined, context: FileActionContext): Promise<void> {
   if (path) {
     const info = await stat(path);
+    if (info.isDirectory) {
+      await grantWorkspaceDirectoryScope(path);
+    } else {
+      await grantMarkdownFileScope(path);
+    }
     await openPrismWindow(info.isDirectory ? { folderPath: path } : { filePath: path });
     return;
   }
@@ -197,8 +234,9 @@ async function handleNewFile(parentPath: string | undefined, context: FileAction
 
   const filePath = await getUniquePath(targetDir, '未命名', '.md');
   await writeTextFile(filePath, '', { createNew: true });
+  const snapshot = await getFileSnapshotOrNull(filePath);
   const content = await readTextFile(filePath);
-  context.documentStore.openDocument(filePath, basename(filePath), content);
+  context.documentStore.openDocument(filePath, basename(filePath), content, snapshot);
   addRecentFile(filePath, basename(filePath));
   await refreshWorkspace(context);
   requestInlineRename(filePath);
@@ -269,19 +307,19 @@ async function handleDuplicate(path: string, context: FileActionContext): Promis
 
 async function handleDelete(path: string, context: FileActionContext): Promise<void> {
   const info = await stat(path);
-  const confirmed = await confirm(
-    `确定要删除“${basename(path)}”吗？此操作不可撤销。`,
-    {
-      title: '删除确认',
-      kind: 'warning',
-      okLabel: '删除',
-      cancelLabel: '取消',
-    },
-  );
+  const result = await deletePathWithTrashFallback({
+    confirmDialog: confirm,
+    displayName: basename(path),
+    isDirectory: info.isDirectory,
+    moveToTrash: movePathToTrash,
+    path,
+    permanentDelete: remove,
+  });
 
-  if (!confirmed) return;
-
-  await remove(path, { recursive: info.isDirectory });
+  if (!result.deleted) {
+    if (result.error) context.showToast?.('已取消删除');
+    return;
+  }
 
   const doc = context.documentStore.currentDocument;
   if (doc?.path && (isSamePath(doc.path, path) || (info.isDirectory && isPathInside(doc.path, path)))) {
@@ -289,7 +327,7 @@ async function handleDelete(path: string, context: FileActionContext): Promise<v
   }
 
   await refreshWorkspace(context);
-  context.showToast?.('已删除');
+  context.showToast?.(result.mode === 'trash' ? '已移到系统废纸篓' : '已永久删除');
 }
 
 async function handleOpenLocation(path: string): Promise<void> {
@@ -337,7 +375,7 @@ export async function executeFileAction(
   input: FileActionInput,
   context: FileActionContext,
 ): Promise<void> {
-  const { command, path, name } = parseAction(input);
+  const { command, path, name } = parseFileAction(input);
 
   try {
     switch (command) {
@@ -439,7 +477,7 @@ export async function executeFileAction(
         return;
 
       default:
-        context.showToast?.(`功能“${command}”尚未实现`);
+        context.showToast?.(getUnsupportedFileActionMessage(command));
     }
   } catch (err) {
     console.error(`[FileAction] ${command} failed:`, err);

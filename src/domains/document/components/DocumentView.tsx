@@ -5,12 +5,15 @@ import { EditorPaneHandle } from '../../editor/components/EditorPane';
 
 interface DocumentViewProps {
   onCursorChange?: (cursor: { line: number; column: number }) => void;
+  onSelectionTextChange?: (text: string) => void;
+  onNotice?: (message: string) => void;
 }
 
 export const DocumentView = forwardRef<EditorPaneHandle, DocumentViewProps>(
-  function DocumentView({ onCursorChange }, ref) {
+  function DocumentView({ onCursorChange, onSelectionTextChange, onNotice }, ref) {
     const currentDocument = useDocumentStore((s) => s.currentDocument);
     const updateContent = useDocumentStore((s) => s.updateContent);
+    const updateScrollState = useDocumentStore((s) => s.updateScrollState);
 
     if (!currentDocument) {
       return (
@@ -43,9 +46,13 @@ export const DocumentView = forwardRef<EditorPaneHandle, DocumentViewProps>(
         <SplitView
           ref={ref}
           content={currentDocument.content}
+          scrollState={currentDocument.scrollState}
           viewMode={currentDocument.viewMode}
           onChange={updateContent}
           onCursorChange={onCursorChange}
+          onSelectionTextChange={onSelectionTextChange}
+          onNotice={onNotice}
+          onScrollStateChange={updateScrollState}
         />
       </div>
     );

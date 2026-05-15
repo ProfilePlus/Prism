@@ -18,8 +18,19 @@ export type CommandId =
   | 'newWindow'
   | 'open'
   | 'openFolder'
+  | 'quickOpen'
   | 'save'
   | 'saveAs'
+  | 'templateReadme'
+  | 'templatePrd'
+  | 'templateMeeting'
+  | 'templateWeekly'
+  | 'templateTechnicalPlan'
+  | 'templateArticle'
+  | 'templatePaperDraft'
+  | 'templateReadingNote'
+  | 'templateResearchSummary'
+  | 'templateWhitePaper'
   | 'print'
   | 'openCurrentLocation'
   | 'closeDocument'
@@ -27,6 +38,8 @@ export type CommandId =
   | 'exportPdf'
   | 'exportDocx'
   | 'exportPng'
+  | 'exportWithPrevious'
+  | 'exportOverwritePrevious'
   | 'undo'
   | 'redo'
   | 'cut'
@@ -46,6 +59,12 @@ export type CommandId =
   | 'orderedList'
   | 'unorderedList'
   | 'taskList'
+  | 'insertTable'
+  | 'formatTable'
+  | 'addTableRow'
+  | 'addTableColumn'
+  | 'deleteTableRow'
+  | 'deleteTableColumn'
   | 'hr'
   | 'footnote'
   | 'linkReference'
@@ -93,6 +112,7 @@ export type CommandId =
   | 'commandPalette'
   | 'mdReference'
   | 'showShortcuts'
+  | 'checkUpdate'
   | 'github'
   | 'feedback'
   | 'about';
@@ -119,6 +139,7 @@ export interface CommandContext {
     format: ExportFormat;
     filename: string;
     documentPath?: string;
+    suggestedPath?: string;
   }) => Promise<string | null>;
   requestSavePath?: (input: {
     filename: string;
@@ -128,6 +149,7 @@ export interface CommandContext {
   openSettings?: () => void;
   openShortcuts?: () => void;
   openCommandPalette?: () => void;
+  openQuickOpen?: () => void;
 }
 
 export interface CommandDefinition {

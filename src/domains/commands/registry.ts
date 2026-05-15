@@ -6,13 +6,32 @@ import { invoke } from '@tauri-apps/api/core';
 import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
 import { loadFolderTree } from '../workspace/lib/loadFolderTree';
 import { openPrismWindow } from '../../lib/openWindow';
+import { grantMarkdownFileScope, grantWorkspaceDirectoryScope } from '../../lib/fileSystemScope';
 import { MARKDOWN_FILE_FILTERS, addRecentFile, basename, dirname } from '../workspace/services';
+import { checkForAppUpdate } from '../update/updateService';
+import {
+  getExternalChangeMessage,
+  getFileSnapshot,
+  getFileSnapshotOrNull,
+  hasFileSnapshotChanged,
+  snapshotFromFileInfo,
+  type FileSnapshot,
+} from '../document/fileSnapshot';
+import {
+  clearRecoverySnapshotsForDocument,
+  createRecoverySnapshot,
+} from '../document/services/recovery';
+import {
+  MARKDOWN_TEMPLATES,
+  type MarkdownTemplateId,
+} from '../editor/extensions/templates';
 import {
   exportDocument,
   getExportFormatLabel,
   resolveExportOptions,
   type ExportFormat,
 } from '../export';
+import type { ExportHistoryEntry, ExportHistorySettings, SettingsState } from '../settings/types';
 import type {
   CommandContext,
   CommandDefinition,
@@ -41,8 +60,41 @@ function hasSavedDocumentPath(context: CommandContext): boolean {
   return Boolean(context.documentStore.currentDocument?.path);
 }
 
-function emitEditorCommand(command: string): void {
-  window.dispatchEvent(new CustomEvent('prism-editor-command', { detail: { command } }));
+function getCurrentDocumentExportHistory(context: CommandContext): ExportHistoryEntry | null {
+  const documentPath = context.documentStore.currentDocument?.path;
+  if (!documentPath) return null;
+  return context.settingsStore.exportHistory.find((entry) => entry.documentPath === documentPath) ?? null;
+}
+
+function hasCurrentDocumentExportHistory(context: CommandContext): boolean {
+  return Boolean(getCurrentDocumentExportHistory(context));
+}
+
+function isExternalFileChangeError(error: unknown): boolean {
+  return error instanceof Error && error.message === getExternalChangeMessage();
+}
+
+async function ensureDocumentNotChangedOnDisk(context: CommandContext, path: string): Promise<FileSnapshot | null> {
+  const doc = context.documentStore.currentDocument;
+  if (!doc) return null;
+
+  const diskSnapshot = await getFileSnapshot(path);
+  const knownSnapshot = {
+    mtimeMs: doc.lastKnownMtime,
+    size: doc.lastKnownSize,
+  };
+
+  if (hasFileSnapshotChanged(knownSnapshot, diskSnapshot)) {
+    const message = getExternalChangeMessage();
+    context.documentStore.markSaveConflict(message, path);
+    throw new Error(message);
+  }
+
+  return diskSnapshot;
+}
+
+function emitEditorCommand(command: string, detail: Record<string, unknown> = {}): void {
+  window.dispatchEvent(new CustomEvent('prism-editor-command', { detail: { command, ...detail } }));
 }
 
 function emitInlineFormat(format: string): void {
@@ -66,6 +118,17 @@ async function handleNew(context: CommandContext): Promise<void> {
   await openPrismWindow({});
 }
 
+function handleMarkdownTemplate(templateId: MarkdownTemplateId, context: CommandContext): void {
+  const template = MARKDOWN_TEMPLATES[templateId];
+  if (!context.documentStore.currentDocument) {
+    context.documentStore.createNewDocument(template.content, template.filename);
+    context.showToast?.(`已创建 ${template.label} 模板`);
+    return;
+  }
+
+  emitEditorCommand('insertTemplate', { templateId });
+}
+
 async function handleOpen(context: CommandContext): Promise<void> {
   const selected = await open({
     multiple: false,
@@ -73,6 +136,7 @@ async function handleOpen(context: CommandContext): Promise<void> {
   });
 
   if (!selected || Array.isArray(selected)) return;
+  await grantMarkdownFileScope(selected);
 
   try {
     const fileInfo = await stat(selected);
@@ -95,9 +159,10 @@ async function handleOpen(context: CommandContext): Promise<void> {
   }
 
   try {
+    const snapshot = snapshotFromFileInfo(await stat(selected));
     const content = await readTextFile(selected);
     const name = basename(selected);
-    context.documentStore.openDocument(selected, name, content);
+    context.documentStore.openDocument(selected, name, content, snapshot);
     addRecentFile(selected, name);
 
     try {
@@ -116,8 +181,9 @@ async function handleOpen(context: CommandContext): Promise<void> {
 }
 
 async function handleOpenFolder(context: CommandContext): Promise<void> {
-  const selected = await open({ directory: true, multiple: false });
+  const selected = await open({ directory: true, multiple: false, recursive: true });
   if (!selected || Array.isArray(selected)) return;
+  await grantWorkspaceDirectoryScope(selected);
 
   if (context.documentStore.currentDocument) {
     await openPrismWindow({ folderPath: selected });
@@ -152,14 +218,32 @@ async function handleSave(context: CommandContext): Promise<void> {
     targetPath = chosen;
   }
 
-  await writeTextFile(targetPath, doc.content);
+  context.documentStore.markSaving(doc.path || undefined);
 
-  if (!doc.path) {
-    context.documentStore.openDocument(targetPath, basename(targetPath), doc.content);
+  try {
+    if (doc.path) {
+      await createRecoverySnapshot({
+        documentPath: doc.path,
+        documentName: doc.name,
+        content: doc.content,
+        reason: 'manual-save',
+      }).catch(() => undefined);
+    }
+    if (doc.path) await ensureDocumentNotChangedOnDisk(context, targetPath);
+    await writeTextFile(targetPath, doc.content);
+    const snapshot = await getFileSnapshotOrNull(targetPath);
+    if (!doc.path) {
+      context.documentStore.openDocument(targetPath, basename(targetPath), doc.content, snapshot);
+    }
+    addRecentFile(targetPath, basename(targetPath));
+    context.documentStore.markSaved(targetPath, snapshot);
+    await clearRecoverySnapshotsForDocument(targetPath).catch(() => undefined);
+  } catch (err) {
+    if (!isExternalFileChangeError(err)) {
+      context.documentStore.markSaveFailed(err, doc.path || undefined);
+    }
+    throw err;
   }
-  addRecentFile(targetPath, basename(targetPath));
-
-  context.documentStore.markSaved();
 }
 
 async function handleSaveAs(context: CommandContext): Promise<void> {
@@ -177,13 +261,178 @@ async function handleSaveAs(context: CommandContext): Promise<void> {
   });
   if (!chosen) return;
 
-  await writeTextFile(chosen, doc.content);
-  context.documentStore.openDocument(chosen, basename(chosen), doc.content);
-  addRecentFile(chosen, basename(chosen));
-  context.documentStore.markSaved();
+  context.documentStore.markSaving();
+  try {
+    if (doc.path) {
+      await createRecoverySnapshot({
+        documentPath: doc.path,
+        documentName: doc.name,
+        content: doc.content,
+        reason: 'manual-save',
+      }).catch(() => undefined);
+    }
+    await writeTextFile(chosen, doc.content);
+    const snapshot = await getFileSnapshotOrNull(chosen);
+    context.documentStore.openDocument(chosen, basename(chosen), doc.content, snapshot);
+    addRecentFile(chosen, basename(chosen));
+    context.documentStore.markSaved(chosen, snapshot);
+    if (doc.path) await clearRecoverySnapshotsForDocument(doc.path).catch(() => undefined);
+    await clearRecoverySnapshotsForDocument(chosen).catch(() => undefined);
+  } catch (err) {
+    context.documentStore.markSaveFailed(err);
+    throw err;
+  }
 }
 
-async function handleExport(format: ExportFormat, context: CommandContext): Promise<void> {
+function createExportHistorySettings(settings: SettingsState): ExportHistorySettings {
+  return {
+    contentTheme: settings.contentTheme,
+    htmlIncludeTheme: settings.exportDefaults.htmlIncludeTheme,
+    pngScale: settings.exportDefaults.pngScale,
+    pdfPaper: settings.exportDefaults.pdfPaper,
+    pdfMargin: settings.exportDefaults.pdfMargin,
+    pdfPageNumbers: settings.exportDefaults.pdfPageNumbers,
+    pageHeaderFooter: settings.exportDefaults.pageHeaderFooter,
+    pageHeaderText: settings.exportDefaults.pageHeaderText,
+    pageFooterText: settings.exportDefaults.pageFooterText,
+    templateId: settings.exportDefaults.templateId,
+    frontMatterOverrides: settings.exportDefaults.frontMatterOverrides,
+    toc: settings.exportDefaults.toc,
+    defaultLocation: settings.exportDefaults.defaultLocation,
+    docxFontPolicy: settings.exportDefaults.docxFontPolicy,
+    docxCustomFontId: settings.exportDefaults.docxCustomFontId,
+  };
+}
+
+function applyExportHistorySettings(
+  baseSettings: SettingsState,
+  historySettings: ExportHistorySettings,
+): SettingsState {
+  return {
+    ...baseSettings,
+    contentTheme: historySettings.contentTheme,
+    exportDefaults: {
+      ...baseSettings.exportDefaults,
+      htmlIncludeTheme: historySettings.htmlIncludeTheme,
+      pngScale: historySettings.pngScale,
+      pdfPaper: historySettings.pdfPaper,
+      pdfMargin: historySettings.pdfMargin,
+      pdfPageNumbers: historySettings.pdfPageNumbers,
+      pageHeaderFooter: historySettings.pageHeaderFooter,
+      pageHeaderText: historySettings.pageHeaderText,
+      pageFooterText: historySettings.pageFooterText,
+      templateId: historySettings.templateId,
+      frontMatterOverrides: historySettings.frontMatterOverrides,
+      toc: historySettings.toc,
+      defaultLocation: historySettings.defaultLocation,
+      docxFontPolicy: historySettings.docxFontPolicy,
+      docxCustomFontId: historySettings.docxCustomFontId,
+    },
+  };
+}
+
+function hasSupportedCitationPathExtension(path: string, extensions: string[]) {
+  const normalized = path.trim().toLowerCase();
+  return normalized.length === 0 || extensions.some((extension) => normalized.endsWith(extension));
+}
+
+function getCitationPathValidation(citation: SettingsState['citation']) {
+  const issues: string[] = [];
+  if (!hasSupportedCitationPathExtension(citation.bibliographyPath, ['.bib', '.bibtex', '.json'])) {
+    issues.push('参考文献文件后缀需为 .bib / .bibtex / .json');
+  }
+  if (!hasSupportedCitationPathExtension(citation.cslStylePath, ['.csl'])) {
+    issues.push('CSL 样式文件后缀需为 .csl');
+  }
+  if (!citation.bibliographyPath.trim() && citation.cslStylePath.trim()) {
+    issues.push('缺少参考文献文件');
+  }
+  return issues.length > 0 ? issues.join('；') : '通过';
+}
+
+function buildExportFailureDiagnostic(input: {
+  format: ExportFormat;
+  documentName: string;
+  documentPath: string;
+  outputPath?: string | null;
+  stage: string;
+  settings: SettingsState;
+  warnings?: string[];
+  error: unknown;
+}) {
+  const errorMessage = formatError(input.error);
+  const stack = input.error instanceof Error && input.error.stack
+    ? input.error.stack
+    : '';
+  const pandoc = input.settings.pandoc;
+  const pandocStatus = pandoc.lastCheckedAt === null
+    ? '未检测'
+    : pandoc.detected
+      ? '可用'
+      : '不可用';
+  const citation = input.settings.citation;
+  const citationPathValidation = getCitationPathValidation(citation);
+  const citationPandocReady = pandoc.detected && Boolean(citation.bibliographyPath) && citationPathValidation === '通过';
+  return [
+    'Prism 导出失败诊断',
+    `时间: ${new Date().toISOString()}`,
+    `格式: ${getExportFormatLabel(input.format)} (${input.format})`,
+    `阶段: ${input.stage}`,
+    `文档: ${input.documentName}`,
+    `文档路径: ${input.documentPath || '(未保存)'}`,
+    `输出路径: ${input.outputPath || '(未选择)'}`,
+    `内容主题: ${input.settings.contentTheme}`,
+    `导出模板: ${input.settings.exportDefaults.templateId}`,
+    `Front matter 覆盖: ${input.settings.exportDefaults.frontMatterOverrides ? '开启' : '关闭'}`,
+    `目录: ${input.settings.exportDefaults.toc ? '开启' : '关闭'}`,
+    `默认导出位置: ${input.settings.exportDefaults.defaultLocation}`,
+    `PDF 纸张: ${input.settings.exportDefaults.pdfPaper}`,
+    `PDF 边距: ${input.settings.exportDefaults.pdfMargin}`,
+    `页码: ${input.settings.exportDefaults.pdfPageNumbers ? '开启' : '关闭'}`,
+    `页眉页脚: ${input.settings.exportDefaults.pageHeaderFooter ? '开启' : '关闭'}`,
+    `页眉文本: ${input.settings.exportDefaults.pageHeaderText || '(空)'}`,
+    `页脚文本: ${input.settings.exportDefaults.pageFooterText || '(空)'}`,
+    `PNG 清晰度: ${input.settings.exportDefaults.pngScale}x`,
+    `HTML 内联主题: ${input.settings.exportDefaults.htmlIncludeTheme ? '是' : '否'}`,
+    `DOCX 字体策略: ${input.settings.exportDefaults.docxFontPolicy}`,
+    `DOCX 自定义字体: ${input.settings.exportDefaults.docxCustomFontId || '(未指定)'}`,
+    `参考文献文件: ${citation.bibliographyPath || '(未配置)'}`,
+    `CSL 样式文件: ${citation.cslStylePath || '(未配置)'}`,
+    `引用路径校验: ${citationPathValidation}`,
+    `Pandoc 引用条件: ${citationPandocReady ? '满足' : '未满足'}`,
+    `Pandoc 状态: ${pandocStatus}`,
+    `Pandoc 路径: ${pandoc.path || '(系统 pandoc)'}`,
+    pandoc.version ? `Pandoc 版本: ${pandoc.version}` : '',
+    pandoc.lastError ? `Pandoc 错误: ${pandoc.lastError}` : '',
+    input.warnings?.length
+      ? `导出警告:\n${input.warnings.map((message) => `- ${message}`).join('\n')}`
+      : '',
+    `错误: ${errorMessage}`,
+    stack ? `堆栈:\n${stack}` : '',
+  ].filter(Boolean).join('\n');
+}
+
+function emitExportFailure(input: {
+  format: ExportFormat;
+  diagnostic: string;
+}) {
+  window.dispatchEvent(new CustomEvent('prism-export-failure', {
+    detail: {
+      title: `${getExportFormatLabel(input.format)} 导出失败`,
+      diagnostic: input.diagnostic,
+    },
+  }));
+}
+
+async function handleExport(
+  format: ExportFormat,
+  context: CommandContext,
+  options: {
+    outputPath?: string;
+    suggestedPath?: string;
+    settings?: SettingsState;
+  } = {},
+): Promise<void> {
   const doc = context.documentStore.currentDocument;
   if (!doc) {
     context.showToast?.('没有可导出的文档');
@@ -195,34 +444,82 @@ async function handleExport(format: ExportFormat, context: CommandContext): Prom
       detail: message ? { visible: true, message } : { visible: false },
     }));
   };
+  let outputPath: string | null | undefined;
+  let lastProgress = '准备导出';
+  const exportSettings = options.settings ?? context.settingsStore;
+  const exportWarnings: string[] = [];
 
   try {
-    if (!context.requestExportPath) {
+    if (!options.outputPath && !context.requestExportPath) {
       context.showToast?.('导出保存面板未就绪');
       return;
     }
 
-    const outputPath = await context.requestExportPath({
+    outputPath = options.outputPath ?? await context.requestExportPath?.({
       format,
       filename: doc.name,
       documentPath: doc.path,
+      suggestedPath: options.suggestedPath,
     });
     if (!outputPath) return;
 
     const exported = await exportDocument(resolveExportOptions({
       content: doc.content,
       filename: doc.name,
-      settings: context.settingsStore,
-      onProgress: (message) => setExportProgress(message),
-      onWarning: (message) => context.showToast?.(message),
+      settings: exportSettings,
+      onProgress: (message) => {
+        lastProgress = message;
+        setExportProgress(message);
+      },
+      onWarning: (message) => {
+        exportWarnings.push(message);
+        context.showToast?.(message);
+      },
     }), format, outputPath);
 
     if (exported) {
+      if (doc.path) {
+        context.settingsStore.recordExportHistory({
+          documentPath: doc.path,
+          documentName: doc.name,
+          format,
+          outputPath,
+          settings: createExportHistorySettings(exportSettings),
+        });
+      }
       context.showToast?.(`${getExportFormatLabel(format)} 导出完成`);
     }
+  } catch (err) {
+    const diagnostic = buildExportFailureDiagnostic({
+      format,
+      documentName: doc.name,
+      documentPath: doc.path,
+      outputPath,
+      stage: lastProgress,
+      settings: exportSettings,
+      warnings: exportWarnings,
+      error: err,
+    });
+    emitExportFailure({ format, diagnostic });
+    context.showToast?.(`${getExportFormatLabel(format)} 导出失败，已生成诊断文本`);
   } finally {
     setExportProgress(null);
   }
+}
+
+async function handleExportWithPrevious(context: CommandContext, overwrite: boolean): Promise<void> {
+  const history = getCurrentDocumentExportHistory(context);
+  if (!history) {
+    context.showToast?.('当前文档没有上次导出记录');
+    return;
+  }
+
+  const settings = applyExportHistorySettings(context.settingsStore, history.settings);
+  await handleExport(history.format, context, {
+    settings,
+    outputPath: overwrite ? history.outputPath : undefined,
+    suggestedPath: history.outputPath,
+  });
 }
 
 async function handleOpenCurrentLocation(context: CommandContext): Promise<void> {
@@ -259,7 +556,26 @@ async function handleCloseDocument(context: CommandContext): Promise<void> {
       if (!chosen) return;
       targetPath = chosen;
     }
-    await writeTextFile(targetPath, doc.content);
+    context.documentStore.markSaving(doc.path || undefined);
+    try {
+      if (doc.path) {
+        await createRecoverySnapshot({
+          documentPath: doc.path,
+          documentName: doc.name,
+          content: doc.content,
+          reason: 'manual-save',
+        }).catch(() => undefined);
+      }
+      if (doc.path) await ensureDocumentNotChangedOnDisk(context, targetPath);
+      await writeTextFile(targetPath, doc.content);
+      context.documentStore.markSaved(targetPath, await getFileSnapshotOrNull(targetPath));
+      await clearRecoverySnapshotsForDocument(targetPath).catch(() => undefined);
+    } catch (err) {
+      if (!isExternalFileChangeError(err)) {
+        context.documentStore.markSaveFailed(err, doc.path || undefined);
+      }
+      throw err;
+    }
   }
 
   context.documentStore.closeDocument();
@@ -327,6 +643,28 @@ async function handleHelpLink(command: CommandId): Promise<void> {
   if (url) await openUrl(url);
 }
 
+async function handleCheckUpdate(context: CommandContext): Promise<void> {
+  context.showToast?.('正在检查更新...');
+
+  try {
+    const result = await checkForAppUpdate();
+    if (result.status === 'none') {
+      context.showToast?.('当前已是最新版本');
+      return;
+    }
+
+    const shouldOpen = await ask(
+      `发现新版本 ${result.version}（当前 ${result.currentVersion}）。是否打开 GitHub Releases？`,
+      { title: '检查更新', kind: 'info' },
+    );
+    if (shouldOpen) {
+      await openUrl('https://github.com/AlexPlum405/Prism/releases/latest');
+    }
+  } catch (error) {
+    context.showToast?.(`检查更新失败: ${formatError(error)}`);
+  }
+}
+
 function command(definition: CommandDefinition): CommandDefinition {
   return definition;
 }
@@ -364,6 +702,15 @@ export const commandRegistry = [
     run: handleOpenFolder,
   }),
   command({
+    id: 'quickOpen',
+    label: '快速打开文件',
+    category: '文件',
+    keywords: ['quick', 'open', 'file', 'workspace'],
+    shortcuts: [{ code: 'KeyP', mod: true }],
+    enabled: (context) => Boolean(context.workspaceStore.rootPath && context.workspaceStore.fileTree.length > 0),
+    run: (context) => (context.openQuickOpen ?? context.openCommandPalette)?.(),
+  }),
+  command({
     id: 'save',
     label: '保存',
     category: '文件',
@@ -382,11 +729,80 @@ export const commandRegistry = [
     run: handleSaveAs,
   }),
   command({
+    id: 'templateReadme',
+    label: 'README 模板',
+    category: '文件',
+    keywords: ['template', 'readme'],
+    run: (context) => handleMarkdownTemplate('readme', context),
+  }),
+  command({
+    id: 'templatePrd',
+    label: 'PRD 模板',
+    category: '文件',
+    keywords: ['template', 'prd', 'product'],
+    run: (context) => handleMarkdownTemplate('prd', context),
+  }),
+  command({
+    id: 'templateMeeting',
+    label: '会议纪要模板',
+    category: '文件',
+    keywords: ['template', 'meeting'],
+    run: (context) => handleMarkdownTemplate('meeting', context),
+  }),
+  command({
+    id: 'templateWeekly',
+    label: '周报模板',
+    category: '文件',
+    keywords: ['template', 'weekly'],
+    run: (context) => handleMarkdownTemplate('weekly', context),
+  }),
+  command({
+    id: 'templateTechnicalPlan',
+    label: '技术方案模板',
+    category: '文件',
+    keywords: ['template', 'technical', 'plan'],
+    run: (context) => handleMarkdownTemplate('technicalPlan', context),
+  }),
+  command({
+    id: 'templateArticle',
+    label: '公众号长文模板',
+    category: '文件',
+    keywords: ['template', 'article'],
+    run: (context) => handleMarkdownTemplate('article', context),
+  }),
+  command({
+    id: 'templatePaperDraft',
+    label: '论文草稿模板',
+    category: '文件',
+    keywords: ['template', 'paper', 'academic', '论文'],
+    run: (context) => handleMarkdownTemplate('paperDraft', context),
+  }),
+  command({
+    id: 'templateReadingNote',
+    label: '读书笔记模板',
+    category: '文件',
+    keywords: ['template', 'reading', 'book', '读书笔记'],
+    run: (context) => handleMarkdownTemplate('readingNote', context),
+  }),
+  command({
+    id: 'templateResearchSummary',
+    label: '研究摘要模板',
+    category: '文件',
+    keywords: ['template', 'research', 'summary', '研究摘要'],
+    run: (context) => handleMarkdownTemplate('researchSummary', context),
+  }),
+  command({
+    id: 'templateWhitePaper',
+    label: '白皮书模板',
+    category: '文件',
+    keywords: ['template', 'whitepaper', '白皮书'],
+    run: (context) => handleMarkdownTemplate('whitePaper', context),
+  }),
+  command({
     id: 'print',
     label: '打印',
     category: '文件',
     keywords: ['print'],
-    shortcuts: [{ code: 'KeyP', mod: true }],
     run: () => window.print(),
   }),
   command({
@@ -435,6 +851,22 @@ export const commandRegistry = [
     keywords: ['export', 'png', 'image'],
     enabled: hasDocument,
     run: (context) => handleExport('png', context),
+  }),
+  command({
+    id: 'exportWithPrevious',
+    label: '按上次设置导出',
+    category: '文件',
+    keywords: ['export', 'last', 'previous'],
+    enabled: hasCurrentDocumentExportHistory,
+    run: (context) => handleExportWithPrevious(context, false),
+  }),
+  command({
+    id: 'exportOverwritePrevious',
+    label: '覆盖上次导出文件',
+    category: '文件',
+    keywords: ['export', 'overwrite', 'last'],
+    enabled: hasCurrentDocumentExportHistory,
+    run: (context) => handleExportWithPrevious(context, true),
   }),
 
   command({
@@ -603,6 +1035,54 @@ export const commandRegistry = [
     shortcuts: [{ code: 'KeyX', mod: true, shift: true }],
     enabled: hasDocument,
     run: () => emitBlockFormat('taskList'),
+  }),
+  command({
+    id: 'insertTable',
+    label: '插入表格',
+    category: '插入',
+    keywords: ['table'],
+    enabled: hasDocument,
+    run: () => emitEditorCommand('insertTable'),
+  }),
+  command({
+    id: 'formatTable',
+    label: '格式化当前表格',
+    category: '插入',
+    keywords: ['table', 'format'],
+    enabled: hasDocument,
+    run: () => emitEditorCommand('formatTable'),
+  }),
+  command({
+    id: 'addTableRow',
+    label: '添加表格行',
+    category: '插入',
+    keywords: ['table', 'row'],
+    enabled: hasDocument,
+    run: () => emitEditorCommand('addTableRow'),
+  }),
+  command({
+    id: 'addTableColumn',
+    label: '添加表格列',
+    category: '插入',
+    keywords: ['table', 'column'],
+    enabled: hasDocument,
+    run: () => emitEditorCommand('addTableColumn'),
+  }),
+  command({
+    id: 'deleteTableRow',
+    label: '删除表格行',
+    category: '插入',
+    keywords: ['table', 'row', 'delete'],
+    enabled: hasDocument,
+    run: () => emitEditorCommand('deleteTableRow'),
+  }),
+  command({
+    id: 'deleteTableColumn',
+    label: '删除表格列',
+    category: '插入',
+    keywords: ['table', 'column', 'delete'],
+    enabled: hasDocument,
+    run: () => emitEditorCommand('deleteTableColumn'),
   }),
   command({
     id: 'hr',
@@ -943,6 +1423,13 @@ export const commandRegistry = [
     category: '帮助',
     keywords: ['shortcut', 'keyboard'],
     run: (context) => context.openShortcuts?.(),
+  }),
+  command({
+    id: 'checkUpdate',
+    label: '检查更新',
+    category: '帮助',
+    keywords: ['update', 'release', 'version'],
+    run: handleCheckUpdate,
   }),
   command({
     id: 'github',

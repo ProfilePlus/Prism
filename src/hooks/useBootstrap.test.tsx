@@ -7,6 +7,7 @@ import { useSettingsStore } from '../domains/settings/store';
 vi.mock('@tauri-apps/plugin-fs', () => ({
   readTextFile: vi.fn(),
   exists: vi.fn(),
+  stat: vi.fn(),
 }));
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -18,7 +19,7 @@ vi.mock('../domains/workspace/lib/loadFolderTree', () => ({
 }));
 
 import { invoke } from '@tauri-apps/api/core';
-import { exists, readTextFile } from '@tauri-apps/plugin-fs';
+import { exists, readTextFile, stat } from '@tauri-apps/plugin-fs';
 import { loadFolderTree } from '../domains/workspace/lib/loadFolderTree';
 import { useBootstrap } from './useBootstrap';
 
@@ -34,6 +35,7 @@ beforeEach(() => {
   window.history.replaceState({}, '', '?file=C:/docs/bootstrap.md');
   vi.clearAllMocks();
   (exists as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+  (stat as ReturnType<typeof vi.fn>).mockResolvedValue({ size: 12, mtime: new Date(1000) });
   (invoke as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 });
 
@@ -87,5 +89,94 @@ describe('useBootstrap', () => {
     const ws = useWorkspaceStore.getState();
     expect(ws.rootPath).toBe('C:/docs');
     expect(ws.fileTree).toEqual(mockTree);
+  });
+
+  it('does not bootstrap before settings are loaded', async () => {
+    (readTextFile as ReturnType<typeof vi.fn>).mockResolvedValue('file content');
+
+    const { rerender } = renderHook(
+      ({ enabled }) => useBootstrap(enabled),
+      { initialProps: { enabled: false } },
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(readTextFile).not.toHaveBeenCalled();
+
+    rerender({ enabled: true });
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(readTextFile).toHaveBeenCalledWith('C:/docs/bootstrap.md');
+  });
+
+  it('opens pending files before last session once bootstrap is enabled', async () => {
+    window.history.replaceState({}, '', '/');
+    useSettingsStore.setState({
+      restoreLastSession: true,
+      lastSession: {
+        filePath: 'C:/docs/last.md',
+        viewMode: 'preview',
+        updatedAt: 1,
+      },
+      recentFiles: [],
+      saveSettings: vi.fn(),
+    });
+
+    (invoke as ReturnType<typeof vi.fn>).mockImplementation(async (command: string) => {
+      if (command === 'get_pending_files') return ['C:/docs/opened.md'];
+      return undefined;
+    });
+    (readTextFile as ReturnType<typeof vi.fn>).mockImplementation(async (path: string) => {
+      return path.endsWith('opened.md') ? 'opened content' : 'last session content';
+    });
+    (loadFolderTree as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    renderHook(() => useBootstrap(true));
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const doc = useDocumentStore.getState().currentDocument;
+    expect(doc?.path).toBe('C:/docs/opened.md');
+    expect(doc?.content).toBe('opened content');
+  });
+
+  it('restores last session view mode and scroll state when no explicit file is requested', async () => {
+    window.history.replaceState({}, '', '/');
+    useSettingsStore.setState({
+      restoreLastSession: true,
+      lastSession: {
+        filePath: 'C:/docs/last.md',
+        viewMode: 'split',
+        scrollState: { editorRatio: 0.35, previewRatio: 0.6 },
+        updatedAt: 1,
+      },
+      recentFiles: [],
+      saveSettings: vi.fn(),
+    });
+    (readTextFile as ReturnType<typeof vi.fn>).mockResolvedValue('last session content');
+    (loadFolderTree as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    renderHook(() => useBootstrap(true));
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(useDocumentStore.getState().currentDocument).toMatchObject({
+      path: 'C:/docs/last.md',
+      viewMode: 'split',
+      scrollState: { editorRatio: 0.35, previewRatio: 0.6 },
+    });
   });
 });

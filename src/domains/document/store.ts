@@ -1,21 +1,38 @@
 import { create } from 'zustand';
-import { DocumentState } from './types';
+import { DocumentScrollState, DocumentState } from './types';
+import type { FileSnapshot } from './fileSnapshot';
 import { useSettingsStore } from '../settings/store';
 
 interface DocumentStore extends DocumentState {
-  openDocument: (path: string, name: string, content: string) => void;
+  openDocument: (path: string, name: string, content: string, snapshot?: FileSnapshot | null) => void;
   closeDocument: () => void;
-  createNewDocument: () => void;
+  createNewDocument: (content?: string, name?: string) => void;
   updateContent: (content: string) => void;
   updateDocumentPath: (oldPath: string, newPath: string, name: string) => void;
+  updateScrollState: (scrollState: Partial<DocumentScrollState>) => void;
   setViewMode: (viewMode: 'edit' | 'split' | 'preview') => void;
-  markSaved: () => void;
+  updateFileSnapshot: (path: string, snapshot: FileSnapshot | null) => void;
+  markSaving: (path?: string) => void;
+  markSaved: (path?: string, snapshot?: FileSnapshot | null) => void;
+  markSaveFailed: (error: unknown, path?: string) => void;
+  markSaveConflict: (error: unknown, path?: string) => void;
 }
+
+function formatSaveError(error: unknown) {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === 'string' && error.trim()) return error;
+  return '保存失败';
+}
+
+const DEFAULT_SCROLL_STATE: DocumentScrollState = {
+  editorRatio: 0,
+  previewRatio: 0,
+};
 
 export const useDocumentStore = create<DocumentStore>((set) => ({
   currentDocument: null,
 
-  openDocument: (path, name, content) => {
+  openDocument: (path, name, content, snapshot = null) => {
     set({
       currentDocument: {
         path,
@@ -23,7 +40,12 @@ export const useDocumentStore = create<DocumentStore>((set) => ({
         content,
         isDirty: false,
         lastSavedAt: Date.now(),
+        lastKnownMtime: snapshot?.mtimeMs ?? null,
+        lastKnownSize: snapshot?.size ?? null,
+        saveStatus: 'saved',
+        saveError: null,
         viewMode: useSettingsStore.getState().defaultViewMode,
+        scrollState: { ...DEFAULT_SCROLL_STATE },
       },
     });
   },
@@ -32,15 +54,21 @@ export const useDocumentStore = create<DocumentStore>((set) => ({
     set({ currentDocument: null });
   },
 
-  createNewDocument: () => {
+  createNewDocument: (content = '', name = 'Untitled.md') => {
+    const hasInitialContent = content.length > 0;
     set({
       currentDocument: {
         path: '',
-        name: 'Untitled.md',
-        content: '',
-        isDirty: false,
+        name,
+        content,
+        isDirty: hasInitialContent,
         lastSavedAt: Date.now(),
+        lastKnownMtime: null,
+        lastKnownSize: null,
+        saveStatus: hasInitialContent ? 'dirty' : 'saved',
+        saveError: null,
         viewMode: useSettingsStore.getState().defaultViewMode,
+        scrollState: { ...DEFAULT_SCROLL_STATE },
       },
     });
   },
@@ -53,6 +81,8 @@ export const useDocumentStore = create<DocumentStore>((set) => ({
           ...state.currentDocument,
           content,
           isDirty: true,
+          saveStatus: 'dirty',
+          saveError: null,
         },
       };
     });
@@ -71,6 +101,34 @@ export const useDocumentStore = create<DocumentStore>((set) => ({
     });
   },
 
+  updateFileSnapshot: (path, snapshot) => {
+    set((state) => {
+      if (!state.currentDocument || state.currentDocument.path !== path) return state;
+      return {
+        currentDocument: {
+          ...state.currentDocument,
+          lastKnownMtime: snapshot?.mtimeMs ?? null,
+          lastKnownSize: snapshot?.size ?? null,
+        },
+      };
+    });
+  },
+
+  updateScrollState: (scrollState) => {
+    set((state) => {
+      if (!state.currentDocument) return state;
+      return {
+        currentDocument: {
+          ...state.currentDocument,
+          scrollState: {
+            ...state.currentDocument.scrollState,
+            ...scrollState,
+          },
+        },
+      };
+    });
+  },
+
   setViewMode: (viewMode) => {
     set((state) => {
       if (!state.currentDocument) return state;
@@ -83,14 +141,63 @@ export const useDocumentStore = create<DocumentStore>((set) => ({
     });
   },
 
-  markSaved: () => {
+  markSaving: (path) => {
     set((state) => {
       if (!state.currentDocument) return state;
+      if (path !== undefined && state.currentDocument.path !== path) return state;
+      return {
+        currentDocument: {
+          ...state.currentDocument,
+          saveStatus: 'saving',
+          saveError: null,
+        },
+      };
+    });
+  },
+
+  markSaved: (path, snapshot) => {
+    set((state) => {
+      if (!state.currentDocument) return state;
+      if (path !== undefined && state.currentDocument.path !== path) return state;
       return {
         currentDocument: {
           ...state.currentDocument,
           isDirty: false,
           lastSavedAt: Date.now(),
+          lastKnownMtime: snapshot ? snapshot.mtimeMs : state.currentDocument.lastKnownMtime,
+          lastKnownSize: snapshot ? snapshot.size : state.currentDocument.lastKnownSize,
+          saveStatus: 'saved',
+          saveError: null,
+        },
+      };
+    });
+  },
+
+  markSaveFailed: (error, path) => {
+    set((state) => {
+      if (!state.currentDocument) return state;
+      if (path !== undefined && state.currentDocument.path !== path) return state;
+      return {
+        currentDocument: {
+          ...state.currentDocument,
+          isDirty: true,
+          saveStatus: 'failed',
+          saveError: formatSaveError(error),
+        },
+      };
+    });
+  },
+
+  markSaveConflict: (error, path) => {
+    set((state) => {
+      if (!state.currentDocument) return state;
+      if (path !== undefined && state.currentDocument.path !== path) return state;
+      return {
+        currentDocument: {
+          ...state.currentDocument,
+          isDirty: true,
+          saveStatus: 'conflict',
+          saveError: formatSaveError(error),
         },
       };
     });

@@ -2,15 +2,19 @@ import {
   DEFAULT_SETTINGS,
   type AutoSaveStrategy,
   type AppearanceMode,
+  type CitationSettings,
   type CustomFont,
   type DocxFontPolicy,
   type DefaultViewMode,
   type ExportDefaultLocation,
   type ExportDefaultFormat,
+  type ExportHistoryEntry,
+  type ExportHistorySettings,
   type ExportTemplateId,
   type FontSource,
   type FontSourceKind,
   type LastSessionState,
+  type PandocSettings,
   type PdfMargin,
   type PdfPaper,
   type RecentFileEntry,
@@ -74,6 +78,21 @@ function booleanOrDefault(value: unknown, fallback: boolean): boolean {
 
 function stringOrDefault(value: unknown, fallback: string): string {
   return typeof value === 'string' && value.trim() ? value : fallback;
+}
+
+function exportTextOrDefault(value: unknown, fallback: string): string {
+  if (typeof value !== 'string') return fallback;
+  return value.replace(/\s+/g, ' ').trim().slice(0, 160);
+}
+
+function optionalText(value: unknown, maxLength: number): string {
+  if (typeof value !== 'string') return '';
+  return value.replace(/\s+/g, ' ').trim().slice(0, maxLength);
+}
+
+function optionalPath(value: unknown, maxLength = 1000): string {
+  if (typeof value !== 'string') return '';
+  return value.trim().slice(0, maxLength);
 }
 
 function inferAutoSaveStrategy(interval: number): AutoSaveStrategy {
@@ -144,23 +163,149 @@ export function normalizeRecentFiles(value: unknown, limit = DEFAULT_SETTINGS.re
     .slice(0, limit);
 }
 
+function normalizeExportHistorySettings(value: unknown): ExportHistorySettings {
+  const settings = value && typeof value === 'object'
+    ? value as Partial<ExportHistorySettings>
+    : {};
+  const legacySettings = settings as Partial<ExportHistorySettings> & {
+    pdfHeaderFooter?: unknown;
+    pdfHeaderText?: unknown;
+    pdfFooterText?: unknown;
+  };
+  const defaults = DEFAULT_SETTINGS.exportDefaults;
+
+  return {
+    contentTheme: isContentTheme(settings.contentTheme)
+      ? settings.contentTheme
+      : DEFAULT_SETTINGS.contentTheme,
+    htmlIncludeTheme: booleanOrDefault(settings.htmlIncludeTheme, defaults.htmlIncludeTheme),
+    pngScale: numberInRange(settings.pngScale, defaults.pngScale, 1, 4),
+    pdfPaper: isPdfPaper(settings.pdfPaper) ? settings.pdfPaper : defaults.pdfPaper,
+    pdfMargin: isPdfMargin(settings.pdfMargin) ? settings.pdfMargin : defaults.pdfMargin,
+    pdfPageNumbers: booleanOrDefault(settings.pdfPageNumbers, defaults.pdfPageNumbers),
+    pageHeaderFooter: booleanOrDefault(
+      settings.pageHeaderFooter ?? legacySettings.pdfHeaderFooter,
+      defaults.pageHeaderFooter,
+    ),
+    pageHeaderText: exportTextOrDefault(
+      settings.pageHeaderText ?? legacySettings.pdfHeaderText,
+      defaults.pageHeaderText,
+    ),
+    pageFooterText: exportTextOrDefault(
+      settings.pageFooterText ?? legacySettings.pdfFooterText,
+      defaults.pageFooterText,
+    ),
+    templateId: isExportTemplateId(settings.templateId) ? settings.templateId : defaults.templateId,
+    frontMatterOverrides: booleanOrDefault(settings.frontMatterOverrides, defaults.frontMatterOverrides),
+    toc: booleanOrDefault(settings.toc, defaults.toc),
+    defaultLocation: isExportDefaultLocation(settings.defaultLocation)
+      ? settings.defaultLocation
+      : defaults.defaultLocation,
+    docxFontPolicy: isDocxFontPolicy(settings.docxFontPolicy)
+      ? settings.docxFontPolicy
+      : defaults.docxFontPolicy,
+    docxCustomFontId: typeof settings.docxCustomFontId === 'string'
+      ? settings.docxCustomFontId
+      : defaults.docxCustomFontId,
+  };
+}
+
+export function normalizeExportHistory(value: unknown, limit = 50): ExportHistoryEntry[] {
+  if (!Array.isArray(value)) return [];
+  const candidates: ExportHistoryEntry[] = [];
+
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue;
+    const candidate = item as Partial<ExportHistoryEntry>;
+    if (typeof candidate.documentPath !== 'string' || !candidate.documentPath.trim()) continue;
+    if (typeof candidate.outputPath !== 'string' || !candidate.outputPath.trim()) continue;
+    if (!isExportDefaultFormat(candidate.format)) continue;
+
+    candidates.push({
+      documentPath: candidate.documentPath,
+      documentName: stringOrDefault(candidate.documentName, candidate.documentPath.split(/[\\/]/).pop() || 'Untitled.md'),
+      format: candidate.format,
+      outputPath: candidate.outputPath,
+      settings: normalizeExportHistorySettings(candidate.settings),
+      exportedAt: typeof candidate.exportedAt === 'number' && Number.isFinite(candidate.exportedAt)
+        ? candidate.exportedAt
+        : Date.now(),
+    });
+  }
+
+  const seen = new Set<string>();
+  return candidates
+    .sort((a, b) => b.exportedAt - a.exportedAt)
+    .filter((entry) => {
+      const key = entry.documentPath.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, limit);
+}
+
+export function normalizePandocSettings(value: unknown): PandocSettings {
+  if (!value || typeof value !== 'object') return DEFAULT_SETTINGS.pandoc;
+  const candidate = value as Partial<PandocSettings>;
+  const lastCheckedAt = typeof candidate.lastCheckedAt === 'number' && Number.isFinite(candidate.lastCheckedAt)
+    ? Math.max(0, candidate.lastCheckedAt)
+    : null;
+  const detected = booleanOrDefault(candidate.detected, DEFAULT_SETTINGS.pandoc.detected);
+  const version = optionalText(candidate.version, 160);
+  const lastError = optionalText(candidate.lastError, 500);
+
+  return {
+    path: typeof candidate.path === 'string'
+      ? candidate.path.trim()
+      : DEFAULT_SETTINGS.pandoc.path,
+    detected,
+    version: detected ? version : '',
+    lastCheckedAt,
+    lastError: detected ? '' : lastError,
+  };
+}
+
+export function normalizeCitationSettings(value: unknown): CitationSettings {
+  if (!value || typeof value !== 'object') return DEFAULT_SETTINGS.citation;
+  const candidate = value as Partial<CitationSettings>;
+  return {
+    bibliographyPath: optionalPath(candidate.bibliographyPath),
+    cslStylePath: optionalPath(candidate.cslStylePath),
+  };
+}
+
 function normalizeLastSession(value: unknown): LastSessionState | null {
   if (!value || typeof value !== 'object') return null;
   const session = value as Partial<LastSessionState>;
   const filePath = typeof session.filePath === 'string' ? session.filePath : undefined;
   const folderPath = typeof session.folderPath === 'string' ? session.folderPath : undefined;
   if (!filePath && !folderPath) return null;
+  const rawScrollState = session.scrollState;
+  const scrollState = rawScrollState && typeof rawScrollState === 'object'
+    ? {
+        editorRatio: clampRatio((rawScrollState as { editorRatio?: unknown }).editorRatio),
+        previewRatio: clampRatio((rawScrollState as { previewRatio?: unknown }).previewRatio),
+      }
+    : undefined;
 
   return {
     filePath,
     folderPath,
     viewMode: isDefaultViewMode(session.viewMode) ? session.viewMode : undefined,
+    scrollState,
     sidebarVisible: typeof session.sidebarVisible === 'boolean' ? session.sidebarVisible : undefined,
     sidebarTab: session.sidebarTab === 'files' || session.sidebarTab === 'outline' || session.sidebarTab === 'search'
       ? session.sidebarTab
       : undefined,
     updatedAt: typeof session.updatedAt === 'number' ? session.updatedAt : Date.now(),
   };
+}
+
+function clampRatio(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(0, Math.min(1, value))
+    : 0;
 }
 
 function migrateEditorFontSource(saved: Partial<SettingsState>): FontSource {
@@ -196,6 +341,11 @@ export function normalizeSettings(saved: Partial<SettingsState>): SettingsState 
     saved.exportDefaults && typeof saved.exportDefaults === 'object'
       ? saved.exportDefaults
       : {} as Partial<SettingsState['exportDefaults']>;
+  const legacyExportDefaults = exportDefaults as Partial<SettingsState['exportDefaults']> & {
+    pdfHeaderFooter?: unknown;
+    pdfHeaderText?: unknown;
+    pdfFooterText?: unknown;
+  };
   const autoSaveInterval = numberInRange(
     saved.autoSaveInterval,
     DEFAULT_SETTINGS.autoSaveInterval,
@@ -212,6 +362,7 @@ export function normalizeSettings(saved: Partial<SettingsState>): SettingsState 
   return {
     ...DEFAULT_SETTINGS,
     ...saved,
+    settingsVersion: DEFAULT_SETTINGS.settingsVersion,
     theme: isAppearanceMode(saved.theme) ? saved.theme : DEFAULT_SETTINGS.theme,
     contentTheme: isContentTheme(saved.contentTheme)
       ? saved.contentTheme
@@ -231,7 +382,6 @@ export function normalizeSettings(saved: Partial<SettingsState>): SettingsState 
       : DEFAULT_SETTINGS.defaultViewMode,
     exportDefaults: {
       ...DEFAULT_SETTINGS.exportDefaults,
-      ...exportDefaults,
       format: isExportDefaultFormat(exportDefaults.format)
         ? exportDefaults.format
         : DEFAULT_SETTINGS.exportDefaults.format,
@@ -251,9 +401,33 @@ export function normalizeSettings(saved: Partial<SettingsState>): SettingsState 
       pdfMargin: isPdfMargin(exportDefaults.pdfMargin)
         ? exportDefaults.pdfMargin
         : DEFAULT_SETTINGS.exportDefaults.pdfMargin,
+      pdfPageNumbers: booleanOrDefault(
+        exportDefaults.pdfPageNumbers,
+        DEFAULT_SETTINGS.exportDefaults.pdfPageNumbers,
+      ),
+      pageHeaderFooter: booleanOrDefault(
+        exportDefaults.pageHeaderFooter ?? legacyExportDefaults.pdfHeaderFooter,
+        DEFAULT_SETTINGS.exportDefaults.pageHeaderFooter,
+      ),
+      pageHeaderText: exportTextOrDefault(
+        exportDefaults.pageHeaderText ?? legacyExportDefaults.pdfHeaderText,
+        DEFAULT_SETTINGS.exportDefaults.pageHeaderText,
+      ),
+      pageFooterText: exportTextOrDefault(
+        exportDefaults.pageFooterText ?? legacyExportDefaults.pdfFooterText,
+        DEFAULT_SETTINGS.exportDefaults.pageFooterText,
+      ),
       templateId: isExportTemplateId(exportDefaults.templateId)
         ? exportDefaults.templateId
         : DEFAULT_SETTINGS.exportDefaults.templateId,
+      frontMatterOverrides: booleanOrDefault(
+        exportDefaults.frontMatterOverrides,
+        DEFAULT_SETTINGS.exportDefaults.frontMatterOverrides,
+      ),
+      toc: booleanOrDefault(
+        exportDefaults.toc,
+        DEFAULT_SETTINGS.exportDefaults.toc,
+      ),
       defaultLocation: isExportDefaultLocation(exportDefaults.defaultLocation)
         ? exportDefaults.defaultLocation
         : DEFAULT_SETTINGS.exportDefaults.defaultLocation,
@@ -282,6 +456,9 @@ export function normalizeSettings(saved: Partial<SettingsState>): SettingsState 
     previewFontSource: migratePreviewFontSource(saved),
     recentFilesLimit,
     recentFiles: normalizeRecentFiles(saved.recentFiles, recentFilesLimit),
+    exportHistory: normalizeExportHistory(saved.exportHistory),
+    pandoc: normalizePandocSettings(saved.pandoc),
+    citation: normalizeCitationSettings(saved.citation),
     restoreLastSession: booleanOrDefault(saved.restoreLastSession, DEFAULT_SETTINGS.restoreLastSession),
     lastSession: normalizeLastSession(saved.lastSession),
     windowState: {

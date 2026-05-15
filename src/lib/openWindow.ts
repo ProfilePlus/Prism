@@ -19,8 +19,6 @@ export async function openPrismWindow(params: {
 
   const url = `/?${searchParams.toString()}`;
 
-  console.log('[openPrismWindow] Creating window:', { label, url });
-
   const isMacOS = getRuntimePlatform() === 'mac';
 
   const webview = new WebviewWindow(label, {
@@ -34,10 +32,6 @@ export async function openPrismWindow(params: {
     transparent: !isMacOS,
     titleBarStyle: isMacOS ? 'overlay' : undefined,
     hiddenTitle: isMacOS,
-  });
-
-  await webview.once('tauri://created', () => {
-    console.log('[openPrismWindow] Window created:', label);
   });
 
   await webview.once('tauri://error', (e) => {

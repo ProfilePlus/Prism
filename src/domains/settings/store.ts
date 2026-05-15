@@ -8,17 +8,26 @@ import {
   ExportDefaultFormat,
   ShortcutStyle,
   AutoSaveStrategy,
+  CitationSettings,
   CustomFont,
   DocxFontPolicy,
   ExportDefaultLocation,
+  ExportHistoryEntry,
   ExportTemplateId,
   FontSource,
   LastSessionState,
+  PandocSettings,
   PdfMargin,
   PdfPaper,
   RecentFileEntry,
 } from './types';
-import { normalizeRecentFiles, normalizeSettings } from './normalize';
+import {
+  normalizeCitationSettings,
+  normalizeExportHistory,
+  normalizePandocSettings,
+  normalizeRecentFiles,
+  normalizeSettings,
+} from './normalize';
 import { registerCustomFonts } from './fontService';
 import {
   readTextFile,
@@ -27,6 +36,8 @@ import {
   exists,
 } from '@tauri-apps/plugin-fs';
 import { appDataDir } from '@tauri-apps/api/path';
+import { invoke } from '@tauri-apps/api/core';
+import { joinPath } from '../workspace/services/path';
 
 const CONFIG_FILENAME = 'config.json';
 const LEGACY_RECENT_FILES_KEY = 'prism_recent_files';
@@ -39,7 +50,13 @@ export const autoSaveIntervalByStrategy: Record<AutoSaveStrategy, number> = {
 
 async function getConfigPath(): Promise<string> {
   const appData = await appDataDir();
-  return `${appData}${CONFIG_FILENAME}`;
+  return joinPath(appData, CONFIG_FILENAME);
+}
+
+async function loadLegacySettingsConfig(): Promise<Partial<SettingsState> | null> {
+  const raw = await invoke<string | null>('read_legacy_settings_config');
+  if (!raw) return null;
+  return JSON.parse(raw) as Partial<SettingsState>;
 }
 
 function applyAppearanceTheme(theme: AppearanceMode) {
@@ -76,6 +93,12 @@ function resolveFontFamily(source: FontSource, customFonts: CustomFont[], fallba
   return source.value || fallback;
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (typeof error === 'string' && error.trim()) return error;
+  return 'Pandoc 检测失败';
+}
+
 interface SettingsStore extends SettingsState {
   setTheme: (theme: AppearanceMode) => void;
   setContentTheme: (theme: ContentTheme) => void;
@@ -94,11 +117,23 @@ interface SettingsStore extends SettingsState {
   setExportHtmlIncludeTheme: (includeTheme: boolean) => void;
   setExportPdfPaper: (paper: PdfPaper) => void;
   setExportPdfMargin: (margin: PdfMargin) => void;
+  setExportPdfPageNumbers: (enabled: boolean) => void;
+  setExportPageHeaderFooter: (enabled: boolean) => void;
+  setExportPageHeaderText: (text: string) => void;
+  setExportPageFooterText: (text: string) => void;
   setExportTemplateId: (templateId: ExportTemplateId) => void;
+  setExportFrontMatterOverrides: (enabled: boolean) => void;
+  setExportToc: (enabled: boolean) => void;
   setExportDefaultLocation: (location: ExportDefaultLocation) => void;
   setExportCustomDirectory: (directory: string) => void;
   setExportDocxFontPolicy: (policy: DocxFontPolicy) => void;
   setExportDocxCustomFontId: (fontId: string) => void;
+  setPandocPath: (path: string) => void;
+  setPandocDetection: (pandoc: PandocSettings) => void;
+  detectPandoc: () => Promise<PandocSettings>;
+  setCitationBibliographyPath: (path: string) => void;
+  setCitationCslStylePath: (path: string) => void;
+  setCitationSettings: (citation: CitationSettings) => void;
   setShortcutStyle: (style: ShortcutStyle) => void;
   setAutoSaveEnabled: (enabled: boolean) => void;
   setAutoSaveInterval: (interval: number) => void;
@@ -108,6 +143,7 @@ interface SettingsStore extends SettingsState {
   addRecentFile: (path: string, name: string) => void;
   clearRecentFiles: () => void;
   setRecentFilesLimit: (limit: number) => void;
+  recordExportHistory: (entry: Omit<ExportHistoryEntry, 'exportedAt'> & { exportedAt?: number }) => void;
   setRestoreLastSession: (restore: boolean) => void;
   setLastSession: (session: LastSessionState | null) => void;
   loadSettings: () => Promise<void>;
@@ -253,8 +289,38 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     get().saveSettings();
   },
 
+  setExportPdfPageNumbers: (pdfPageNumbers) => {
+    set((state) => ({ exportDefaults: { ...state.exportDefaults, pdfPageNumbers } }));
+    get().saveSettings();
+  },
+
+  setExportPageHeaderFooter: (pageHeaderFooter) => {
+    set((state) => ({ exportDefaults: { ...state.exportDefaults, pageHeaderFooter } }));
+    get().saveSettings();
+  },
+
+  setExportPageHeaderText: (pageHeaderText) => {
+    set((state) => ({ exportDefaults: { ...state.exportDefaults, pageHeaderText } }));
+    get().saveSettings();
+  },
+
+  setExportPageFooterText: (pageFooterText) => {
+    set((state) => ({ exportDefaults: { ...state.exportDefaults, pageFooterText } }));
+    get().saveSettings();
+  },
+
   setExportTemplateId: (templateId) => {
     set((state) => ({ exportDefaults: { ...state.exportDefaults, templateId } }));
+    get().saveSettings();
+  },
+
+  setExportFrontMatterOverrides: (frontMatterOverrides) => {
+    set((state) => ({ exportDefaults: { ...state.exportDefaults, frontMatterOverrides } }));
+    get().saveSettings();
+  },
+
+  setExportToc: (toc) => {
+    set((state) => ({ exportDefaults: { ...state.exportDefaults, toc } }));
     get().saveSettings();
   },
 
@@ -275,6 +341,73 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   setExportDocxCustomFontId: (docxCustomFontId) => {
     set((state) => ({ exportDefaults: { ...state.exportDefaults, docxCustomFontId } }));
+    get().saveSettings();
+  },
+
+  setPandocPath: (path) => {
+    set((state) => ({
+      pandoc: {
+        ...state.pandoc,
+        path,
+        detected: false,
+        version: '',
+        lastCheckedAt: null,
+        lastError: '',
+      },
+    }));
+    get().saveSettings();
+  },
+
+  setPandocDetection: (pandoc) => {
+    set({ pandoc: normalizePandocSettings(pandoc) });
+    get().saveSettings();
+  },
+
+  detectPandoc: async () => {
+    try {
+      const result = await invoke<PandocSettings>('detect_pandoc', {
+        path: get().pandoc.path || null,
+      });
+      const pandoc = normalizePandocSettings(result);
+      set({ pandoc });
+      await get().saveSettings();
+      return pandoc;
+    } catch (error) {
+      const pandoc: PandocSettings = {
+        ...get().pandoc,
+        detected: false,
+        version: '',
+        lastCheckedAt: Date.now(),
+        lastError: getErrorMessage(error),
+      };
+      set({ pandoc });
+      await get().saveSettings();
+      return pandoc;
+    }
+  },
+
+  setCitationBibliographyPath: (bibliographyPath) => {
+    set((state) => ({
+      citation: normalizeCitationSettings({
+        ...state.citation,
+        bibliographyPath,
+      }),
+    }));
+    get().saveSettings();
+  },
+
+  setCitationCslStylePath: (cslStylePath) => {
+    set((state) => ({
+      citation: normalizeCitationSettings({
+        ...state.citation,
+        cslStylePath,
+      }),
+    }));
+    get().saveSettings();
+  },
+
+  setCitationSettings: (citation) => {
+    set({ citation: normalizeCitationSettings(citation) });
     get().saveSettings();
   },
 
@@ -346,6 +479,20 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     get().saveSettings();
   },
 
+  recordExportHistory: (entry) => {
+    if (!entry.documentPath.trim() || !entry.outputPath.trim()) return;
+    set((state) => ({
+      exportHistory: normalizeExportHistory([
+        {
+          ...entry,
+          exportedAt: entry.exportedAt ?? Date.now(),
+        },
+        ...state.exportHistory.filter((item) => item.documentPath !== entry.documentPath),
+      ]),
+    }));
+    get().saveSettings();
+  },
+
   setRestoreLastSession: (restoreLastSession) => {
     set({ restoreLastSession });
     get().saveSettings();
@@ -357,15 +504,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   },
 
   loadSettings: async () => {
-    try {
-      const configPath = await getConfigPath();
-      const raw = await readTextFile(configPath);
-      const saved = JSON.parse(raw) as Partial<SettingsState>;
-      const settings = normalizeSettings(saved);
-      if (!saved.recentFiles) {
-        settings.recentFiles = migrateLegacyRecentFiles(settings.recentFilesLimit);
-      }
-
+    const applyLoadedSettings = (settings: SettingsState) => {
       set(settings);
 
       applyAppearanceTheme(settings.theme);
@@ -382,10 +521,34 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         };
         mediaQuery.addEventListener('change', handleChange);
       }
+    };
 
-      console.log('[Settings] Loaded from:', configPath);
+    try {
+      const configPath = await getConfigPath();
+      const raw = await readTextFile(configPath);
+      const saved = JSON.parse(raw) as Partial<SettingsState>;
+      const settings = normalizeSettings(saved);
+      if (!saved.recentFiles) {
+        settings.recentFiles = migrateLegacyRecentFiles(settings.recentFilesLimit);
+      }
+
+      applyLoadedSettings(settings);
     } catch {
-      console.log('[Settings] No config found, using defaults');
+      try {
+        const legacySaved = await loadLegacySettingsConfig();
+        if (legacySaved) {
+          const settings = normalizeSettings(legacySaved);
+          if (!legacySaved.recentFiles) {
+            settings.recentFiles = migrateLegacyRecentFiles(settings.recentFilesLimit);
+          }
+          applyLoadedSettings(settings);
+          await get().saveSettings();
+          return;
+        }
+      } catch {
+        // If legacy migration fails, continue with defaults.
+      }
+
       applyAppearanceTheme(DEFAULT_SETTINGS.theme);
       applyContentTheme(DEFAULT_SETTINGS.contentTheme);
 
@@ -410,6 +573,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
       const configPath = await getConfigPath();
       const {
+        settingsVersion,
         theme,
         contentTheme,
         fontSize,
@@ -430,12 +594,16 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         previewFontSource,
         recentFiles,
         recentFilesLimit,
+        exportHistory,
+        pandoc,
+        citation,
         restoreLastSession,
         lastSession,
         windowState,
       } = get();
       const data = JSON.stringify(
         {
+          settingsVersion,
           theme,
           contentTheme,
           fontSize,
@@ -456,6 +624,9 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
           previewFontSource,
           recentFiles,
           recentFilesLimit,
+          exportHistory,
+          pandoc,
+          citation,
           restoreLastSession,
           lastSession,
           windowState,
@@ -463,11 +634,14 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         null,
         2,
       );
-
       await writeTextFile(configPath, data);
-      console.log('[Settings] Saved to:', configPath);
     } catch (err) {
       console.error('[Settings] Save failed:', err);
     }
   },
 }));
+
+export const __settingsStoreTesting = {
+  getConfigPath,
+  loadLegacySettingsConfig,
+};
