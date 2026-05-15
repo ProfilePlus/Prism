@@ -191,6 +191,35 @@ describe('PreviewPane theme switching', () => {
     expect(screen.getByRole('button', { name: '跳到源码' })).toHaveAttribute('data-preview-source-line', '4');
   });
 
+  it('keeps Mermaid parser error artifacts out of the app body', async () => {
+    vi.mocked(markdownToHtml).mockReturnValueOnce(
+      `<div class="mermaid-placeholder" data-mermaid="${encodeURIComponent('graph TD\n  A -->')}" data-source-line="12"></div>`,
+    );
+    let sandboxWasConnectedDuringRender = false;
+    mermaidMock.render.mockImplementationOnce(async (_id, _code, renderContainer?: Element) => {
+      sandboxWasConnectedDuringRender = renderContainer?.isConnected ?? false;
+      const libraryErrorSvg = document.createElement('svg');
+      libraryErrorSvg.dataset.testid = 'mermaid-library-error-artifact';
+      libraryErrorSvg.textContent = 'Syntax error in text';
+      (renderContainer ?? document.body).appendChild(libraryErrorSvg);
+      throw new Error('Syntax error in text');
+    });
+
+    render(<PreviewPane content="```mermaid\ngraph TD\n  A -->\n```" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Mermaid 渲染失败')).toBeInTheDocument();
+    });
+
+    const renderContainer = mermaidMock.render.mock.calls[0][2] as Element | undefined;
+    expect(renderContainer).toBeInstanceOf(HTMLElement);
+    expect((renderContainer as HTMLElement | undefined)?.dataset.prismMermaidSandbox).toBe('true');
+    expect(sandboxWasConnectedDuringRender).toBe(true);
+    expect(renderContainer?.isConnected).toBe(false);
+    expect(document.body.querySelector('[data-testid="mermaid-library-error-artifact"]')).not.toBeInTheDocument();
+    expect(screen.getByText('Syntax error in text')).toBeInTheDocument();
+  });
+
   it('reuses cached Mermaid SVG for the same diagram and content theme', async () => {
     const mermaidHtml = `<div class="mermaid-placeholder" data-mermaid="${encodeURIComponent('graph TD; A-->B')}" data-source-line="2"></div>`;
     vi.mocked(markdownToHtml).mockReturnValue(mermaidHtml);

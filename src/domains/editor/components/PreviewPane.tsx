@@ -110,6 +110,23 @@ function getMermaidCacheKey(contentTheme: ContentTheme, code: string) {
   return `${contentTheme}:${hash.toString(36)}:${code.length}`;
 }
 
+function createMermaidRenderSandbox() {
+  const sandbox = document.createElement('div');
+  sandbox.dataset.prismMermaidSandbox = 'true';
+  sandbox.setAttribute('aria-hidden', 'true');
+  Object.assign(sandbox.style, {
+    position: 'absolute',
+    inset: '0 auto auto -10000px',
+    width: '800px',
+    height: '600px',
+    overflow: 'hidden',
+    visibility: 'hidden',
+    pointerEvents: 'none',
+  });
+  document.body.appendChild(sandbox);
+  return sandbox;
+}
+
 function renderMermaidSvg(container: HTMLElement, svg: string) {
   container.classList.remove('mermaid-placeholder--failed');
   container.innerHTML = svg;
@@ -349,6 +366,7 @@ export function PreviewPane({ content, documentPath, onNotice }: PreviewPaneProp
         mermaid.initialize({
           startOnLoad: false,
           ...mermaidConfig,
+          suppressErrorRendering: true,
         });
 
         const placeholderList = Array.from(placeholders);
@@ -371,15 +389,18 @@ export function PreviewPane({ content, documentPath, onNotice }: PreviewPaneProp
             }
 
             const id = `mermaid-${Date.now()}-${i}`;
+            const renderSandbox = createMermaidRenderSandbox();
 
             try {
-              const { svg } = await mermaid.render(id, code);
+              const { svg } = await mermaid.render(id, code, renderSandbox);
               if (cancelled) return;
               mermaidSvgCache.set(cacheKey, svg);
               renderMermaidSvg(el, svg);
             } catch (err) {
               if (cancelled) return;
               renderMermaidError(el, err);
+            } finally {
+              renderSandbox.remove();
             }
 
             await waitForPreviewRenderSlot();
