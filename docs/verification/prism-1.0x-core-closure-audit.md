@@ -36,7 +36,7 @@
 核心 1.0.x 本地写作体验已经有较多实现和自动测试覆盖，但还不能判定“完全闭环”。可以把状态分成三类：
 
 - **已具备最小闭环**：文件保存状态、外部修改冲突、recovery、图片粘贴、组件级图片拖拽接线、表格/列表/模板、快速打开、源码-预览跳转、导出设置、引用设置与 Pandoc 回退。
-- **弱验证**：长文预览性能、真实 Pandoc citeproc、正式签名/公证、Windows 发布链路、Finder / Explorer 图片拖拽。
+- **弱验证**：真实 Pandoc citeproc、正式签名/公证、Windows 发布链路、Finder / Explorer 图片拖拽、30 秒人工输入帧率 / CPU 量化。
 - **未闭环但非当前主线**：CLI/deep link、主题包 / 导出模板包、插件 API。插件市场按计划为明确非目标。
 
 下一步不建议再盲目加功能；应先补 1-2 个真实 smoke 文档或自动化检查，把弱验证变成可复现验证。
@@ -55,7 +55,7 @@
 | 导出工作台可靠性有证据 | HTML/PDF/PNG/DOCX pipeline、golden fixture、复杂导出产物 smoke、命令入口四格式集成 smoke、真实 Prism UI 四格式导出、PDF / PNG 栅格颜色兼容修复、DOCX task list、Pandoc 回退、安全清理测试、导出进度事件、App 层进度 UI / 失败诊断复制测试 | 自动化和 macOS 真实 UI smoke 较强；真实 Pandoc citeproc 仍受环境阻塞 |
 | 专业扩展有证据 | citation settings、Pandoc citeproc 分支、citekey / suppress-author 占位、邮箱/代码语境误报防护、专业写作 smoke 文档、中文排版 10 万字符级 micro benchmark、排版诊断 250 条长列表组件回归 | 自动化中等偏强，但本机缺 Pandoc，真实 citeproc 未闭环 |
 | 每批验证 gate 通过 | 最近多批均执行 `npm test -- --run`、`npm run build`、`git diff --check` 并通过；最新全量为 55 files / 319 tests；涉及 Tauri 的历史批次已记录 build / fallback DMG 结果 | 已满足当前自动化 gate |
-| 无剩余必需工作 | Finder / Explorer 图片拖拽与 Option / Alt 原路径、30 秒人工连续输入量化、图片缺失的精确资产索引、Pandoc、签名公证、Windows release 仍未完成 | 未满足 |
+| 无剩余必需工作 | Finder / Explorer 图片拖拽与 Option / Alt 原路径、30 秒人工连续输入量化、Pandoc、签名公证、Windows release 仍未完成 | 未满足 |
 
 因此，当前 goal 的正确状态是“继续推进或拆分为更小 goal”，不能调用 `update_goal complete`。
 
@@ -428,7 +428,7 @@
 ### 未完成项
 
 - macOS 文件树删除到系统废纸篓已通过真实桌面 smoke；Windows 废纸篓、Finder / Explorer 拖拽、Option / Alt 原路径和文件动作剩余分支仍需真实桌面 smoke。系统剪贴板图片粘贴、链接补全/诊断、表格、列表、模板、大纲和选区统计已有 macOS 真实 `.app` smoke，但 Windows 剪贴板和 Windows 写作效率桌面路径未验证。
-- 预览真实 CodeMirror 输入延迟、undo history、键盘跳转即时同步和批量 Mermaid / KaTeX / 图片组合端到端性能仍未回填；真实 Preview viewport drift 已补一轮 macOS `.app` 证据，但不能覆盖所有导航路径。
+- 预览真实 viewport drift、单次输入 / undo、键盘跳转、重媒体显示和 System Events 键盘突发输入已补 macOS `.app` 证据；仍缺 30 秒人工输入、帧率和 CPU 量化，不能宣称性能基准闭环。
 - 本机未安装 Pandoc，真实 BibTeX / CSL citeproc HTML 未验证。
 - Apple Developer ID 签名、公证、Windows installer / updater / 文件关联仍是发布环境阻塞。
 
