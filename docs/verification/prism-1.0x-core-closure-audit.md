@@ -43,11 +43,11 @@
 
 ### Active goal 完成度判定
 
-当前 active goal 不能标记完成。可交付条件与证据如下：
+按产品全量闭环口径，当前不能宣称所有任务全部完成；按 2026-05-15 新版 active goal（持续推进到只剩外部 / 人工阻塞即可停止），本机可执行 checkpoint 已推进到停止条件 2。可交付条件与证据如下：
 
 | 成功条件 | 当前证据 | 判定 |
 | --- | --- | --- |
-| 基于本地计划持续推进 v1.4.0 优化 | `docs/prism-product-optimization-plan.md`、本审计、各 smoke 文档、多个已完成自动化切片 | 进行中 |
+| 基于本地计划持续推进 v1.4.0 优化 | `docs/prism-product-optimization-plan.md`、本审计、各 smoke 文档、多个已完成自动化切片；本机可完成项已推进到只剩外部 / 人工阻塞 | 满足新版 goal 停止条件 |
 | 保持单文档单窗口与 OpenAI 极简方向 | `CONTEXT.md`、ADR、原型约束；本轮未引入 tab、图谱、云同步、移动端、插件市场或 WYSIWYG | 已满足 |
 | 文件安全与发布可信核心路径有证据 | 保存状态、外部修改冲突、recovery、App 层 recovery modal 接线、macOS App-only 真实 crash / restart recovery smoke、fs scope、macOS Prism UI 文件树删除到废纸篓、release checklist、updater manifest、macOS fallback DMG、Windows release smoke 文档 | 自动化与 macOS 运行时 smoke 较强，但正式签名 / 公证 / Windows release 环境未闭环 |
 | 写作效率核心路径有证据 | 图片 helper、Markdown 链接补全/诊断、轻量 `[[note]]` 工作区内链补全、表格、列表、模板、快速打开、字数统计、CodeMirror 全局命令事件接线、paste / normal-drop / Alt-drop DOM 接线测试、Alt-drop 缺路径提示、列表 keymap 组件级回归、链接补全上下文组件回归、macOS 真实 `.app` 系统剪贴板图片粘贴、快速打开、链接补全/诊断、表格命令、列表续写/退出、PRD 模板插入、大纲搜索和选区统计 smoke | 自动化较强，macOS 主要写作路径已补真实桌面证据；macOS Finder 拖拽已尝试但当前自动化工具无法安全完成，Finder / Explorer 拖拽、Option / Alt 原路径和 Windows 桌面路径仍未闭环 |
@@ -55,9 +55,9 @@
 | 导出工作台可靠性有证据 | HTML/PDF/PNG/DOCX pipeline、golden fixture、复杂导出产物 smoke、命令入口四格式集成 smoke、真实 Prism UI 四格式导出、PDF / PNG 栅格颜色兼容修复、DOCX task list、Pandoc 回退、安全清理测试、导出进度事件、App 层进度 UI / 失败诊断复制测试 | 自动化和 macOS 真实 UI smoke 较强；真实 Pandoc citeproc 仍受环境阻塞 |
 | 专业扩展有证据 | citation settings、Pandoc citeproc 分支、citekey / suppress-author 占位、邮箱/代码语境误报防护、专业写作 smoke 文档、中文排版 10 万字符级 micro benchmark、排版诊断 250 条长列表组件回归 | 自动化中等偏强，但本机缺 Pandoc，真实 citeproc 未闭环 |
 | 每批验证 gate 通过 | 最近多批均执行 `npm test -- --run`、`npm run build`、`git diff --check` 并通过；最新全量为 55 files / 319 tests；涉及 Tauri 的历史批次已记录 build / fallback DMG 结果 | 已满足当前自动化 gate |
-| 无剩余必需工作 | Finder / Explorer 图片拖拽与 Option / Alt 原路径、30 秒人工连续输入量化、Pandoc、签名公证、Windows release 仍未完成 | 未满足 |
+| 无剩余必需工作 | Finder / Explorer 图片拖拽与 Option / Alt 原路径、30 秒人工连续输入量化、Pandoc、签名公证、Windows release 仍未完成 | 未满足产品全量完成；满足新版 goal 停止条件 2 |
 
-因此，当前 goal 的正确状态是“继续推进或拆分为更小 goal”，不能调用 `update_goal complete`。
+因此，当前状态应表述为：本机可执行的 1.0.x 本地写作体验 checkpoint 已推进到只剩外部 / 人工阻塞，可以按新版 goal 停止条件收束；但不能对外宣称 Prism 1.0.x 全量任务全部完成。
 
 ## 4. 文件安全与发布可信
 
@@ -434,4 +434,4 @@
 
 ### 结论
 
-当前状态适合拆成更小的真实 smoke goal 继续推进。自动化 proxy 已覆盖较多核心分支，下一步最有价值的是真实桌面验证；不满足“无剩余必需工作”，因此不能调用 `update_goal complete`。
+当前状态已经满足新版 goal 的停止条件 2：本机可执行 checkpoint 已推进到只剩外部 / 人工阻塞。自动化 proxy 和 macOS 真实 `.app` smoke 已覆盖较多核心分支；下一步最有价值的是在具备对应环境后补真实桌面验证、Pandoc citeproc、签名公证和 Windows 发布链路。产品全量仍不满足“无剩余必需工作”，不能把它说成所有任务全部完成。
