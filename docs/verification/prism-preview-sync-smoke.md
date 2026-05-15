@@ -253,7 +253,7 @@ P1 问题：
   - `.codex-smoke/preview-heavy/real-app-heavy-tail.png`
 - 限制：
   - 本轮证明真实 app 中本地图片、Mermaid、KaTeX 和长文本混排可显示、可滚动、尾部不空白；没有采集帧率、CPU 或输入延迟指标。
-  - 本轮暴露状态栏 `LINK 50` 对已存在本地图片仍误报缺失链接；原因是链接诊断只使用 Markdown 文件树作为存在性索引，不包含图片资产。该问题独立于预览渲染，需后续单独修复。
+  - 本轮暴露状态栏 `LINK 50` 对已存在本地图片误报缺失链接；随后已调整 `linkDiagnostics`：在没有资产感知索引时，Markdown 图片语法 `![](...)` 默认不做 missing-file 诊断，避免 Markdown-only 文件树造成假阳性。精确图片缺失检测仍需后续资产索引。
 
 待剩余真实性能 smoke 完成后，在此追加：
 

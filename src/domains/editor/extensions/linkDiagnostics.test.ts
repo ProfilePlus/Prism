@@ -54,6 +54,48 @@ describe('markdown link diagnostics', () => {
     })).toEqual([]);
   });
 
+  it('does not report image targets as missing when the workspace index only tracks markdown files', () => {
+    const diagnostics = scanMarkdownLinks('![ok](assets/image.png) [missing](docs/missing.md)', {
+      currentPath: '/repo/docs/page.md',
+      workspaceFiles: ['/repo/docs/existing.md'],
+      workspaceRoot: '/repo',
+    });
+
+    expect(diagnostics).toEqual([
+      {
+        column: 25,
+        kind: 'missing-file',
+        line: 1,
+        message: '未找到链接文件 docs/missing.md',
+        target: 'docs/missing.md',
+      },
+    ]);
+  });
+
+  it('can validate image targets when an asset-aware index is available', () => {
+    expect(scanMarkdownLinks('![missing](assets/missing.png)', {
+      currentPath: '/repo/docs/page.md',
+      validateImageTargets: true,
+      workspaceFiles: ['/repo/docs/assets/existing.png'],
+      workspaceRoot: '/repo',
+    })).toEqual([
+      {
+        column: 1,
+        kind: 'missing-file',
+        line: 1,
+        message: '未找到链接文件 assets/missing.png',
+        target: 'assets/missing.png',
+      },
+    ]);
+
+    expect(scanMarkdownLinks('![ok](assets/existing.png)', {
+      currentPath: '/repo/docs/page.md',
+      validateImageTargets: true,
+      workspaceFiles: ['/repo/docs/assets/existing.png'],
+      workspaceRoot: '/repo',
+    })).toEqual([]);
+  });
+
   it('reports empty link targets', () => {
     expect(scanMarkdownLinks('[empty]()')).toEqual([
       {

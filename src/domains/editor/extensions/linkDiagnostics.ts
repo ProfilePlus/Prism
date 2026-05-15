@@ -12,6 +12,7 @@ export interface LinkDiagnostic {
 
 interface LinkScanContext {
   currentPath?: string;
+  validateImageTargets?: boolean;
   workspaceFiles?: string[];
   workspaceRoot?: string | null;
 }
@@ -122,6 +123,7 @@ export function scanMarkdownLinks(content: string, context: LinkScanContext = {}
 
       if (isExternalTarget(target)) continue;
 
+      const isImageLink = lineText.slice(match.index ?? 0).startsWith('!');
       const { path, hash } = stripTargetMetadata(target);
       if (!path && hash) {
         const slug = safeDecodeURIComponent(hash).replace(/^#/, '');
@@ -136,6 +138,8 @@ export function scanMarkdownLinks(content: string, context: LinkScanContext = {}
         }
         continue;
       }
+
+      if (isImageLink && !context.validateImageTargets) continue;
 
       if (path && !targetExists(safeDecodeURIComponent(path), context)) {
         diagnostics.push({
