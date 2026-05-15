@@ -51,6 +51,19 @@ describe('HorizontalScrollbar metrics', () => {
 
     expect(metrics.scrollable).toBe(true);
     expect(metrics.thumbWidth).toBe(MAX_THUMB_WIDTH);
-    expect(metrics.thumbLeft).toBe(120);
+    expect(metrics.thumbLeft).toBe((400 - MAX_THUMB_WIDTH) / 2);
+  });
+
+  it('lets the compact thumb reach the right edge at maximum horizontal scroll', () => {
+    const metrics = getScrollbarMetrics({
+      clientWidth: 500,
+      scrollLeft: 500,
+      scrollWidth: 1000,
+      trackWidth: 400,
+    });
+
+    expect(metrics.scrollable).toBe(true);
+    expect(metrics.thumbWidth).toBe(MAX_THUMB_WIDTH);
+    expect(metrics.thumbLeft).toBe(400 - MAX_THUMB_WIDTH);
   });
 });

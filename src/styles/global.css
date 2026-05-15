@@ -324,7 +324,7 @@ body.typewriter-mode .cm-editor {
 }
 
 .prism-scrollbar-host {
-  --prism-horizontal-scrollbar-inset: clamp(44px, 8vw, 96px);
+  --prism-horizontal-scrollbar-inset: 0px;
 }
 
 .prism-horizontal-scrollbar {

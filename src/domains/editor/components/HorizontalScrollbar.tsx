@@ -10,8 +10,8 @@ interface ScrollbarMetrics {
   thumbWidth: number;
 }
 
-const MIN_THUMB_WIDTH = 56;
-const MAX_THUMB_WIDTH = 160;
+const MIN_THUMB_WIDTH = 40;
+const MAX_THUMB_WIDTH = 40;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
