@@ -3,7 +3,7 @@
 > 日期：2026-05-15  
 > 目标：验证 Markdown 高频写作能力在真实桌面编辑器工作流中可用。  
 > 计划来源：`docs/prism-product-optimization-plan.md` 第 4 节“写作效率工具”。  
-> 当前状态：已补图片粘贴文件写入、同秒冲突、标题锚点补全/诊断一致性和轻量 wiki 内链补全自动化回归；macOS 真实 `.app` 系统剪贴板图片粘贴和快速打开键盘 smoke 已通过；Finder / Explorer 拖拽、Option / Alt 原路径和完整 Prism UI smoke 尚未执行。
+> 当前状态：已补图片粘贴文件写入、同秒冲突、标题锚点补全/诊断一致性和轻量 wiki 内链补全自动化回归；macOS 真实 `.app` 已通过系统剪贴板图片粘贴、快速打开键盘、链接补全/诊断、表格命令、列表续写/退出、PRD 模板插入、大纲搜索和选区统计 smoke；Finder / Explorer 拖拽、Option / Alt 原路径和 Windows 桌面路径尚未执行。
 
 ## 1. 覆盖范围
 
@@ -297,6 +297,33 @@ P1 问题：
 - `npm test -- --run src/domains/editor/components/EditorPane.integration.test.tsx`：通过，1 file / 15 tests。
 - `npm test -- --run src/domains/editor/extensions/imagePaste.test.ts`：通过，1 file / 7 tests。
 - 限制：这仍是 DOM 事件级回归，不替代 macOS Finder 真实拖入、Windows Explorer 真实拖入和 Option / Alt 修饰键差异的桌面 smoke。
+
+2026-05-15 macOS 真实 `.app` 链接、命令、大纲和统计 smoke：
+
+- 使用 `npm run tauri:build:app-smoke` 生成的 `Prism.app`，打开 `.codex-smoke/writing-efficiency/workspace/index.md`。
+- 链接诊断：状态栏显示 `LINK 3`；点击后弹出“链接问题”面板，列出缺失文件 `docs/missing.md`、缺失标题 `#不存在标题`、空链接三类问题；点击“缺失标题”后编辑器跳到第 8 行，状态栏显示 `LN 8 COL 1`。
+- 链接补全：在真实编辑器输入 `[Guide](` 后弹出补全面板，候选包含 `#写作效率-smoke`、`#已存在标题`、`docs/api.md`、`docs/guide.md`、`index.md`；键盘选中 `docs/guide.md` 后插入 `[Guide](docs/guide.md)`，链接问题数从 4 回落到 3。
+- `[[note]]` 内链补全：输入 `[[` 后弹出工作区 Markdown 候选，包含 `docs/api`、`docs/guide`、`index`，不显示图片文件，也不带 `.md` 后缀。
+- 表格命令：把光标放入现有表格，通过命令面板执行“格式化当前表格”，表格从 `| Name|Score |` 格式化为对齐后的 `| Name  | Score |` / `| ----- | ----: |` / `| Prism |    10 |`，表格上下正文未被改动。
+- 列表体验：在 `- 第一项` 行末按 Enter 续写出空 `- `；在空列表项再次按 Enter 后退出列表，生成普通空行。
+- 模板：命令面板搜索 `PRD` 并执行“PRD 模板”，在当前光标位置插入 Markdown-only PRD skeleton，包含 `# PRD：功能名称`、背景、目标、非目标、用户故事、功能范围、验收标准、风险与依赖。
+- 大纲：切换“大纲”页后标题层级可见；搜索 `目标` 后只保留 `目标`、`非目标` 两个匹配项。
+- 字数统计：选中“正文段落 English word 与中文混排。”后状态栏从全文统计切换为选区统计，显示 `选区 中 9 EN 2 字符 21 1 分钟`。
+- 截图证据：
+  - `.codex-smoke/writing-efficiency/link-diagnostics-real-app.png`
+  - `.codex-smoke/writing-efficiency/link-diagnostic-jump-real-app.png`
+  - `.codex-smoke/writing-efficiency/link-completion-real-app.png`
+  - `.codex-smoke/writing-efficiency/link-completion-insert-real-app.png`
+  - `.codex-smoke/writing-efficiency/wiki-link-completion-real-app.png`
+  - `.codex-smoke/writing-efficiency/table-format-command-real-app.png`
+  - `.codex-smoke/writing-efficiency/list-continuation-exit-real-app.png`
+  - `.codex-smoke/writing-efficiency/template-prd-command-real-app.png`
+  - `.codex-smoke/writing-efficiency/selection-writing-stats-real-app.png`
+  - `.codex-smoke/writing-efficiency/outline-search-real-app.png`
+- 限制：
+  - 这次 smoke 覆盖 macOS 真实 `.app` 的键盘、命令面板、状态栏和大纲路径；没有覆盖 Finder / Explorer 真实拖拽。
+  - `[[note]]` 只验证候选展示，未执行候选插入；插入路径仍由 `EditorPane.integration.test.tsx` 覆盖。
+  - 本次验证继续使用 `.codex-smoke/` 临时 fixture，不提交 smoke 产物。
 
 待真实 smoke 完成后，在此追加：
 
