@@ -826,7 +826,8 @@ export const SplitView = forwardRef<EditorPaneHandle, SplitViewProps>(
               minWidth: 0,
               display: 'flex',
               flexDirection: 'column',
-              overflow: 'auto',
+              overflowY: 'auto',
+              overflowX: 'hidden',
               background: 'var(--bg-preview)',
             }}
           >

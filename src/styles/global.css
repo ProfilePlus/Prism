@@ -261,6 +261,56 @@ body.typewriter-mode .cm-editor {
 *:hover::-webkit-scrollbar-thumb { background-color: var(--c-fog); }
 *::-webkit-scrollbar-thumb:hover { background-color: var(--c-ash); }
 
+.cm-editor::-webkit-scrollbar:horizontal,
+.cm-editor .cm-scroller::-webkit-scrollbar:horizontal,
+.preview-compat::-webkit-scrollbar:horizontal {
+  display: none;
+  height: 0 !important;
+}
+
+.cm-editor::-webkit-scrollbar-track:horizontal,
+.cm-editor::-webkit-scrollbar-thumb:horizontal,
+.cm-editor .cm-scroller::-webkit-scrollbar-track:horizontal,
+.cm-editor .cm-scroller::-webkit-scrollbar-thumb:horizontal,
+.preview-compat::-webkit-scrollbar-track:horizontal,
+.preview-compat::-webkit-scrollbar-thumb:horizontal {
+  display: none;
+  background-color: transparent !important;
+}
+
+.preview-compat pre::-webkit-scrollbar:horizontal,
+.preview-compat .mermaid-placeholder::-webkit-scrollbar:horizontal {
+  display: block;
+  height: 6px;
+}
+
+.preview-compat pre::-webkit-scrollbar-track:horizontal,
+.preview-compat .mermaid-placeholder::-webkit-scrollbar-track:horizontal {
+  display: block;
+  margin-inline: 24px;
+}
+
+.preview-compat pre::-webkit-scrollbar-thumb:horizontal,
+.preview-compat .mermaid-placeholder::-webkit-scrollbar-thumb:horizontal {
+  display: block;
+  min-width: 56px;
+  border-block: 2px solid transparent;
+  border-inline: 24px solid transparent;
+  border-radius: 999px;
+  background-color: transparent;
+  background-clip: padding-box;
+}
+
+.preview-compat pre:hover::-webkit-scrollbar-thumb:horizontal,
+.preview-compat .mermaid-placeholder:hover::-webkit-scrollbar-thumb:horizontal {
+  background-color: color-mix(in srgb, var(--c-ash) 32%, transparent);
+}
+
+.preview-compat pre::-webkit-scrollbar-thumb:horizontal:hover,
+.preview-compat .mermaid-placeholder::-webkit-scrollbar-thumb:horizontal:hover {
+  background-color: color-mix(in srgb, var(--c-graphite) 48%, transparent);
+}
+
 /* ============================================================
    编辑器字体：跟随内容主题
    ============================================================ */
