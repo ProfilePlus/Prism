@@ -3,7 +3,7 @@
 > 日期：2026-05-15  
 > 目标：验证 Markdown 高频写作能力在真实桌面编辑器工作流中可用。  
 > 计划来源：`docs/prism-product-optimization-plan.md` 第 4 节“写作效率工具”。  
-> 当前状态：已补图片粘贴文件写入、同秒冲突、标题锚点补全/诊断一致性和轻量 wiki 内链补全自动化回归；macOS 真实 `.app` 系统剪贴板图片粘贴 smoke 已通过；Finder / Explorer 拖拽、Option / Alt 原路径和完整 Prism UI smoke 尚未执行。
+> 当前状态：已补图片粘贴文件写入、同秒冲突、标题锚点补全/诊断一致性和轻量 wiki 内链补全自动化回归；macOS 真实 `.app` 系统剪贴板图片粘贴和快速打开键盘 smoke 已通过；Finder / Explorer 拖拽、Option / Alt 原路径和完整 Prism UI smoke 尚未执行。
 
 ## 1. 覆盖范围
 
@@ -43,7 +43,7 @@
 - `src/domains/workspace/services/writingStats.test.ts` 和 `StatusBar.test.tsx`：中文/英文/字符/阅读时间和选区统计展示。
 - `src/domains/commands/registry.test.ts`：快速打开、表格、模板、导出等命令注册到菜单和命令面板。
 
-这些测试证明算法、命令注册、图片写入 contract 和部分 CodeMirror 命令事件可用，但不能替代真实系统剪贴板、系统文件拖拽和桌面快捷键路径。
+这些测试证明算法、命令注册、图片写入 contract 和部分 CodeMirror 命令事件可用；macOS 真实 `.app` 已补系统剪贴板图片粘贴和快速打开键盘路径。Finder / Explorer 系统文件拖拽、Option / Alt 原路径拖拽和剩余桌面命令仍不能只靠自动化替代。
 
 ## 3. Smoke 工作区
 
@@ -275,6 +275,20 @@ P1 问题：
   - 这只验证 macOS 系统剪贴板图片粘贴，尚未验证 Finder / Explorer 拖拽。
   - Option / Alt 原路径拖拽仍未执行。
   - 本次 smoke 期间曾用 `Cmd+/` 聚焦编辑器，临时 fixture 的第一行被 CodeMirror 注释命令改为 HTML 注释；该变更只影响 `.codex-smoke/` fixture，不影响产品代码。
+
+2026-05-15 macOS 真实 `.app` 快速打开键盘 smoke：
+
+- 使用同一个 `npm run tauri:build:app-smoke` 生成的 `Prism.app` 和 `.codex-smoke/writing-efficiency/workspace/`。
+- 真实键盘路径：在 Prism 激活状态下按 `Mod+P` 打开快速打开；输入 `gui` 后结果列表出现 `guide.md`，路径为 `docs`。
+- 回车打开结果后，窗口标题变为 `guide.md`；文件树中 `docs/guide.md` 被选中；编辑区显示 `# Guide`；状态栏显示已保存。
+- 清空搜索时，快速打开结果列表可见 `index.md`、`api.md`、`guide.md` 等工作区文件，证明空查询能读取当前 workspace 文件列表。
+- 截图证据：
+  - `.codex-smoke/writing-efficiency/quick-open-guide-search-keystroke-real-app.png`
+  - `.codex-smoke/writing-efficiency/quick-open-guide-opened-by-keyboard.png`
+  - `.codex-smoke/writing-efficiency/quick-open-empty-real-app-2.png`
+- 限制：
+  - 本 smoke 验证了路径片段搜索和键盘打开结果；最近打开加权仍主要依赖 `src/domains/workspace/services/fileTree.test.ts`，没有额外截图证明排序权重。
+  - 这不覆盖链接补全、表格命令、列表体验、模板插入、拖拽图片和 Option / Alt 原路径。
 
 待真实 smoke 完成后，在此追加：
 
