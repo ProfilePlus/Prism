@@ -49,13 +49,13 @@
 | --- | --- | --- |
 | 基于本地计划持续推进 v1.4.0 优化 | `docs/prism-product-optimization-plan.md`、本审计、各 smoke 文档、多个已完成自动化切片 | 进行中 |
 | 保持单文档单窗口与 OpenAI 极简方向 | `CONTEXT.md`、ADR、原型约束；本轮未引入 tab、图谱、云同步、移动端、插件市场或 WYSIWYG | 已满足 |
-| 文件安全与发布可信核心路径有证据 | 保存状态、外部修改冲突、recovery、App 层 recovery modal 接线、fs scope、废纸篓 fallback、release checklist、updater manifest、macOS fallback DMG、Windows release smoke 文档 | 自动化较强，但真实 crash / release 环境未闭环 |
+| 文件安全与发布可信核心路径有证据 | 保存状态、外部修改冲突、recovery、App 层 recovery modal 接线、macOS App-only 真实 crash / restart recovery smoke、fs scope、废纸篓 fallback、release checklist、updater manifest、macOS fallback DMG、Windows release smoke 文档 | 自动化与 macOS 运行时 smoke 较强，但正式签名 / 公证 / Windows release 环境未闭环 |
 | 写作效率核心路径有证据 | 图片 helper、Markdown 链接补全/诊断、轻量 `[[note]]` 工作区内链补全、表格、列表、模板、快速打开、字数统计、CodeMirror 全局命令事件接线、paste / Alt-drop DOM 接线测试、列表 keymap 组件级回归、链接补全上下文组件回归 | 自动化较强，但真实系统剪贴板 / Finder / Explorer 拖拽未闭环 |
 | 预览同步与 HTML 安全有证据 | source-line mapping、点击跳源码、长文 / 重媒体 mapping、内容更新后 source-line 刷新、10 万字符级 Markdown -> HTML smoke、Mermaid 队列、KaTeX/Mermaid 错误定位、链接安全清理测试 | 自动化中等偏强，但真实 CodeMirror 输入性能未闭环 |
 | 导出工作台可靠性有证据 | HTML/PDF/PNG/DOCX pipeline、golden fixture、复杂导出产物 smoke、命令入口四格式集成 smoke、真实 app 打开复杂文档预览截图、DOCX task list、Pandoc 回退、安全清理测试、导出进度事件、App 层进度 UI / 失败诊断复制测试 | 自动化较强，但真实 Prism UI 四格式导出和人工打开产物未闭环 |
 | 专业扩展有证据 | citation settings、Pandoc citeproc 分支、citekey / suppress-author 占位、邮箱/代码语境误报防护、专业写作 smoke 文档、中文排版 10 万字符级 micro benchmark、排版诊断 250 条长列表组件回归 | 自动化中等偏强，但本机缺 Pandoc，真实 citeproc 未闭环 |
 | 每批验证 gate 通过 | 最近多批均执行 `npm test -- --run`、`npm run build`、`git diff --check` 并通过；最新全量为 55 files / 315 tests；涉及 Tauri 的历史批次已记录 build / fallback DMG 结果 | 已满足当前自动化 gate |
-| 无剩余必需工作 | recovery crash/restart、复杂导出真实 UI、写作效率桌面 smoke、预览真实 drift / 性能、Pandoc、签名公证、Windows release 仍未完成 | 未满足 |
+| 无剩余必需工作 | 复杂导出真实 UI、写作效率桌面 smoke、预览真实 drift / 性能、Pandoc、签名公证、Windows release 仍未完成 | 未满足 |
 
 因此，当前 goal 的正确状态是“继续推进或拆分为更小 goal”，不能调用 `update_goal complete`。
 
@@ -87,6 +87,7 @@
 - `src/domains/commands/registry.test.ts` 覆盖手动保存前创建 `manual-save` recovery 快照、保存成功后清理快照、磁盘外部修改时保留快照且不覆盖磁盘文件。
 - `src/domains/document/hooks/useRecoveryQueue.ts` 把启动扫描 recovery 快照、当前提示队列、恢复/丢弃动作从 `App.tsx` 抽成可测 hook；`useRecoveryQueue.test.tsx` 覆盖启动列出快照、恢复后移除当前快照、丢弃只移除当前快照、恢复失败 / 丢弃失败保留快照和卸载后不更新状态。
 - `src/App.tsx` 通过 `shouldShowRecoveryPrompt()` 明确 recovery modal 的 App 级遮挡规则：有启动快照、没有保存对话框、没有保存冲突时才显示；`src/App.recovery.test.tsx` 覆盖 App 接入 `RecoveryModal`、恢复 / 丢弃动作转发、保存冲突优先展示 `SaveConflictModal`，以及 save dialog 遮挡规则。
+- `docs/verification/prism-recovery-crash-smoke.md` 记录 macOS App-only 真实 crash / restart recovery smoke：关闭自动保存后真实编辑已保存文档，recovery 快照包含 marker 且原文件不含 marker；`kill -9` 后重启显示“恢复文档”modal；点击恢复后内容回到编辑器且状态为“已编辑 / 未保存”；`Cmd+S` 后原文件写入 marker、recovery 目录清理，再次重启不再提示同一快照。
 - `src-tauri/capabilities/default.json` 只列出 fs 默认、read/write files、appData 递归读写等能力；`docs/prism-p0-runtime-smoke.md` 记录 `rg '"path": "\\*\\*"' src-tauri/capabilities` 无命中。
 - `src/lib/fileSystemScope.ts` 调用 `grant_markdown_file_scope`；`src-tauri/src/lib.rs` 通过 `FsExt` scope 授权非对话框打开的 Markdown 文件。
 - `src-tauri/src/lib.rs` 新增 `move_path_to_trash` Tauri command；`src/lib/fileActions.ts` 删除文件时优先移到系统废纸篓，失败后才二次确认永久删除。macOS Finder AppleScript 已从直接 `POSIX file` 修正为 `POSIX file ... as alias`，2026-05-15 同脚本真实 smoke 返回 0，源文件消失并进入 `.Trash`；同日已用真实 `.app` 打开临时 workspace，截图证明文件树可见，但尚未点击删除。
@@ -100,7 +101,7 @@
 ### 验证强度
 
 - 自动测试强：store、auto-save、manual-save command、external monitor、conflict resolution、recovery、settings path persistence、文件删除废纸篓 fallback 均有测试；recovery 已覆盖单个快照丢弃、丢弃失败不误报成功、坏快照忽略、错位快照过滤、malformed metadata 过滤、旧快照文件名回退、同毫秒快照不覆盖、手动保存外部修改时保留快照、App 层恢复提示队列的恢复/丢弃/失败路径，以及 App 树中 `RecoveryModal` 与 `SaveConflictModal` 的优先级接线。
-- 运行时 smoke 中等偏强：macOS release bundle 的文件打开、fs scope、settings 写入、manifest 生成已有本机证据。
+- 运行时 smoke 较强：macOS release bundle 的文件打开、fs scope、settings 写入、manifest 生成已有本机证据；recovery crash / restart 已用最新 `npm run tauri:build:app-smoke` bundle 跑通真实编辑、强退、重启恢复、显式保存清理和二次重启不重复提示。
 - 发布可信弱验证：Apple Developer ID 签名、公证、GitHub Release 正式 `latest.json`、Windows installer/updater 仍未在真实发布环境完成；macOS DMG 已有 Finder 超时 fallback，但 fallback DMG 没有 Finder 美化布局；Windows v1.4.0 已明确为 release 阻塞项。
 
 ### 缺口
@@ -108,12 +109,12 @@
 - Apple Developer ID 签名与公证没有真实证书环境结果，不能宣称 stable 发布链路闭环。
 - 默认 `npm run tauri:build` 在本机仍可能被 updater 私钥、Apple 签名/公证或 DMG Finder AppleScript 超时阻塞；当前 App-only smoke 构建可用于本地运行时验证，fallback 可生成可校验 DMG，但二者都不能替代正式 Stable release 签名、公证和 updater artifacts。
 - Windows release、Windows updater 产物和 Windows 文件关联仍未真实验证；`docs/verification/prism-windows-release-smoke.md` 已把它们明确列为 Stable 阻塞项。
-- recovery 真实崩溃后启动提示已有 domain、hook、组件和 App 接线证据；2026-05-15 第三次注入合法 appData 快照并启动真实 `.app` 后，已用 `screencapture` 取得“恢复文档”modal 可见证据，点击“恢复这个版本”后编辑区显示注入内容，标题栏为“已编辑”，状态栏为“未保存”。限制是该快照由 smoke 注入，不是通过真实编辑后异常退出自动生成，因此 crash 生成快照链路仍需补。
+- recovery 真实 crash / restart 在 macOS App-only bundle 中已闭环；尚未做真实桌面的“丢弃快照”按钮、保存失败路径和 Windows crash/restart，不能把这些平台 / 分支也宣称完成。
 - 文件删除已优先接入系统废纸篓，macOS Finder AppleScript 同路径 smoke 已通过，真实 `.app` 文件树可见截图已补；还需要用户确认后执行 Prism UI 文件树删除点击，以及 Windows Explorer smoke 确认 Windows 进入系统废纸篓。
 
 ### 下一步
 
-优先补 `docs/verification/prism-recovery-crash-smoke.md` 或 Windows release smoke。若当前机器没有 Windows 环境，先把 Windows smoke 作为 release 阻塞项写进发布清单，不要包装成已完成。
+优先继续补文件安全里仍能在本机完成的真实桌面 smoke，例如 Prism UI 文件树删除 / 废纸篓路径；Windows release / updater / 文件关联和正式签名公证仍按环境阻塞记录，不要包装成已完成。
 
 ## 5. 写作效率
 
@@ -362,20 +363,20 @@
 
 ### 下一步
 
-短期不继续扩展文件树功能；下一批应执行 `docs/verification/prism-file-actions-smoke.md` 或转向复杂导出真实 smoke / recovery crash smoke。文件动作 smoke 完成前，不能宣称系统废纸篓在 macOS / Windows 桌面都已闭环。
+短期不继续扩展文件树功能；下一批应执行 `docs/verification/prism-file-actions-smoke.md`，至少补 macOS Prism UI 文件树删除 / 废纸篓真实路径。文件动作 smoke 完成前，不能宣称系统废纸篓在 macOS / Windows 桌面都已闭环。
 
 ## 11. 后续执行建议
 
 建议只选一个 checkpoint 继续，优先级如下：
 
-1. **复杂导出真实 smoke**  
-   `docs/verification/prism-complex-export-smoke.md` 已补 smoke 协议、自动化 pipeline 产物 smoke 和 UI 阻塞记录；下一步仍应通过真实 Prism UI 生成 HTML/PDF/PNG/DOCX 产物并回填结果。价值最高，因为导出可靠是 Prism 的核心承诺，也是当前弱验证最多的区域。
+1. **文件动作真实桌面 smoke**
+   `docs/verification/prism-file-actions-smoke.md` 已补协议和自动化 contract；下一步应在临时 workspace 中通过真实 Prism UI 删除测试文件并确认进入 macOS 废纸篓，同时把 Windows Explorer 废纸篓 / 打开位置列为平台阻塞或后续 Windows 机器验证项。价值是继续闭合最高优先级的文件安全风险。
 
 2. **写作效率桌面 smoke**  
    `docs/verification/prism-writing-efficiency-smoke.md` 已补 smoke 协议和检查表；下一步应真实执行图片粘贴、图片拖拽、Alt/Option 原路径、链接补全/诊断、表格、列表、模板。价值是把函数级测试提升为真实编辑器工作流验证。
 
-3. **recovery crash/restart smoke**  
-   `docs/verification/prism-recovery-crash-smoke.md` 已补 smoke 协议和检查表；下一步应真实强退 Prism 并回填异常退出恢复、丢弃快照、保存失败和快照上限结果。价值是补齐“防丢稿”承诺中最需要用户信任的最后一段。
+3. **复杂导出真实 smoke**
+   `docs/verification/prism-complex-export-smoke.md` 已补 smoke 协议、自动化 pipeline 产物 smoke 和 UI 阻塞记录；下一步仍应通过真实 Prism UI 生成 HTML/PDF/PNG/DOCX 产物并回填结果。价值高，因为导出可靠是 Prism 的核心承诺，也是当前弱验证最多的区域。
 
 不建议下一批直接做 CLI/deep link 或主题包；它们属于外扩能力，不是核心 1.0.x 本地写作体验闭环的首要风险。
 
@@ -397,6 +398,7 @@
 
 - `src/App.recovery.test.tsx` 覆盖 recovery modal App 接线、导出进度 UI 和导出失败诊断浮层。
 - `src/domains/document/hooks/useAutoSave.test.tsx` 覆盖自动保存关闭时仍生成 recovery 快照，且不调用磁盘 stat、原文件写入或 recovery 清理。
+- `docs/verification/prism-recovery-crash-smoke.md` 记录 macOS App-only 真实 crash / restart recovery smoke：真实编辑生成 recovery、原文件未写回、`kill -9` 后重启显示恢复提示、恢复后保持未保存、显式保存清理 recovery、再次重启不再提示。
 - `src/domains/commands/registry.test.ts` 覆盖导出进度事件接线、成功 / 失败后的进度清理，以及导出失败诊断中的 warning 汇总。
 - `src/lib/fileActions.test.ts` 覆盖删除流程首次取消、废纸篓优先、废纸篓失败后取消永久删除和废纸篓失败后二次确认永久删除。
 - `src/domains/editor/components/EditorPane.integration.test.tsx` 覆盖 CodeMirror 命令事件、剪贴板图片 paste、Alt / Option drop、列表 keymap 按键路径、Markdown 链接补全上下文和 `[[note]]` wiki 内链补全上下文。
@@ -413,7 +415,6 @@
 
 ### 未完成项
 
-- recovery crash/restart 真实 UI smoke 尚未取得可靠可见性证据。
 - 系统废纸篓、Finder / Explorer 拖拽、系统剪贴板、Option / Alt 原路径仍需真实桌面 smoke。
 - 预览真实 CodeMirror 输入延迟、真实 Preview viewport drift 和批量 Mermaid / KaTeX / 图片组合端到端性能仍未回填。
 - 复杂导出真实 Prism UI 四格式导出、PDF / PNG 视觉检查、DOCX 打开检查仍未闭环。

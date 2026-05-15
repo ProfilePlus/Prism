@@ -3,7 +3,7 @@
 > 日期：2026-05-15  
 > 目标：验证 Prism 在异常退出或保存失败后能让用户找回未保存内容。  
 > 计划来源：`docs/prism-product-optimization-plan.md` 第 3 节“文件安全、自动保存与恢复”。  
-> 当前状态：本文档定义 smoke 协议和检查表；合法 recovery 快照注入后的真实 `.app` 启动提示和恢复动作已通过截图验证；真实编辑后异常退出自动生成快照仍未执行。
+> 当前状态：本文档定义 smoke 协议和检查表；合法 recovery 快照注入后的真实 `.app` 启动提示和恢复动作已通过截图验证；真实编辑后异常退出生成 recovery、重启恢复、保存清理和二次重启不重复提示已在 macOS App-only smoke bundle 中通过。
 
 ## 1. 覆盖范围
 
@@ -194,7 +194,7 @@ P1 问题：
 - `src/domains/document/hooks/useAutoSave.ts` 不再把 recovery 快照绑定到自动保存开关：只要已保存文档处于 dirty 且未处于 conflict，就会在计时器触发时先写入 recovery；当自动保存关闭时停在 recovery，不写回原文件。
 - `src/domains/document/hooks/useAutoSave.test.tsx` 新增“自动保存关闭仍写 recovery”回归，确认不会调用 `stat`、`writeTextFile` 或清理 recovery，文档保持 dirty。
 
-本轮仍未真实强退 Prism。已执行的自动化验证在本批最终汇报中记录：
+本批自动化证据完成时仍未真实强退 Prism；后续真实 crash / restart smoke 结果见下方追加记录。已执行的自动化验证在本批最终汇报中记录：
 
 - `npm test -- --run src/domains/document/hooks/useAutoSave.test.tsx`：通过，1 file / 5 tests。
 - `npm test -- --run`：通过，55 files / 315 tests。
@@ -266,7 +266,44 @@ P1 问题：
 
 结论：这次 smoke 通过了“合法 recovery 快照存在时，真实 `.app` 启动会显示恢复提示，并且点击恢复后注入内容回到编辑器且状态为未保存”。限制是：本次快照由 smoke 注入，不是通过真实编辑后异常退出自动生成；因此“异常退出生成快照”仍未闭环。
 
-待真实 smoke 完成后，在此追加：
+2026-05-15 第四次真实 crash / restart smoke：真实编辑生成快照 + 强退恢复
+
+- 先发现旧 `.app` bundle 会导致误判：未重新构建前，真实编辑后 `target_contains_marker=no`、`recovery_contains_marker=no`、`recovery_files=0`。该结果只作为 stale bundle 诊断，不计入功能失败。
+- 重新执行 `npm run tauri:build:app-smoke`，结果通过，生成 `src-tauri/target/release/bundle/macos/Prism.app`；该命令包含 `npm run build`，仅有既有 Vite large chunk warning。
+- 准备 fixture：`.codex-smoke/recovery-real/recovery-target.md`，初始磁盘内容为 `Initial disk version.`。
+- 临时备份 appData 配置到 `.codex-smoke/recovery-real/appdata-backup/config.json.before-real-crash-smoke`，并只在 smoke 期间设置：
+  - `autoSaveEnabled=false`
+  - `autoSaveInterval=500`
+  - `autoSaveStrategy=instant`
+  - `lastSession.filePath=.codex-smoke/recovery-real/recovery-target.md`
+- marker：`CRASH_SMOKE_REAL_MARKER_20260515174022`；recovery document id：`6cd2604e`。
+- 启动方式：`open -n src-tauri/target/release/bundle/macos/Prism.app`。
+- 通过 Computer Use 对真实 CodeMirror 文本区设置完整内容，窗口标题显示“已编辑”，状态栏显示“未保存”。
+- 等待 recovery 定时器后检查：
+  - `target_contains_marker=no`，证明自动保存关闭时没有写回原文件。
+  - `recovery_contains_marker=yes`，证明真实编辑内容已写入 appData recovery。
+  - `recovery_files=1`，快照路径为 `~/Library/Application Support/com.prism.editor.v1/recovery/6cd2604e/1778838046405.json`。
+  - 编辑态截图：`.codex-smoke/recovery-real/evidence/01-real-edit-dirty.png`。
+- 使用 `kill -9 78147` 强退 Prism，随后确认 `process_after_kill=stopped`。
+- 重新启动同一 App-only bundle 后，真实窗口显示“恢复文档”modal，包含：
+  - 文档名：`recovery-target.md`
+  - 路径：`.codex-smoke/recovery-real/recovery-target.md`
+  - 提示：`Prism 找到一个本地恢复快照`
+  - 按钮：`丢弃快照`、`恢复这个版本`
+  - modal 截图：`.codex-smoke/recovery-real/evidence/02-restart-recovery-modal.png`
+- 点击“恢复这个版本”后，真实编辑器恢复 marker 内容，标题栏为“已编辑”，状态栏为“未保存”；恢复截图：`.codex-smoke/recovery-real/evidence/03-restored-dirty.png`。
+- 恢复后检查：
+  - `target_contains_marker_after_restore=no`，证明恢复动作没有静默覆盖磁盘文件。
+  - `recovery_contains_marker_after_restore=yes`，证明未保存状态下快照仍留在磁盘。
+- 执行 `Cmd+S` 保存后检查：
+  - `target_contains_marker_after_save=yes`，证明用户显式保存后内容写入原文件。
+  - `recovery_dir_exists_after_save=no` / `recovery_files_after_save=0`，证明保存成功后清理该文档 recovery。
+- 再次重启 Prism，恢复 modal 不再出现，窗口直接打开已保存文档；截图：`.codex-smoke/recovery-real/evidence/04-restart-after-save-no-modal.png`。
+- smoke 结束后已恢复原 appData `config.json`，并确认 `recovery_dir_exists_final=no`。
+
+结论：macOS App-only smoke 通过了真实编辑后异常退出生成 recovery、重启显示恢复提示、恢复后保持未保存状态、显式保存清理 recovery、再次重启不重复提示的完整链路。剩余未做的真实桌面路径是“丢弃快照”按钮、保存失败路径和 Windows crash/restart；这些已有自动化 contract 或需要对应平台 / 权限补验证，不能混同为本次 crash/restart 通过范围。
+
+后续补充丢弃快照、保存失败或 Windows crash/restart smoke 时，在此追加：
 
 ```text
 日期：
