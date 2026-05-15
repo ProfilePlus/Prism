@@ -3,7 +3,7 @@
 > 日期：2026-05-15  
 > 目标：验证源码编辑与 Markdown 预览之间的映射、滚动同步、点击跳转和渲染诊断在真实长文中可信。  
 > 计划来源：`docs/prism-product-optimization-plan.md` 第 6 节“预览同步与渲染诊断”。  
-> 当前状态：已补长文和重媒体 source-line mapping 自动化回归，并降低预览滚动回算中的样式读取成本；macOS 真实 `.app` 已补分栏长文打开、源码/预览滚动同步、预览点击跳源码、底部错误区不空白、单次真实输入预览刷新、视图切换、undo history、`Cmd+Down` 跳文末同步，以及本地图片 / Mermaid / KaTeX 混排重媒体 smoke；连续输入延迟和精确帧率 / CPU 量化尚未闭环。
+> 当前状态：已补长文和重媒体 source-line mapping 自动化回归，并降低预览滚动回算中的样式读取成本；macOS 真实 `.app` 已补分栏长文打开、源码/预览滚动同步、预览点击跳源码、底部错误区不空白、单次真实输入预览刷新、视图切换、undo history、`Cmd+Down` 跳文末同步、本地图片 / Mermaid / KaTeX 混排重媒体 smoke，以及 System Events 键盘突发输入 smoke；30 秒人工输入、精确帧率和 CPU 量化尚未闭环。
 
 ## 1. 覆盖范围
 
@@ -254,6 +254,17 @@ P1 问题：
 - 限制：
   - 本轮证明真实 app 中本地图片、Mermaid、KaTeX 和长文本混排可显示、可滚动、尾部不空白；没有采集帧率、CPU 或输入延迟指标。
   - 本轮暴露状态栏 `LINK 50` 对已存在本地图片误报缺失链接；随后已调整 `linkDiagnostics`：在没有资产感知索引时，Markdown 图片语法 `![](...)` 默认不做 missing-file 诊断，避免 Markdown-only 文件树造成假阳性。精确图片缺失检测仍需后续资产索引。
+
+### 2026-05-15 macOS 真实 `.app` 键盘突发输入 smoke
+
+- 工具：macOS `System Events` 向 Prism 进程发送真实 `keystroke` 事件，不使用剪贴板粘贴；命令总耗时 `/usr/bin/time -p` 记录为 `real 1.07s`。
+- 输入内容：先输入 marker `PERF_TYPING_20260515`，再连续发送 30 组中英混排输入。由于当前系统中文输入法开启，原始英文 / 中文片段被输入法转换为中文词组；这说明测试经过真实输入法路径，不是直接写 DOM。
+- 结果：编辑器接收约 1.1KB 新文本，右侧预览同步显示 marker 和后续文本，窗口没有空白或卡死；自动保存后 `rg -n "PERF_TYPING_20260515" .codex-smoke/preview-heavy/preview-heavy.md` 命中第 2 行。
+- 清理：按一次 `Cmd+Z` 撤销整段临时输入，等待自动保存后同一 `rg` 命令无命中，fixture 恢复为无 marker 状态。
+- 截图证据：
+  - `.codex-smoke/preview-heavy/real-app-typing-smoke.png`
+- 限制：
+  - 这证明真实键盘事件的突发输入、预览刷新、自动保存和 undo history 可用；仍不等同于 30 秒人工连续输入、帧率或 CPU 基准。
 
 待剩余真实性能 smoke 完成后，在此追加：
 
