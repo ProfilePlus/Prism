@@ -37,13 +37,13 @@
 - `src/domains/editor/extensions/tables.test.ts`：插入表格、格式化、增删行列、避免误伤普通正文。
 - `src/domains/editor/extensions/markdownLists.test.ts`：无序、有序、任务列表续写、空项退出、缩进和反缩进。
 - `src/domains/editor/extensions/templates.test.ts`：通用模板、学术模板、插入边界和非法模板 id 防护。
-- `src/domains/editor/components/EditorPane.integration.test.tsx`：真实挂载 CodeMirror 编辑器后，验证 `prism-editor-command`、`prism-format`、`prism-block-format` 能触发表格插入、模板插入、行内加粗和任务列表，并忽略非法模板 id；同时覆盖剪贴板图片 paste、Alt / Option 图片 drop 的 DOM 事件接线，列表 Enter 续写、空项退出、Tab / Shift+Tab 缩进的 CodeMirror keymap 路径，以及 Markdown 链接补全和 `[[note]]` wiki 内链补全的当前文档 / 工作区上下文。
+- `src/domains/editor/components/EditorPane.integration.test.tsx`：真实挂载 CodeMirror 编辑器后，验证 `prism-editor-command`、`prism-format`、`prism-block-format` 能触发表格插入、模板插入、行内加粗和任务列表，并忽略非法模板 id；同时覆盖剪贴板图片 paste、普通图片 drop 复制到 assets、Alt / Option 图片 drop 插入原路径、Alt / Option 缺原生路径提示，列表 Enter 续写、空项退出、Tab / Shift+Tab 缩进的 CodeMirror keymap 路径，以及 Markdown 链接补全和 `[[note]]` wiki 内链补全的当前文档 / 工作区上下文。
 - `src/domains/workspace/services/fileTree.test.ts`：快速打开排序、最近打开加权。
 - `src/domains/workspace/components/OutlinePanel.test.tsx`：大纲标题渲染、搜索过滤、无匹配空状态，以及过滤后点击仍跳到原源码行。
 - `src/domains/workspace/services/writingStats.test.ts` 和 `StatusBar.test.tsx`：中文/英文/字符/阅读时间和选区统计展示。
 - `src/domains/commands/registry.test.ts`：快速打开、表格、模板、导出等命令注册到菜单和命令面板。
 
-这些测试证明算法、命令注册、图片写入 contract 和部分 CodeMirror 命令事件可用；macOS 真实 `.app` 已补系统剪贴板图片粘贴和快速打开键盘路径。Finder / Explorer 系统文件拖拽、Option / Alt 原路径拖拽和剩余桌面命令仍不能只靠自动化替代。
+这些测试证明算法、命令注册、图片写入 contract 和部分 CodeMirror 命令事件可用；macOS 真实 `.app` 已补系统剪贴板图片粘贴和快速打开键盘路径。普通图片 drop / Alt 原路径 drop / Alt 缺路径提示已有 CodeMirror DOM 接线回归，但 Finder / Explorer 系统文件拖拽和剩余桌面命令仍不能只靠组件级自动化替代。
 
 ## 3. Smoke 工作区
 
@@ -235,12 +235,12 @@ P1 问题：
 - `src/domains/editor/components/EditorPane.tsx` 对 `prism-heading` payload 增加 `h1`-`h6` 校验，避免无效全局事件打断编辑器。
 - `src/domains/editor/components/EditorPane.integration.test.tsx` 新增无效 `prism-block-format` / `prism-editor-command` payload 回归：缺失 detail 或缺失字段时不会抛错，也不会改正文。
 - `src/domains/editor/components/EditorPane.tsx` 对 block format 和 editor command 全局事件增加字符串字段守卫，避免菜单或命令面板异常 payload 打断编辑器。
-- `src/domains/editor/components/EditorPane.integration.test.tsx` 新增图片事件接线回归：真实挂载 CodeMirror 后，`paste` 剪贴板图片会调用当前文档资产保存 pipeline 并插入 Markdown 图片；Alt / Option `drop` 图片会插入原始路径 Markdown 链接，且不会复制到 assets。
+- `src/domains/editor/components/EditorPane.integration.test.tsx` 新增图片事件接线回归：真实挂载 CodeMirror 后，`paste` 剪贴板图片会调用当前文档资产保存 pipeline 并插入 Markdown 图片；普通 `drop` 图片会复制到当前文档 assets 并插入相对 Markdown 图片；Alt / Option `drop` 图片会插入原始路径 Markdown 链接且不会复制到 assets；Alt / Option `drop` 取不到原生路径时显示“当前运行环境无法读取拖拽文件原始路径”并保持正文不变。
 - `src/domains/editor/components/EditorPane.integration.test.tsx` 新增列表键盘路径回归：通过真实挂载的 CodeMirror view 触发 `Enter` 续写列表、空项再次 `Enter` 退出列表、`Tab` 缩进和 `Shift+Tab` 反缩进。
 - `src/domains/editor/components/EditorPane.integration.test.tsx` 新增链接补全上下文回归：真实挂载 CodeMirror 后，在 `](` 触发位置启动补全，确认建议包含当前文档 heading、同目录 Markdown、上级 README，并排除图片文件。
 - `src/domains/workspace/components/OutlinePanel.tsx` 新增大纲搜索框，支持按 heading 文本过滤大纲列表；过滤不改变源码行号，点击结果仍跳到原始标题行。
 - `src/domains/workspace/components/OutlinePanel.test.tsx` 新增大纲搜索回归：标题渲染、搜索过滤、无匹配空状态、过滤后点击跳源码行。
-- `npm test -- --run src/domains/editor/components/EditorPane.integration.test.tsx`：通过，1 file / 12 tests。
+- `npm test -- --run src/domains/editor/components/EditorPane.integration.test.tsx`：通过，1 file / 15 tests。
 - `npm test -- --run src/domains/workspace/components/OutlinePanel.test.tsx`：通过，1 file / 4 tests。
 - `src/domains/editor/extensions/linkCompletion.ts` 新增轻量 `[[note]]` wiki 内链补全：优先识别 `[[` 触发上下文，只读取工作区 Markdown / Markdown-like 文档，补全值为工作区相对路径并移除 `.md` / `.markdown` / `.txt` 后缀；不实现图谱、反链或 wiki link 渲染。
 - `src/domains/editor/extensions/linkCompletion.test.ts` 新增 wiki 内链触发和补全回归：`[[docs/gu` 能触发查询，`[[closed]]` 不触发；补全包含 `docs/guide`、`docs/api`、`README`，排除图片文件。
@@ -288,7 +288,15 @@ P1 问题：
   - `.codex-smoke/writing-efficiency/quick-open-empty-real-app-2.png`
 - 限制：
   - 本 smoke 验证了路径片段搜索和键盘打开结果；最近打开加权仍主要依赖 `src/domains/workspace/services/fileTree.test.ts`，没有额外截图证明排序权重。
-  - 这不覆盖链接补全、表格命令、列表体验、模板插入、拖拽图片和 Option / Alt 原路径。
+  - 这不覆盖链接补全、表格命令、列表体验、模板插入、Finder / Explorer 真实拖拽图片和 Option / Alt 原路径。
+
+2026-05-15 补强图片拖拽组件级接线：
+
+- `src/domains/editor/components/EditorPane.integration.test.tsx` 新增普通图片 drop 回归：真实挂载 CodeMirror 后，未按 Alt / Option 时会调用当前文档资产保存 pipeline，插入 `assets/<document>/...` 相对 Markdown 图片，并且不会读取原生文件路径。
+- `src/domains/editor/components/EditorPane.integration.test.tsx` 新增 Alt / Option 缺原生路径回归：取不到 native path 时显示“当前运行环境无法读取拖拽文件原始路径”，不调用 assets 复制 pipeline，也不改正文。
+- `npm test -- --run src/domains/editor/components/EditorPane.integration.test.tsx`：通过，1 file / 15 tests。
+- `npm test -- --run src/domains/editor/extensions/imagePaste.test.ts`：通过，1 file / 7 tests。
+- 限制：这仍是 DOM 事件级回归，不替代 macOS Finder 真实拖入、Windows Explorer 真实拖入和 Option / Alt 修饰键差异的桌面 smoke。
 
 待真实 smoke 完成后，在此追加：
 

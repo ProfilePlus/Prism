@@ -50,7 +50,7 @@
 | 基于本地计划持续推进 v1.4.0 优化 | `docs/prism-product-optimization-plan.md`、本审计、各 smoke 文档、多个已完成自动化切片 | 进行中 |
 | 保持单文档单窗口与 OpenAI 极简方向 | `CONTEXT.md`、ADR、原型约束；本轮未引入 tab、图谱、云同步、移动端、插件市场或 WYSIWYG | 已满足 |
 | 文件安全与发布可信核心路径有证据 | 保存状态、外部修改冲突、recovery、App 层 recovery modal 接线、macOS App-only 真实 crash / restart recovery smoke、fs scope、macOS Prism UI 文件树删除到废纸篓、release checklist、updater manifest、macOS fallback DMG、Windows release smoke 文档 | 自动化与 macOS 运行时 smoke 较强，但正式签名 / 公证 / Windows release 环境未闭环 |
-| 写作效率核心路径有证据 | 图片 helper、Markdown 链接补全/诊断、轻量 `[[note]]` 工作区内链补全、表格、列表、模板、快速打开、字数统计、CodeMirror 全局命令事件接线、paste / Alt-drop DOM 接线测试、列表 keymap 组件级回归、链接补全上下文组件回归、macOS 真实 `.app` 系统剪贴板图片粘贴和快速打开键盘 smoke | 自动化较强，macOS 部分桌面路径已补；Finder / Explorer 拖拽和剩余真实 UI smoke 未闭环 |
+| 写作效率核心路径有证据 | 图片 helper、Markdown 链接补全/诊断、轻量 `[[note]]` 工作区内链补全、表格、列表、模板、快速打开、字数统计、CodeMirror 全局命令事件接线、paste / normal-drop / Alt-drop DOM 接线测试、Alt-drop 缺路径提示、列表 keymap 组件级回归、链接补全上下文组件回归、macOS 真实 `.app` 系统剪贴板图片粘贴和快速打开键盘 smoke | 自动化较强，macOS 部分桌面路径已补；Finder / Explorer 拖拽和剩余真实 UI smoke 未闭环 |
 | 预览同步与 HTML 安全有证据 | source-line mapping、点击跳源码、长文 / 重媒体 mapping、内容更新后 source-line 刷新、10 万字符级 Markdown -> HTML smoke、Mermaid 队列、KaTeX/Mermaid 错误定位、链接安全清理测试 | 自动化中等偏强，但真实 CodeMirror 输入性能未闭环 |
 | 导出工作台可靠性有证据 | HTML/PDF/PNG/DOCX pipeline、golden fixture、复杂导出产物 smoke、命令入口四格式集成 smoke、真实 app 打开复杂文档预览截图、DOCX task list、Pandoc 回退、安全清理测试、导出进度事件、App 层进度 UI / 失败诊断复制测试 | 自动化较强，但真实 Prism UI 四格式导出和人工打开产物未闭环 |
 | 专业扩展有证据 | citation settings、Pandoc citeproc 分支、citekey / suppress-author 占位、邮箱/代码语境误报防护、专业写作 smoke 文档、中文排版 10 万字符级 micro benchmark、排版诊断 250 条长列表组件回归 | 自动化中等偏强，但本机缺 Pandoc，真实 citeproc 未闭环 |
@@ -147,7 +147,7 @@
 - `src/domains/editor/components/EditorPane.integration.test.tsx` 真实挂载 CodeMirror 后覆盖 Markdown 列表 keymap：`Enter` 续写列表、空项再次 `Enter` 退出列表、`Tab` 缩进和 `Shift+Tab` 反缩进。
 - `src/domains/editor/components/EditorPane.integration.test.tsx` 真实挂载 CodeMirror 后覆盖 Markdown 链接补全上下文：`']('` 触发位置能读取当前文档 heading、工作区 Markdown 文件和当前文档路径，且不会把图片文件作为链接补全项。
 - `src/domains/editor/components/EditorPane.integration.test.tsx` 真实挂载 CodeMirror 后覆盖 `[[note]]` wiki 内链补全上下文：`[[` 触发位置能读取工作区 Markdown 文件，补全 `docs/guide`、`docs/api`、`README`，并排除图片文件和图片去扩展名。
-- `src/domains/editor/components/EditorPane.integration.test.tsx` 真实挂载 CodeMirror 后覆盖图片事件接线：`paste` 剪贴板图片会调用当前文档资产保存 pipeline 并插入 Markdown 图片；Alt / Option `drop` 图片会插入原始路径 Markdown 链接，且不会复制到 assets。
+- `src/domains/editor/components/EditorPane.integration.test.tsx` 真实挂载 CodeMirror 后覆盖图片事件接线：`paste` 剪贴板图片会调用当前文档资产保存 pipeline 并插入 Markdown 图片；普通 `drop` 图片会复制到当前文档 assets 并插入相对 Markdown 图片；Alt / Option `drop` 图片会插入原始路径 Markdown 链接且不会复制到 assets；Alt / Option `drop` 取不到原生路径时显示明确提示并保持正文不变。
 - `src/domains/workspace/services/quickOpen.ts` 实现 name/path/preview 分数和 recent boost；`fileTree.test.ts` 覆盖最近打开加权。
 - `docs/verification/prism-writing-efficiency-smoke.md` 记录 macOS 真实 `.app` 快速打开键盘 smoke：`Mod+P` 打开快速打开，输入 `gui` 后出现 `docs/guide.md`，回车后窗口标题、文件树选中项和编辑区内容都切换到 `guide.md`；空搜索结果可见当前 workspace 文件列表。
 - `src/domains/workspace/components/OutlinePanel.tsx` 支持按标题文本搜索大纲；`OutlinePanel.test.tsx` 覆盖标题渲染、搜索过滤、无匹配空状态和过滤后点击仍跳到原源码行。
@@ -156,11 +156,11 @@
 ### 验证强度
 
 - 自动测试强：各 helper 和 command registry 覆盖较多；图片粘贴已覆盖实际 fs 写入调用和同秒文件名不覆盖；Markdown 链接补全、heading anchor、轻量 wiki 内链补全和链接诊断均有 helper 回归。
-- UI 行为中等偏强：React 组件测试覆盖面板、状态栏和 CodeMirror 命令事件接线；全局编辑器事件已覆盖表格、模板、行内格式、heading、任务列表和异常 payload 防护；列表 keymap 已覆盖 Enter / Tab / Shift+Tab 的 CodeMirror 按键路径；Markdown 链接补全和 `[[note]]` 内链补全已覆盖挂载后 CodeMirror 上下文；macOS 真实 `.app` 已补系统剪贴板图片粘贴和快速打开键盘路径；图片拖拽仍只有 CodeMirror DOM 事件接线回归和 helper 层 fs 写入 contract。
+- UI 行为中等偏强：React 组件测试覆盖面板、状态栏和 CodeMirror 命令事件接线；全局编辑器事件已覆盖表格、模板、行内格式、heading、任务列表和异常 payload 防护；列表 keymap 已覆盖 Enter / Tab / Shift+Tab 的 CodeMirror 按键路径；Markdown 链接补全和 `[[note]]` 内链补全已覆盖挂载后 CodeMirror 上下文；macOS 真实 `.app` 已补系统剪贴板图片粘贴和快速打开键盘路径；图片拖拽已有普通 drop、Alt / Option 原路径 drop 和 Alt / Option 缺路径提示的 CodeMirror DOM 事件接线回归，但尚无 Finder / Explorer 真实桌面拖拽 smoke。
 
 ### 缺口
 
-- 图片粘贴已有 macOS 真实 `.app` 系统剪贴板 smoke：PNG 写入 `NSPasteboard` 后通过原生 `Edit > Paste` 触发，产物写入 `assets/index/image-20260515-141341.png`，正文插入相对 Markdown 图片路径。快速打开已有 macOS 真实 `.app` 键盘 smoke：`Mod+P` 搜索 `guide` 并打开 `docs/guide.md`。图片拖拽仍只有 helper 与 CodeMirror DOM 接线自动化，还没有 macOS Finder 拖入、Windows Explorer 拖入和 Alt/Option 修饰键差异验证。
+- 图片粘贴已有 macOS 真实 `.app` 系统剪贴板 smoke：PNG 写入 `NSPasteboard` 后通过原生 `Edit > Paste` 触发，产物写入 `assets/index/image-20260515-141341.png`，正文插入相对 Markdown 图片路径。快速打开已有 macOS 真实 `.app` 键盘 smoke：`Mod+P` 搜索 `guide` 并打开 `docs/guide.md`。图片拖拽已有普通 drop、Alt / Option 原路径 drop 和缺路径提示的组件级接线回归，但还没有 macOS Finder 拖入、Windows Explorer 拖入和 Alt/Option 修饰键差异的真实桌面验证。
 - Markdown 链接补全和 `[[note]]` 内链补全已有 CodeMirror 上下文组件级回归，但仍缺真实桌面输入和补全面板操作 smoke；`[[note]]` 当前只做文件名补全，不包含图谱、反链、链接诊断或预览渲染语义；列表键盘续写已有 CodeMirror keymap 组件级回归，但仍缺真实桌面输入 smoke；表格、模板和任务列表块级命令已有 CodeMirror 命令事件组件级回归，但仍缺真实菜单 / 命令面板操作 smoke。
 
 ### 下一步
@@ -403,7 +403,7 @@
 - `src/domains/commands/registry.test.ts` 覆盖导出进度事件接线、成功 / 失败后的进度清理，以及导出失败诊断中的 warning 汇总。
 - `src/lib/fileActions.test.ts` 覆盖删除流程首次取消、废纸篓优先、废纸篓失败后取消永久删除和废纸篓失败后二次确认永久删除。
 - `src-tauri/src/lib.rs` 覆盖 macOS `~/.Trash` fallback 重名保护；`docs/verification/prism-file-actions-smoke.md` 记录真实 Prism `.app` 文件树删除到 `~/.Trash` 的 UI smoke。
-- `src/domains/editor/components/EditorPane.integration.test.tsx` 覆盖 CodeMirror 命令事件、剪贴板图片 paste、Alt / Option drop、列表 keymap 按键路径、Markdown 链接补全上下文和 `[[note]]` wiki 内链补全上下文。
+- `src/domains/editor/components/EditorPane.integration.test.tsx` 覆盖 CodeMirror 命令事件、剪贴板图片 paste、普通图片 drop、Alt / Option drop、Alt / Option 缺路径提示、列表 keymap 按键路径、Markdown 链接补全上下文和 `[[note]]` wiki 内链补全上下文。
 - `docs/verification/prism-writing-efficiency-smoke.md` 记录 macOS 真实 `.app` 系统剪贴板图片粘贴和快速打开键盘 smoke。
 - `src/lib/markdownToHtml.test.ts` 覆盖 10 万字符级 Markdown -> HTML 长文 smoke，以及链接文字、inline code、fenced code block 内 `[@key]` 不生成 citation 占位。
 - `src/domains/editor/components/PreviewPane.test.tsx` 覆盖 debounce 内容更新后的 source-line DOM 锚点刷新。

@@ -417,6 +417,25 @@ describe('EditorPane command event integration', () => {
     }));
   });
 
+  it('copies dropped images into the document asset pipeline when Alt/Option is not pressed', async () => {
+    openSavedDocument();
+    imagePasteMock.saveClipboardImage.mockResolvedValue('![photo.png](assets/Plan/photo.png)');
+    const { changes, onChange } = await renderEditorPane('Before\n');
+
+    const event = dispatchImageDrop(new File([new Uint8Array([1])], 'photo.png', { type: 'image/png' }));
+
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalled();
+      expect(latestChange(changes)).toContain('![photo.png](assets/Plan/photo.png)');
+    });
+    expect(event.defaultPrevented).toBe(true);
+    expect(imagePasteMock.saveClipboardImage).toHaveBeenCalledWith(expect.objectContaining({
+      documentName: 'Plan.md',
+      documentPath: '/repo/docs/Plan.md',
+    }));
+    expect(imagePasteMock.getNativeImageFilePath).not.toHaveBeenCalled();
+  });
+
   it('inserts original image paths on Alt/Option drop without copying assets', async () => {
     imagePasteMock.getNativeImageFilePath.mockReturnValue('/repo/assets/photo.png');
     const { changes, onChange } = await renderEditorPane('Before\n');
@@ -429,5 +448,21 @@ describe('EditorPane command event integration', () => {
     });
     expect(event.defaultPrevented).toBe(true);
     expect(imagePasteMock.saveClipboardImage).not.toHaveBeenCalled();
+  });
+
+  it('shows a notice when Alt/Option drop cannot read native image paths', async () => {
+    const onNotice = vi.fn();
+    imagePasteMock.getNativeImageFilePath.mockReturnValue(null);
+    const { changes, onChange } = await renderEditorPane('Before\n', { onNotice });
+
+    const event = dispatchImageDrop(new File([new Uint8Array([1])], 'photo.png', { type: 'image/png' }), true);
+
+    await waitFor(() => {
+      expect(onNotice).toHaveBeenCalledWith('当前运行环境无法读取拖拽文件原始路径');
+    });
+    expect(event.defaultPrevented).toBe(true);
+    expect(imagePasteMock.saveClipboardImage).not.toHaveBeenCalled();
+    expect(onChange).not.toHaveBeenCalled();
+    expect(latestChange(changes)).toBe('');
   });
 });
