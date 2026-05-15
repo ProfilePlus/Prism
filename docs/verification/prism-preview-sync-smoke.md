@@ -3,7 +3,7 @@
 > 日期：2026-05-15  
 > 目标：验证源码编辑与 Markdown 预览之间的映射、滚动同步、点击跳转和渲染诊断在真实长文中可信。  
 > 计划来源：`docs/prism-product-optimization-plan.md` 第 6 节“预览同步与渲染诊断”。  
-> 当前状态：已补长文和重媒体 source-line mapping 自动化回归，并降低预览滚动回算中的样式读取成本；macOS 真实 `.app` 已补分栏长文打开、源码/预览滚动同步、预览点击跳源码和底部错误区不空白 smoke；真实输入延迟、undo history 和批量媒体端到端性能尚未闭环。
+> 当前状态：已补长文和重媒体 source-line mapping 自动化回归，并降低预览滚动回算中的样式读取成本；macOS 真实 `.app` 已补分栏长文打开、源码/预览滚动同步、预览点击跳源码、底部错误区不空白、单次真实输入预览刷新、视图切换、undo history 和 `Cmd+Down` 跳文末同步 smoke；连续输入延迟和批量媒体端到端性能尚未闭环。
 
 ## 1. 覆盖范围
 
@@ -227,11 +227,19 @@ P1 问题：
   - `.codex-smoke/preview-sync/error-diagnostic-bottom-real-app.png`
 - 限制：
   - 这次只证明 macOS 真实 `.app` 的长文滚动 drift、预览点击和尾部错误区可用；没有证明连续 30 秒真实人工输入延迟。
-  - `Cmd+Down` 直接跳到文末后预览没有立即跟随，随后一次小幅滚动触发了尾部同步；该路径需要后续作为键盘跳转同步弱点继续观察。
-  - 未执行视图切换后的 undo history 验证。
+  - 该 drift smoke 原本未覆盖视图切换 / undo history / `Cmd+Down` 键盘跳转；同日补充见下一小节。
   - 未执行 50 图片 / 20 Mermaid / 20 KaTeX 组合的真实浏览器端到端性能 smoke。
 
-待真实 smoke 完成后，在此追加：
+### 2026-05-15 macOS 真实 `.app` 输入 / undo / 键盘跳转 smoke
+
+- 使用同一个 `npm run tauri:build:app-smoke` 产物打开 `.codex-smoke/preview-sync/preview-sync.md`，保持分栏模式。
+- 同一真实 app 会话中通过一次性粘贴 marker `PREVIEW_UNDO_PASTE_20260515` 修改文档；编辑器和右侧预览同时显示该 marker，落盘文件中 `rg -n "PREVIEW_UNDO"` 命中第 3 行。
+- 切到预览模式再回到编辑模式后，marker 仍保留在编辑器内容中，说明这条路径没有重建 editor 导致内容丢失。
+- 在编辑器焦点内按一次 `Cmd+Z` 后，marker 从编辑器和右侧预览同时消失；等待自动保存后 UI 显示“已保存”，`rg -n "PREVIEW_UNDO" .codex-smoke/preview-sync/preview-sync.md` 无命中，fixture 文件恢复到无 marker 状态。
+- 从文档顶部按 `Cmd+Down` 后，编辑区跳到文档尾部，状态栏显示 `LN 3210 COL 1`；右侧预览同步显示第 120 节末尾、代码块、Mermaid 错误和 KaTeX 错误区域，未复现此前“键盘跳尾后预览不立即跟随”的弱观察。
+- 本轮仍不把连续输入性能判定为通过：前序 `type_text` 工具耗时无法区分 app 输入延迟和 Computer Use 输入开销；需要后续用更接近真实键盘输入的工具或人工计时补证。
+
+待剩余真实性能 smoke 完成后，在此追加：
 
 ```text
 日期：
