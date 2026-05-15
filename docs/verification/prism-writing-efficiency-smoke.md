@@ -3,7 +3,7 @@
 > 日期：2026-05-15  
 > 目标：验证 Markdown 高频写作能力在真实桌面编辑器工作流中可用。  
 > 计划来源：`docs/prism-product-optimization-plan.md` 第 4 节“写作效率工具”。  
-> 当前状态：已补图片粘贴文件写入、同秒冲突、标题锚点补全/诊断一致性和轻量 wiki 内链补全自动化回归；macOS 真实 `.app` 已通过系统剪贴板图片粘贴、快速打开键盘、链接补全/诊断、表格命令、列表续写/退出、PRD 模板插入、大纲搜索和选区统计 smoke；Finder / Explorer 拖拽、Option / Alt 原路径和 Windows 桌面路径尚未执行。
+> 当前状态：已补图片粘贴文件写入、同秒冲突、标题锚点补全/诊断一致性和轻量 wiki 内链补全自动化回归；macOS 真实 `.app` 已通过系统剪贴板图片粘贴、快速打开键盘、链接补全/诊断、表格命令、列表续写/退出、PRD 模板插入、大纲搜索和选区统计 smoke；Finder / Explorer 拖拽、Option / Alt 原路径和 Windows 桌面路径仍未通过真实桌面 smoke。2026-05-15 曾尝试 macOS Finder 拖拽，但当前自动化工具无法安全完成跨应用文件拖入，不能作为产品通过证据。
 
 ## 1. 覆盖范围
 
@@ -297,6 +297,16 @@ P1 问题：
 - `npm test -- --run src/domains/editor/components/EditorPane.integration.test.tsx`：通过，1 file / 15 tests。
 - `npm test -- --run src/domains/editor/extensions/imagePaste.test.ts`：通过，1 file / 7 tests。
 - 限制：这仍是 DOM 事件级回归，不替代 macOS Finder 真实拖入、Windows Explorer 真实拖入和 Option / Alt 修饰键差异的桌面 smoke。
+
+2026-05-15 macOS Finder 图片拖拽真实 smoke 尝试：
+
+- 使用同一个 `npm run tauri:build:app-smoke` 生成的 `Prism.app`，打开 `.codex-smoke/writing-efficiency/workspace/index.md`。
+- 准备真实 Finder 文件：`.codex-smoke/writing-efficiency/workspace/assets/drag-source.png`，`file` 识别为 `PNG image data, 64 x 64, 8-bit/color RGB, non-interlaced`。
+- 用 Finder `reveal POSIX file` 打开 `assets` 目录并选中 `drag-source.png`。
+- 尝试 1：Computer Use 跨应用 drag 从 Finder 文件行拖到 Prism 右侧可见编辑区；结果没有触发 Prism drop pipeline，`index.md` 和 `assets/index/` 均无新增内容。
+- 尝试 2：通过 macOS `CGEvent` 发送真实鼠标 down / drag / up，从 Finder 文件行拖到 Prism 可见编辑区；结果仍未触发 Prism drop pipeline，反而在 Finder 内把临时 `assets/index` 文件夹和 `drag-source.png` 移动到 `/Users/Alex/index`。已把临时文件恢复回 `.codex-smoke/writing-efficiency/workspace/assets/`。
+- 结论：当前工具链无法安全、可复现地完成 Finder -> Prism 的真实跨应用文件拖拽验证。本项仍不能宣称通过；普通 drop、Alt / Option 原路径和缺路径提示继续只由 `EditorPane.integration.test.tsx` 的 DOM 事件级回归覆盖。
+- 下一步：需要人工手动 smoke，或换用能可靠暴露系统拖拽数据的 UI 自动化工具；Windows Explorer 拖拽仍需 Windows 机器验证。
 
 2026-05-15 macOS 真实 `.app` 链接、命令、大纲和统计 smoke：
 

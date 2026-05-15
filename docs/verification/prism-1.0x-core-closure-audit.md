@@ -35,7 +35,7 @@
 
 核心 1.0.x 本地写作体验已经有较多实现和自动测试覆盖，但还不能判定“完全闭环”。可以把状态分成三类：
 
-- **已具备最小闭环**：文件保存状态、外部修改冲突、recovery、图片粘贴/拖拽、表格/列表/模板、快速打开、源码-预览跳转、导出设置、引用设置与 Pandoc 回退。
+- **已具备最小闭环**：文件保存状态、外部修改冲突、recovery、图片粘贴、组件级图片拖拽接线、表格/列表/模板、快速打开、源码-预览跳转、导出设置、引用设置与 Pandoc 回退。
 - **弱验证**：长文预览性能、真实 Pandoc citeproc、正式签名/公证、Windows 发布链路、Finder / Explorer 图片拖拽。
 - **未闭环但非当前主线**：CLI/deep link、主题包 / 导出模板包、插件 API。插件市场按计划为明确非目标。
 
@@ -50,11 +50,11 @@
 | 基于本地计划持续推进 v1.4.0 优化 | `docs/prism-product-optimization-plan.md`、本审计、各 smoke 文档、多个已完成自动化切片 | 进行中 |
 | 保持单文档单窗口与 OpenAI 极简方向 | `CONTEXT.md`、ADR、原型约束；本轮未引入 tab、图谱、云同步、移动端、插件市场或 WYSIWYG | 已满足 |
 | 文件安全与发布可信核心路径有证据 | 保存状态、外部修改冲突、recovery、App 层 recovery modal 接线、macOS App-only 真实 crash / restart recovery smoke、fs scope、macOS Prism UI 文件树删除到废纸篓、release checklist、updater manifest、macOS fallback DMG、Windows release smoke 文档 | 自动化与 macOS 运行时 smoke 较强，但正式签名 / 公证 / Windows release 环境未闭环 |
-| 写作效率核心路径有证据 | 图片 helper、Markdown 链接补全/诊断、轻量 `[[note]]` 工作区内链补全、表格、列表、模板、快速打开、字数统计、CodeMirror 全局命令事件接线、paste / normal-drop / Alt-drop DOM 接线测试、Alt-drop 缺路径提示、列表 keymap 组件级回归、链接补全上下文组件回归、macOS 真实 `.app` 系统剪贴板图片粘贴、快速打开、链接补全/诊断、表格命令、列表续写/退出、PRD 模板插入、大纲搜索和选区统计 smoke | 自动化较强，macOS 主要写作路径已补真实桌面证据；Finder / Explorer 拖拽、Option / Alt 原路径和 Windows 桌面路径未闭环 |
+| 写作效率核心路径有证据 | 图片 helper、Markdown 链接补全/诊断、轻量 `[[note]]` 工作区内链补全、表格、列表、模板、快速打开、字数统计、CodeMirror 全局命令事件接线、paste / normal-drop / Alt-drop DOM 接线测试、Alt-drop 缺路径提示、列表 keymap 组件级回归、链接补全上下文组件回归、macOS 真实 `.app` 系统剪贴板图片粘贴、快速打开、链接补全/诊断、表格命令、列表续写/退出、PRD 模板插入、大纲搜索和选区统计 smoke | 自动化较强，macOS 主要写作路径已补真实桌面证据；macOS Finder 拖拽已尝试但当前自动化工具无法安全完成，Finder / Explorer 拖拽、Option / Alt 原路径和 Windows 桌面路径仍未闭环 |
 | 预览同步与 HTML 安全有证据 | source-line mapping、点击跳源码、长文 / 重媒体 mapping、内容更新后 source-line 刷新、10 万字符级 Markdown -> HTML smoke、Mermaid 队列、KaTeX/Mermaid 错误定位、链接安全清理测试、macOS 真实 `.app` 长文分栏滚动 / 预览点击 / 尾部错误区 smoke | 自动化中等偏强，macOS 真实 drift 证据已补一轮；真实 CodeMirror 输入性能、undo history 和重媒体端到端性能未闭环 |
 | 导出工作台可靠性有证据 | HTML/PDF/PNG/DOCX pipeline、golden fixture、复杂导出产物 smoke、命令入口四格式集成 smoke、真实 Prism UI 四格式导出、PDF / PNG 栅格颜色兼容修复、DOCX task list、Pandoc 回退、安全清理测试、导出进度事件、App 层进度 UI / 失败诊断复制测试 | 自动化和 macOS 真实 UI smoke 较强；真实 Pandoc citeproc 仍受环境阻塞 |
 | 专业扩展有证据 | citation settings、Pandoc citeproc 分支、citekey / suppress-author 占位、邮箱/代码语境误报防护、专业写作 smoke 文档、中文排版 10 万字符级 micro benchmark、排版诊断 250 条长列表组件回归 | 自动化中等偏强，但本机缺 Pandoc，真实 citeproc 未闭环 |
-| 每批验证 gate 通过 | 最近多批均执行 `npm test -- --run`、`npm run build`、`git diff --check` 并通过；最新全量为 55 files / 315 tests；涉及 Tauri 的历史批次已记录 build / fallback DMG 结果 | 已满足当前自动化 gate |
+| 每批验证 gate 通过 | 最近多批均执行 `npm test -- --run`、`npm run build`、`git diff --check` 并通过；最新全量为 55 files / 319 tests；涉及 Tauri 的历史批次已记录 build / fallback DMG 结果 | 已满足当前自动化 gate |
 | 无剩余必需工作 | Finder / Explorer 图片拖拽与 Option / Alt 原路径、预览真实输入性能 / undo / 重媒体端到端性能、Pandoc、签名公证、Windows release 仍未完成 | 未满足 |
 
 因此，当前 goal 的正确状态是“继续推进或拆分为更小 goal”，不能调用 `update_goal complete`。
@@ -156,15 +156,15 @@
 ### 验证强度
 
 - 自动测试强：各 helper 和 command registry 覆盖较多；图片粘贴已覆盖实际 fs 写入调用和同秒文件名不覆盖；Markdown 链接补全、heading anchor、轻量 wiki 内链补全和链接诊断均有 helper 回归。
-- UI 行为中等偏强：React 组件测试覆盖面板、状态栏和 CodeMirror 命令事件接线；全局编辑器事件已覆盖表格、模板、行内格式、heading、任务列表和异常 payload 防护；列表 keymap 已覆盖 Enter / Tab / Shift+Tab 的 CodeMirror 按键路径；Markdown 链接补全和 `[[note]]` 内链补全已覆盖挂载后 CodeMirror 上下文；macOS 真实 `.app` 已补系统剪贴板图片粘贴、快速打开键盘、链接诊断面板与跳转、Markdown link 补全面板与插入、`[[note]]` 候选展示、命令面板表格格式化、列表续写 / 退出、PRD 模板插入、大纲搜索和选区统计；图片拖拽已有普通 drop、Alt / Option 原路径 drop 和 Alt / Option 缺路径提示的 CodeMirror DOM 事件接线回归，但尚无 Finder / Explorer 真实桌面拖拽 smoke。
+- UI 行为中等偏强：React 组件测试覆盖面板、状态栏和 CodeMirror 命令事件接线；全局编辑器事件已覆盖表格、模板、行内格式、heading、任务列表和异常 payload 防护；列表 keymap 已覆盖 Enter / Tab / Shift+Tab 的 CodeMirror 按键路径；Markdown 链接补全和 `[[note]]` 内链补全已覆盖挂载后 CodeMirror 上下文；macOS 真实 `.app` 已补系统剪贴板图片粘贴、快速打开键盘、链接诊断面板与跳转、Markdown link 补全面板与插入、`[[note]]` 候选展示、命令面板表格格式化、列表续写 / 退出、PRD 模板插入、大纲搜索和选区统计；图片拖拽已有普通 drop、Alt / Option 原路径 drop 和 Alt / Option 缺路径提示的 CodeMirror DOM 事件接线回归。2026-05-15 macOS Finder 拖拽真实 smoke 尝试未能安全触发 Prism drop pipeline，不能作为通过证据。
 
 ### 缺口
 
-- 图片粘贴已有 macOS 真实 `.app` 系统剪贴板 smoke：PNG 写入 `NSPasteboard` 后通过原生 `Edit > Paste` 触发，产物写入 `assets/index/image-20260515-141341.png`，正文插入相对 Markdown 图片路径。快速打开已有 macOS 真实 `.app` 键盘 smoke：`Mod+P` 搜索 `guide` 并打开 `docs/guide.md`。链接诊断已有 macOS 真实 `.app` smoke：状态栏 `LINK 3` 打开“链接问题”面板，列出缺失文件、缺失标题、空链接，点击缺失标题后跳到 `LN 8 COL 1`。Markdown 链接补全已有真实输入 smoke：`[Guide](` 候选包含 heading、工作区 Markdown 文件和当前文件，键盘选择 `docs/guide.md` 后插入 `[Guide](docs/guide.md)`。`[[note]]` 内链补全已有真实候选展示 smoke：候选为 `docs/api`、`docs/guide`、`index`，不展示图片且不带 `.md` 后缀。表格、列表、模板、大纲和选区统计已有 macOS 真实 `.app` smoke：命令面板格式化当前表格、Enter 续写并空项退出列表、命令面板插入 PRD 模板、大纲搜索 `目标` 只显示匹配项、选中文英混排段落后状态栏显示选区统计。图片拖拽已有普通 drop、Alt / Option 原路径 drop 和缺路径提示的组件级接线回归，但还没有 macOS Finder 拖入、Windows Explorer 拖入和 Alt/Option 修饰键差异的真实桌面验证。
+- 图片粘贴已有 macOS 真实 `.app` 系统剪贴板 smoke：PNG 写入 `NSPasteboard` 后通过原生 `Edit > Paste` 触发，产物写入 `assets/index/image-20260515-141341.png`，正文插入相对 Markdown 图片路径。快速打开已有 macOS 真实 `.app` 键盘 smoke：`Mod+P` 搜索 `guide` 并打开 `docs/guide.md`。链接诊断已有 macOS 真实 `.app` smoke：状态栏 `LINK 3` 打开“链接问题”面板，列出缺失文件、缺失标题、空链接，点击缺失标题后跳到 `LN 8 COL 1`。Markdown 链接补全已有真实输入 smoke：`[Guide](` 候选包含 heading、工作区 Markdown 文件和当前文件，键盘选择 `docs/guide.md` 后插入 `[Guide](docs/guide.md)`。`[[note]]` 内链补全已有真实候选展示 smoke：候选为 `docs/api`、`docs/guide`、`index`，不展示图片且不带 `.md` 后缀。表格、列表、模板、大纲和选区统计已有 macOS 真实 `.app` smoke：命令面板格式化当前表格、Enter 续写并空项退出列表、命令面板插入 PRD 模板、大纲搜索 `目标` 只显示匹配项、选中文英混排段落后状态栏显示选区统计。图片拖拽已有普通 drop、Alt / Option 原路径 drop 和缺路径提示的组件级接线回归；macOS Finder 拖拽已尝试但工具无法安全复现，Windows Explorer 拖入和 Alt/Option 修饰键差异仍需人工或平台验证。
 
 ### 下一步
 
-`docs/verification/prism-writing-efficiency-smoke.md` 已覆盖图片粘贴、快速打开、链接补全、链接诊断、表格命令、列表续写 / 退出、模板插入、大纲搜索和选区统计的 macOS 真实 `.app` 路径；下一步应优先真实执行 Finder 拖拽 / Option 原路径和 Windows Explorer 拖拽，把剩余组件级图片拖拽证据提升为用户可见工作流证据。
+`docs/verification/prism-writing-efficiency-smoke.md` 已覆盖图片粘贴、快速打开、链接补全、链接诊断、表格命令、列表续写 / 退出、模板插入、大纲搜索和选区统计的 macOS 真实 `.app` 路径；Finder 拖拽 / Option 原路径仍需要人工 smoke 或更可靠的跨应用拖拽自动化，Windows Explorer 拖拽仍需 Windows 机器。
 
 ## 6. 预览同步
 
@@ -372,7 +372,7 @@
 建议只选一个 checkpoint 继续，优先级如下：
 
 1. **写作效率桌面 smoke**
-   `docs/verification/prism-writing-efficiency-smoke.md` 已补 smoke 协议和检查表，macOS 图片粘贴、快速打开、链接补全/诊断、表格、列表、模板、大纲和选区统计已回填真实 `.app` 证据；下一步应真实执行 Finder / Explorer 图片拖拽和 Option / Alt 原路径。价值是把剩余图片拖拽系统事件证据提升为真实桌面工作流验证。
+   `docs/verification/prism-writing-efficiency-smoke.md` 已补 smoke 协议和检查表，macOS 图片粘贴、快速打开、链接补全/诊断、表格、列表、模板、大纲和选区统计已回填真实 `.app` 证据；Finder 拖拽当前自动化无法安全完成，下一步需要人工 smoke 或更可靠跨应用拖拽工具，Windows Explorer 图片拖拽和 Alt 原路径仍需 Windows 机器。价值是把剩余图片拖拽系统事件证据提升为真实桌面工作流验证。
 
 2. **预览真实输入 / 性能 smoke**
    `docs/verification/prism-preview-sync-smoke.md` 已补长文 drift 真实 `.app` 证据；下一步应真实执行连续输入延迟、undo history、键盘跳转即时同步和重媒体端到端性能。价值是把预览同步从滚动 / 点击证据提升到真实写作过程证据。
