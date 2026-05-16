@@ -40,6 +40,7 @@ import { ShortcutPanel } from './components/shell/ShortcutPanel';
 import { CommandPalette, type CommandPaletteMode } from './components/shell/CommandPalette';
 import { AboutModal } from './components/shell/AboutModal';
 import { SettingsModal } from './components/shell/SettingsModal';
+import { Toast } from './components/shell/Toast';
 import {
   findCommandByKeyboardEvent,
   getCommandMenuItems,
@@ -57,6 +58,7 @@ import {
   joinPath,
 } from './domains/workspace/services';
 import type { ExportDefaultLocation } from './domains/settings/types';
+import { createToastState, type ToastInput, type ToastState } from './lib/toast';
 
 const exportExtensionByFormat: Record<ExportFormat, string> = {
   html: 'html',
@@ -205,7 +207,7 @@ function App() {
     items: ContextMenuItem[];
     kind: 'file' | 'menu';
   } | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
   const [exportProgress, setExportProgress] = useState<string | null>(null);
   const [exportFailure, setExportFailure] = useState<ExportFailureState | null>(null);
   const [saveDialog, setSaveDialog] = useState<SaveDialogState | null>(null);
@@ -304,12 +306,27 @@ function App() {
     workspace.sidebarVisible,
   ]);
 
-  const showToast = useCallback((message: string) => {
-    setToastMessage(message);
+  const dismissToast = useCallback(() => {
     if (toastTimerRef.current) {
       window.clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
     }
-    toastTimerRef.current = window.setTimeout(() => setToastMessage(null), 2800);
+    setToast(null);
+  }, []);
+
+  const showToast = useCallback((input: ToastInput) => {
+    const nextToast = createToastState(input);
+    setToast(nextToast);
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+    if (nextToast.durationMs !== null && nextToast.durationMs > 0) {
+      toastTimerRef.current = window.setTimeout(() => {
+        setToast(null);
+        toastTimerRef.current = null;
+      }, nextToast.durationMs);
+    }
   }, []);
 
   const {
@@ -372,6 +389,15 @@ function App() {
       window.clearTimeout(toastTimerRef.current);
     }
   }, []);
+
+  useEffect(() => {
+    const handleToast = (event: Event) => {
+      const detail = (event as CustomEvent<ToastInput>).detail;
+      if (detail) showToast(detail);
+    };
+    window.addEventListener('prism-toast', handleToast);
+    return () => window.removeEventListener('prism-toast', handleToast);
+  }, [showToast]);
 
   useEffect(() => {
     const handleExportProgress = (event: Event) => {
@@ -932,16 +958,20 @@ function App() {
         </>
       )}
 
-      {toastMessage && (
-        <div role="status" className="prism-toast">
-          {toastMessage}
-        </div>
-      )}
+      {(toast || exportProgress) && (
+        <div className="prism-toast-region">
+          {toast && <Toast toast={toast} onDismiss={dismissToast} />}
 
-      {exportProgress && (
-        <div role="status" className="prism-export-progress">
-          <span className="prism-export-spinner" aria-hidden="true" />
-          <span>{exportProgress}</span>
+          {exportProgress && (
+            <div role="status" aria-live="polite" className="prism-toast prism-toast--loading prism-export-progress">
+              <span className="prism-toast-icon prism-export-spinner" aria-hidden="true" />
+              <span className="prism-toast-copy">
+                <span className="prism-toast-title">正在导出</span>
+                <span className="prism-toast-message">{exportProgress}</span>
+              </span>
+              <span className="prism-toast-progressbar" aria-hidden="true"><span /></span>
+            </div>
+          )}
         </div>
       )}
 

@@ -235,11 +235,16 @@ describe('export commands integration', () => {
       outputPaths.png,
       outputPaths.docx,
     ]);
-    expect(showToast.mock.calls.map(([message]) => message)).toEqual(expect.arrayContaining([
+    const toastTitles = showToast.mock.calls.map(([toast]) => typeof toast === 'string' ? toast : toast.title);
+    expect(toastTitles).toEqual(expect.arrayContaining([
       'HTML 导出完成',
       'PDF 导出完成',
       'PNG 图像 导出完成',
       'Word 导出完成',
     ]));
+    expect(showToast.mock.calls.every(([toast]) => (
+      typeof toast === 'string'
+      || (toast.actions ?? []).map((action: any) => action.label).join(',') === '打开,显示位置'
+    ))).toBe(true);
   });
 });

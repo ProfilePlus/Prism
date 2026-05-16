@@ -424,6 +424,15 @@ function emitExportFailure(input: {
   }));
 }
 
+function showExportPathActionError(context: CommandContext, title: string, error: unknown) {
+  context.showToast?.({
+    tone: 'error',
+    title,
+    message: formatError(error),
+    durationMs: 5200,
+  });
+}
+
 async function handleExport(
   format: ExportFormat,
   context: CommandContext,
@@ -448,6 +457,7 @@ async function handleExport(
   let lastProgress = '准备导出';
   const exportSettings = options.settings ?? context.settingsStore;
   const exportWarnings: string[] = [];
+  const formatLabel = getExportFormatLabel(format);
 
   try {
     if (!options.outputPath && !context.requestExportPath) {
@@ -473,21 +483,56 @@ async function handleExport(
       },
       onWarning: (message) => {
         exportWarnings.push(message);
-        context.showToast?.(message);
+        context.showToast?.({
+          tone: 'warning',
+          title: '导出提示',
+          message,
+          durationMs: 7200,
+        });
       },
     }), format, outputPath);
 
     if (exported) {
+      const completedOutputPath = outputPath;
+      if (!completedOutputPath) return;
+
       if (doc.path) {
         context.settingsStore.recordExportHistory({
           documentPath: doc.path,
           documentName: doc.name,
           format,
-          outputPath,
+          outputPath: completedOutputPath,
           settings: createExportHistorySettings(exportSettings),
         });
       }
-      context.showToast?.(`${getExportFormatLabel(format)} 导出完成`);
+      context.showToast?.({
+        tone: 'success',
+        title: `${formatLabel} 导出完成`,
+        message: basename(completedOutputPath),
+        durationMs: 7200,
+        actions: [
+          {
+            label: '打开',
+            onClick: async () => {
+              try {
+                await openPath(completedOutputPath);
+              } catch (error) {
+                showExportPathActionError(context, '打开导出文件失败', error);
+              }
+            },
+          },
+          {
+            label: '显示位置',
+            onClick: async () => {
+              try {
+                await revealItemInDir(completedOutputPath);
+              } catch (error) {
+                showExportPathActionError(context, '显示导出位置失败', error);
+              }
+            },
+          },
+        ],
+      });
     }
   } catch (err) {
     const diagnostic = buildExportFailureDiagnostic({
@@ -501,7 +546,27 @@ async function handleExport(
       error: err,
     });
     emitExportFailure({ format, diagnostic });
-    context.showToast?.(`${getExportFormatLabel(format)} 导出失败，已生成诊断文本`);
+    context.showToast?.({
+      tone: 'error',
+      title: `${formatLabel} 导出失败`,
+      message: '已生成诊断文本，可查看后重试。',
+      durationMs: 9000,
+      actions: [
+        {
+          label: '查看诊断',
+          dismissOnClick: false,
+          onClick: () => emitExportFailure({ format, diagnostic }),
+        },
+        {
+          label: '重试',
+          onClick: () => handleExport(format, context, {
+            ...options,
+            outputPath: outputPath ?? options.outputPath,
+            settings: exportSettings,
+          }),
+        },
+      ],
+    });
   } finally {
     setExportProgress(null);
   }

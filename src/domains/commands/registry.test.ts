@@ -642,7 +642,13 @@ describe('command registry', () => {
         toc: true,
       }),
     }));
-    expect(showToast).toHaveBeenCalledWith('PDF 导出完成');
+    expect(showToast).toHaveBeenCalledWith(expect.objectContaining({
+      tone: 'success',
+      title: 'PDF 导出完成',
+      message: 'report-copy.pdf',
+    }));
+    const successToast = showToast.mock.calls.find(([toast]) => typeof toast !== 'string' && toast.title === 'PDF 导出完成')?.[0] as any;
+    expect(successToast.actions.map((action: any) => action.label)).toEqual(['打开', '显示位置']);
   });
 
   it('overwrites the previous export path without reopening the save dialog', async () => {
@@ -824,7 +830,18 @@ describe('command registry', () => {
     window.removeEventListener('prism-export-progress', progressListener);
 
     expect(recordExportHistory).not.toHaveBeenCalled();
-    expect(showToast).toHaveBeenCalledWith('PDF 导出失败，已生成诊断文本');
+    expect(showToast).toHaveBeenCalledWith(expect.objectContaining({
+      tone: 'warning',
+      title: '导出提示',
+      message: 'Pandoc 未检测成功；HTML 导出已回退内置管线',
+    }));
+    expect(showToast).toHaveBeenCalledWith(expect.objectContaining({
+      tone: 'error',
+      title: 'PDF 导出失败',
+      message: '已生成诊断文本，可查看后重试。',
+    }));
+    const failureToast = showToast.mock.calls.find(([toast]) => typeof toast !== 'string' && toast.title === 'PDF 导出失败')?.[0] as any;
+    expect(failureToast.actions.map((action: any) => action.label)).toEqual(['查看诊断', '重试']);
     expect(progressListener.mock.calls.map(([event]) => event.detail)).toEqual([
       { visible: true, message: '正在写入 PDF 文件' },
       { visible: false },

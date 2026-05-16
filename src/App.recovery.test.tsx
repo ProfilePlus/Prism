@@ -320,4 +320,33 @@ describe('App export diagnostics wiring', () => {
     });
     expect(screen.getByRole('status')).toHaveTextContent('导出诊断文本已复制');
   });
+
+  it('renders structured toast actions from the app toast event', async () => {
+    const onOpen = vi.fn();
+    mockRecoveryQueue(null);
+
+    render(<App />);
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('prism-toast', {
+        detail: {
+          tone: 'success',
+          title: 'PDF 导出完成',
+          message: 'report.pdf',
+          actions: [{ label: '打开', onClick: onOpen }],
+          durationMs: null,
+        },
+      }));
+    });
+
+    expect(screen.getByRole('status')).toHaveTextContent('PDF 导出完成');
+    expect(screen.getByRole('status')).toHaveTextContent('report.pdf');
+
+    fireEvent.click(screen.getByRole('button', { name: '打开' }));
+
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(screen.queryByText('PDF 导出完成')).not.toBeInTheDocument();
+    });
+  });
 });

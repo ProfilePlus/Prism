@@ -2,6 +2,7 @@ import type { useDocumentStore } from '../document/store';
 import type { useSettingsStore } from '../settings/store';
 import type { useWorkspaceStore } from '../workspace/store';
 import type { ExportFormat } from '../export';
+import type { ToastInput } from '../../lib/toast';
 
 export type CommandCategory =
   | '文件'
@@ -134,7 +135,7 @@ export interface CommandContext {
   documentStore: ReturnType<typeof useDocumentStore.getState>;
   settingsStore: ReturnType<typeof useSettingsStore.getState>;
   workspaceStore: ReturnType<typeof useWorkspaceStore.getState>;
-  showToast?: (message: string) => void;
+  showToast?: (toast: ToastInput) => void;
   requestExportPath?: (input: {
     format: ExportFormat;
     filename: string;
