@@ -150,7 +150,7 @@ describe('SplitView editor lifecycle', () => {
 
     fireEvent.click(screen.getByTestId('editor-scroll-ratio'));
 
-    const previewScroller = screen.getByTestId('preview-pane').parentElement?.parentElement as HTMLElement;
+    const previewScroller = screen.getByTestId('preview-pane').parentElement as HTMLElement;
     Object.defineProperty(previewScroller, 'scrollHeight', { configurable: true, value: 300 });
     Object.defineProperty(previewScroller, 'clientHeight', { configurable: true, value: 100 });
     previewScroller.scrollTop = 50;
