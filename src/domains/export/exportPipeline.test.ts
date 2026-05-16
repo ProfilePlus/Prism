@@ -515,8 +515,10 @@ describe('export pipeline image progress', () => {
   let getContextSpy: { mockRestore: () => void } | null = null;
   let toDataUrlSpy: { mockRestore: () => void } | null = null;
   let originalFonts: unknown;
+  let iframeScrollMetrics: { width: number; height: number } | null = null;
 
   beforeEach(() => {
+    iframeScrollMetrics = null;
     fsMock.writeFile.mockClear();
     fsMock.writeTextFile.mockClear();
     mermaidMock.initialize.mockClear();
@@ -544,6 +546,25 @@ describe('export pipeline image progress', () => {
                 frameDocument.open();
                 frameDocument.write(value);
                 frameDocument.close();
+                const frameHTMLElement = frameDocument.defaultView?.HTMLElement;
+                if (frameHTMLElement && iframeScrollMetrics) {
+                  Object.defineProperty(frameHTMLElement.prototype, 'scrollHeight', {
+                    configurable: true,
+                    get() {
+                      return (this as HTMLElement).classList?.contains('prism-export-document')
+                        ? iframeScrollMetrics?.height ?? 0
+                        : 0;
+                    },
+                  });
+                  Object.defineProperty(frameHTMLElement.prototype, 'scrollWidth', {
+                    configurable: true,
+                    get() {
+                      return (this as HTMLElement).classList?.contains('prism-export-document')
+                        ? iframeScrollMetrics?.width ?? 0
+                        : 0;
+                    },
+                  });
+                }
               }
               (element as HTMLIFrameElement).onload?.(new Event('load'));
             }, 0);
@@ -664,6 +685,28 @@ describe('export pipeline image progress', () => {
   it('caps raster export scale for very tall documents', () => {
     expect(__exportPipelineTesting.getSafeRasterScale(980, 60_000, 2)).toBeLessThan(0.3);
     expect(__exportPipelineTesting.getSafeRasterScale(980, 2_000, 2)).toBe(2);
+  });
+
+  it('renders long pdf documents as page slices without whole-document downscaling', async () => {
+    fsMock.writeFile.mockClear();
+    canvasRenderMock.render.mockClear();
+    const warnings: string[] = [];
+    iframeScrollMetrics = { width: 980, height: 60_000 };
+
+    try {
+      await exportPdf(createInput({ onWarning: (message) => warnings.push(message) }), '/tmp/long.pdf');
+    } finally {
+      iframeScrollMetrics = null;
+    }
+
+    const renderCalls = canvasRenderMock.render.mock.calls as unknown as Array<[HTMLElement, { scale: number }]>;
+    expect(renderCalls.length).toBeGreaterThan(1);
+    expect(renderCalls.every(([, options]) => options.scale === 2)).toBe(true);
+    expect(warnings).not.toEqual(expect.arrayContaining([expect.stringContaining('0.21x')]));
+    const { PDFDocument } = await import('pdf-lib');
+    const bytes = fsMock.writeFile.mock.calls[0][1] as Uint8Array;
+    const pdf = await PDFDocument.load(bytes);
+    expect(pdf.getPageCount()).toBe(renderCalls.length);
   });
 
   it('reports diagnostic progress stages for pdf export', async () => {
@@ -907,7 +950,7 @@ describe('export pipeline docx header and footer', () => {
 
     expect(fsMock.readFile).toHaveBeenCalledWith('/tmp/prism-doc/assets/logo.svg');
     expect(documentXml).toContain('<w:drawing>');
-    expect(mediaFiles.some((filePath) => /\.jpe?g$/.test(filePath))).toBe(true);
+    expect(mediaFiles.some((filePath) => /\.png$/.test(filePath))).toBe(true);
     expect(mediaFiles.some((filePath) => /\.svg$/.test(filePath))).toBe(false);
   });
 
@@ -939,8 +982,42 @@ describe('export pipeline docx header and footer', () => {
     const documentXml = await zip.file('word/document.xml')?.async('string');
 
     expect(documentXml).toContain('<w:drawing>');
-    expect(mediaFiles.some((filePath) => /\.jpe?g$/.test(filePath))).toBe(true);
+    expect(mediaFiles.some((filePath) => /\.png$/.test(filePath))).toBe(true);
     expect(mediaFiles.some((filePath) => /\.svg$/.test(filePath))).toBe(false);
+  });
+
+  it('normalizes docx drawing ids for WPS-compatible image rendering', async () => {
+    fsMock.writeFile.mockClear();
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="120"><text>WPS 图像</text></svg>';
+    fsMock.readFile.mockImplementation(async () => new TextEncoder().encode(svg));
+
+    await exportDocx(createInput({
+      content: [
+        '# Images',
+        '',
+        '![One](assets/one.svg)',
+        '',
+        '![Two](assets/two.svg)',
+        '',
+        '```mermaid',
+        'graph TD',
+        'A[开始]-->B[结束]',
+        '```',
+      ].join('\n'),
+      documentPath: '/tmp/prism-doc/article.md',
+    } as Partial<ExportDocumentInput>), '/tmp/wps-images.docx');
+
+    const { default: JSZip } = await import('jszip');
+    const bytes = fsMock.writeFile.mock.calls[0][1] as Uint8Array;
+    const zip = await JSZip.loadAsync(bytes);
+    const documentXml = await zip.file('word/document.xml')?.async('string') ?? '';
+    const docPrIds = Array.from(documentXml.matchAll(/<wp:docPr\b[^>]*\bid="(\d+)"/g), (match) => match[1]);
+    const cNvPrIds = Array.from(documentXml.matchAll(/<pic:cNvPr\b[^>]*\bid="(\d+)"/g), (match) => match[1]);
+
+    expect(docPrIds).toHaveLength(3);
+    expect(cNvPrIds).toHaveLength(3);
+    expect(docPrIds).toEqual(['1', '2', '3']);
+    expect(cNvPrIds).toEqual(['1', '2', '3']);
   });
 
   it('reports diagnostic progress stages for docx export', async () => {

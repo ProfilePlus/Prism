@@ -60,6 +60,7 @@ type CitationPlaceholderContext = 'html' | 'builtIn';
 
 const MAX_EXPORT_CANVAS_DIMENSION = 16_000;
 const MAX_EXPORT_CANVAS_AREA = 64_000_000;
+const PDF_EXPORT_RASTER_SCALE = 2;
 
 function stripMarkdownExtension(filename: string) {
   return filename.replace(/\.(md|markdown|txt)$/i, '') || 'Untitled';
@@ -956,11 +957,11 @@ async function svgToRasterDataUrl(
   }
 }
 
-async function svgToDocxJpegImage(svgText: string) {
-  const image = await svgToRasterDataUrl(svgText, { mimeType: 'image/jpeg', quality: 0.95 });
+async function svgToDocxPngImage(svgText: string) {
+  const image = await svgToRasterDataUrl(svgText, { mimeType: 'image/png' });
   if (!image) throw new Error('SVG 栅格化结果为空');
   return {
-    type: 'jpg' as const,
+    type: 'png' as const,
     data: dataUrlToBytes(image.dataUrl),
     width: image.width,
     height: image.height,
@@ -995,7 +996,7 @@ async function renderMermaidImage(source: string, contentTheme: ContentTheme) {
           renderSandbox,
         );
         const docxSvg = prepareSvgForDocx(svg);
-        const image = await svgToDocxJpegImage(docxSvg).catch(() => null);
+        const image = await svgToDocxPngImage(docxSvg).catch(() => null);
         if (image) {
           return image satisfies MermaidDocxImage;
         }
@@ -1017,7 +1018,7 @@ async function renderMarkdownImage(source: string, documentPath?: string): Promi
   if (media.mimeType === 'image/svg+xml') {
     const svgText = new TextDecoder().decode(media.bytes);
     const docxSvg = prepareSvgForDocx(svgText);
-    return svgToDocxJpegImage(docxSvg).catch(() => null);
+    return svgToDocxPngImage(docxSvg).catch(() => null);
   }
 
   const type = getDocxRasterType(media.mimeType, media.filePath);
@@ -1050,6 +1051,35 @@ function createDocxImageRun(
     transformation: { width, height },
     altText,
   } as any);
+}
+
+function rewriteOpenXmlNumericAttribute(xml: string, tagName: string, attrName: string) {
+  let nextId = 1;
+  const tagPattern = new RegExp(`<${tagName}\\b[^>]*\\/?>`, 'g');
+  const attrPattern = new RegExp(`\\b${attrName}="[^"]*"`);
+  return xml.replace(tagPattern, (tag) => {
+    const replacement = `${attrName}="${nextId}"`;
+    nextId += 1;
+    if (attrPattern.test(tag)) return tag.replace(attrPattern, replacement);
+    return tag.replace(/\/?>$/, (end) => ` ${replacement}${end}`);
+  });
+}
+
+async function normalizeDocxDrawingCompatibility(blob: Blob) {
+  const buffer = await blob.arrayBuffer();
+  const { default: JSZip } = await import('jszip');
+  const zip = await JSZip.loadAsync(buffer);
+  const documentXmlFile = zip.file('word/document.xml');
+  if (!documentXmlFile) return new Uint8Array(buffer);
+
+  const documentXml = await documentXmlFile.async('string');
+  const normalizedXml = rewriteOpenXmlNumericAttribute(
+    rewriteOpenXmlNumericAttribute(documentXml, 'wp:docPr', 'id'),
+    'pic:cNvPr',
+    'id',
+  );
+  zip.file('word/document.xml', normalizedXml);
+  return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
 }
 
 async function inlineImages(root: HTMLElement, input: ExportDocumentInput) {
@@ -1248,22 +1278,24 @@ export async function exportPdf(input: ExportDocumentInput, outputPath?: string)
 
   reportCitationPlaceholderWarning(input);
   const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
-  const image = await createRenderedPng(input, { scale: 1.25 });
-  reportProgress(input, exportProgressMessages.generateFile('PDF'));
-  const pdf = await PDFDocument.create();
-  const embedded = await pdf.embedPng(dataUrlToBytes(image.dataUrl));
-  const pageNumberFont = input.pdfPageNumbers
-    ? await pdf.embedFont(StandardFonts.Helvetica)
-    : null;
-
   const paper = pdfPageSizePoints[input.pdfPaper ?? 'a4'];
   const margins = pdfPageMarginsPoints[input.pdfMargin ?? 'standard'];
   const pageWidth = paper.width;
   const pageHeight = paper.height;
   const contentWidth = pageWidth - margins.left - margins.right;
   const contentHeight = pageHeight - margins.top - margins.bottom;
-  const scaledHeight = contentWidth * (image.height / image.width);
-  const pageCount = Math.max(1, Math.ceil(scaledHeight / contentHeight));
+  const renderedPages = await createRenderedPdfPages(input, {
+    contentWidth,
+    contentHeight,
+    scale: PDF_EXPORT_RASTER_SCALE,
+  });
+  reportProgress(input, exportProgressMessages.generateFile('PDF'));
+  const pdf = await PDFDocument.create();
+  const pageNumberFont = input.pdfPageNumbers
+    ? await pdf.embedFont(StandardFonts.Helvetica)
+    : null;
+
+  const pageCount = renderedPages.length;
   const drawChromeText = async (
     page: any,
     text: string,
@@ -1283,10 +1315,13 @@ export async function exportPdf(input: ExportDocumentInput, outputPath?: string)
   };
 
   for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+    const image = renderedPages[pageIndex];
+    const embedded = await pdf.embedPng(dataUrlToBytes(image.dataUrl));
+    const scaledHeight = contentWidth * (image.height / image.width);
     const page = pdf.addPage([pageWidth, pageHeight]);
     page.drawImage(embedded, {
       x: margins.left,
-      y: pageHeight - margins.top - scaledHeight + pageIndex * contentHeight,
+      y: pageHeight - margins.top - scaledHeight,
       width: contentWidth,
       height: scaledHeight,
     });
@@ -1331,6 +1366,85 @@ export async function exportPdf(input: ExportDocumentInput, outputPath?: string)
   reportProgress(input, exportProgressMessages.writeFile('PDF'));
   await writeFile(targetPath, bytes);
   return true;
+}
+
+async function createRenderedPdfPages(
+  input: ExportDocumentInput,
+  options: { contentWidth: number; contentHeight: number; scale?: number },
+) {
+  const { default: html2canvas } = await import('html2canvas');
+  const iframe = await createStandaloneExportFrame(input);
+  try {
+    const frameDocument = iframe.contentDocument;
+    const target = frameDocument?.querySelector<HTMLElement>('.prism-export-document');
+    if (!frameDocument || !target) throw new Error('导出内容渲染失败');
+
+    const width = Math.max(980, Math.ceil(target.scrollWidth), Math.ceil(frameDocument.documentElement.scrollWidth));
+    const height = Math.max(
+      200,
+      Math.ceil(target.scrollHeight),
+      Math.ceil(frameDocument.body.scrollHeight),
+      Math.ceil(frameDocument.documentElement.scrollHeight),
+    );
+    iframe.style.width = `${width}px`;
+    iframe.style.height = `${height}px`;
+    await nextFrame();
+    normalizeRasterComputedColors(target);
+
+    const cssPxToPdfPoint = options.contentWidth / width;
+    const pageCssHeight = Math.max(1, options.contentHeight / cssPxToPdfPoint);
+    const pageCount = Math.max(1, Math.ceil(height / pageCssHeight));
+    const requestedScale = options.scale ?? PDF_EXPORT_RASTER_SCALE;
+    const backgroundColor = normalizeCssColorFunctionsForRaster(
+      target.ownerDocument.defaultView?.getComputedStyle(target).backgroundColor ?? '',
+    ) || '#ffffff';
+    let warnedScaleCap = false;
+
+    const pages = [];
+    for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+      const y = Math.floor(pageIndex * pageCssHeight);
+      const nextY = Math.min(height, Math.floor((pageIndex + 1) * pageCssHeight));
+      const sliceHeight = Math.max(1, nextY - y);
+      const scale = getSafeRasterScale(width, sliceHeight, requestedScale);
+      if (scale < requestedScale && !warnedScaleCap) {
+        warnedScaleCap = true;
+        reportWarning(
+          input,
+          `当前页面内容较大，PDF 单页图像已自动降至 ${Number(scale.toFixed(2))}x，避免系统画布尺寸限制。`,
+        );
+      }
+
+      const canvas = await html2canvas(target, {
+        backgroundColor,
+        scale,
+        useCORS: true,
+        logging: false,
+        width,
+        height: sliceHeight,
+        x: 0,
+        y,
+        windowWidth: width,
+        windowHeight: height,
+        scrollX: 0,
+        scrollY: 0,
+      });
+      const dataUrl = canvas.toDataURL('image/png');
+      if (!dataUrl.startsWith('data:image/png')) {
+        throw new Error(`PDF 单页画布超出系统限制 (${Math.ceil(width * scale)} x ${Math.ceil(sliceHeight * scale)})`);
+      }
+      pages.push({
+        dataUrl,
+        width: canvas.width || Math.ceil(width * scale),
+        height: canvas.height || Math.ceil(sliceHeight * scale),
+      });
+    }
+    return pages;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : err instanceof Event ? err.type : String(err);
+    throw new Error(`PDF 渲染失败: ${message}`);
+  } finally {
+    iframe.remove();
+  }
 }
 
 async function createRenderedPng(input: ExportDocumentInput, options: { scale?: number } = {}) {
@@ -2030,8 +2144,9 @@ export async function exportDocx(input: ExportDocumentInput, outputPath?: string
   });
 
   const blob = await Packer.toBlob(document);
+  const bytes = await normalizeDocxDrawingCompatibility(blob);
   reportProgress(input, exportProgressMessages.writeFile('Word'));
-  await writeFile(targetPath, new Uint8Array(await blob.arrayBuffer()));
+  await writeFile(targetPath, bytes);
   return true;
 }
 
