@@ -1,4 +1,4 @@
-import { writeFile, writeTextFile } from '@tauri-apps/plugin-fs';
+import { readFile, writeFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { invoke } from '@tauri-apps/api/core';
 import { readCustomFontBytes } from '../settings/fontService';
 import type {
@@ -20,6 +20,7 @@ import {
   type DocxTheme,
 } from './exportSettings';
 import { getMermaidThemeConfig } from '../themes';
+import { dirname, joinPath } from '../workspace/services/path';
 import {
   buildExportTocHtml,
   buildExportTocItems,
@@ -36,6 +37,10 @@ type HeaderFooterTextPart =
   | { type: 'pages' };
 type MermaidDocxImage =
   | { type: 'png'; data: Uint8Array; width: number; height: number }
+  | { type: 'svg'; data: string; fallback: Uint8Array; width: number; height: number };
+type RasterDocxImageType = 'png' | 'jpg' | 'gif' | 'bmp';
+type ExportDocxImage =
+  | { type: RasterDocxImageType; data: Uint8Array; width: number; height: number }
   | { type: 'svg'; data: string; fallback: Uint8Array; width: number; height: number };
 type ExportFileLabel = 'HTML' | 'PDF' | 'PNG' | 'Word';
 interface PandocCitationHtmlResult {
@@ -397,10 +402,12 @@ function svgToDataUrl(svg: string) {
 }
 
 function getSvgSize(svg: string) {
-  const document = new DOMParser().parseFromString(svg, 'image/svg+xml');
-  const element = document.documentElement;
-  const width = Number.parseFloat(element.getAttribute('width') ?? '');
-  const height = Number.parseFloat(element.getAttribute('height') ?? '');
+  const svgDocument = new DOMParser().parseFromString(svg, 'image/svg+xml');
+  const element = svgDocument.documentElement;
+  const widthAttribute = element.getAttribute('width') ?? '';
+  const heightAttribute = element.getAttribute('height') ?? '';
+  const width = widthAttribute.trim().endsWith('%') ? Number.NaN : Number.parseFloat(widthAttribute);
+  const height = heightAttribute.trim().endsWith('%') ? Number.NaN : Number.parseFloat(heightAttribute);
   const viewBox = (element.getAttribute('viewBox') ?? '')
     .split(/[\s,]+/)
     .map((value) => Number.parseFloat(value));
@@ -409,6 +416,53 @@ function getSvgSize(svg: string) {
     width: Math.max(80, Math.round(Number.isFinite(width) ? width : viewBox[2] || 640)),
     height: Math.max(40, Math.round(Number.isFinite(height) ? height : viewBox[3] || 360)),
   };
+}
+
+function ensureSvgExplicitSize(svg: SVGSVGElement) {
+  const serialized = new XMLSerializer().serializeToString(svg);
+  const size = getSvgSize(serialized);
+  const widthAttribute = svg.getAttribute('width') ?? '';
+  const heightAttribute = svg.getAttribute('height') ?? '';
+  if (!widthAttribute || widthAttribute.trim().endsWith('%')) {
+    svg.setAttribute('width', String(size.width));
+  }
+  if (!heightAttribute || heightAttribute.trim().endsWith('%')) {
+    svg.setAttribute('height', String(size.height));
+  }
+}
+
+function replaceForeignObjectLabels(svg: SVGSVGElement) {
+  svg.querySelectorAll('foreignObject').forEach((node) => {
+    const text = (node.textContent ?? '').replace(/\s+/g, ' ').trim();
+    if (!text) {
+      node.remove();
+      return;
+    }
+
+    const owner = node.ownerDocument;
+    const width = Number.parseFloat(node.getAttribute('width') ?? '') || 0;
+    const height = Number.parseFloat(node.getAttribute('height') ?? '') || 0;
+    const x = Number.parseFloat(node.getAttribute('x') ?? '') || 0;
+    const y = Number.parseFloat(node.getAttribute('y') ?? '') || 0;
+    const textNode = owner.createElementNS('http://www.w3.org/2000/svg', 'text');
+    textNode.setAttribute('x', String(x + width / 2));
+    textNode.setAttribute('y', String(y + height / 2));
+    textNode.setAttribute('text-anchor', 'middle');
+    textNode.setAttribute('dominant-baseline', 'middle');
+    textNode.setAttribute('font-size', '14');
+    textNode.setAttribute('fill', '#1f2933');
+    textNode.textContent = text;
+    node.replaceWith(textNode);
+  });
+}
+
+function prepareSvgForDocx(svgText: string) {
+  const svgDocument = new DOMParser().parseFromString(svgText, 'image/svg+xml');
+  const svg = svgDocument.documentElement;
+  if (svg.tagName.toLowerCase() !== 'svg') return svgText;
+  replaceForeignObjectLabels(svg as unknown as SVGSVGElement);
+  ensureSvgExplicitSize(svg as unknown as SVGSVGElement);
+  return new XMLSerializer().serializeToString(svg);
 }
 
 function getImageSize(dataUrl: string) {
@@ -434,6 +488,97 @@ function blobToDataUrl(blob: Blob) {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(blob);
   });
+}
+
+function bytesToBase64(bytes: Uint8Array) {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.slice(index, index + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
+
+function bytesToDataUrl(bytes: Uint8Array, mimeType: string) {
+  return `data:${mimeType};base64,${bytesToBase64(bytes)}`;
+}
+
+function isWindowsAbsolutePath(value: string) {
+  return /^[a-zA-Z]:[\\/]/.test(value);
+}
+
+function isExternalMediaSrc(value: string) {
+  if (/^https?:\/\//i.test(value) || value.startsWith('//')) return true;
+  if (value.startsWith('data:') || value.startsWith('blob:')) return true;
+  if (isWindowsAbsolutePath(value)) return false;
+  return /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(value);
+}
+
+function stripMediaUrlDecorations(value: string) {
+  const hashIndex = value.indexOf('#');
+  const queryIndex = value.indexOf('?');
+  const indexes = [hashIndex, queryIndex].filter((index) => index >= 0);
+  return indexes.length > 0 ? value.slice(0, Math.min(...indexes)) : value;
+}
+
+function decodeExportMediaPath(value: string) {
+  try {
+    return decodeURI(value);
+  } catch {
+    return value;
+  }
+}
+
+function fileUrlToPath(value: string) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'file:') return null;
+    return decodeURIComponent(url.pathname);
+  } catch {
+    return null;
+  }
+}
+
+function resolveExportMediaPath(rawSrc: string, documentPath?: string) {
+  const src = stripMediaUrlDecorations(rawSrc.trim());
+  if (!src || src.startsWith('#') || src.startsWith('?')) return null;
+  if (src.startsWith('file://')) return fileUrlToPath(src);
+  if (isExternalMediaSrc(src)) return null;
+  if (src.startsWith('/') || isWindowsAbsolutePath(src)) return decodeExportMediaPath(src);
+  if (!documentPath) return null;
+  return joinPath(dirname(documentPath), decodeExportMediaPath(src));
+}
+
+function getExportMediaMimeType(filePath: string) {
+  const normalized = stripMediaUrlDecorations(filePath).toLowerCase();
+  if (normalized.endsWith('.svg')) return 'image/svg+xml';
+  if (normalized.endsWith('.png')) return 'image/png';
+  if (normalized.endsWith('.jpg') || normalized.endsWith('.jpeg')) return 'image/jpeg';
+  if (normalized.endsWith('.gif')) return 'image/gif';
+  if (normalized.endsWith('.bmp')) return 'image/bmp';
+  if (normalized.endsWith('.webp')) return 'image/webp';
+  return 'application/octet-stream';
+}
+
+function getDocxRasterType(mimeType: string, filePath: string): RasterDocxImageType | null {
+  const normalized = stripMediaUrlDecorations(filePath).toLowerCase();
+  if (mimeType === 'image/png' || normalized.endsWith('.png')) return 'png';
+  if (mimeType === 'image/jpeg' || normalized.endsWith('.jpg') || normalized.endsWith('.jpeg')) return 'jpg';
+  if (mimeType === 'image/gif' || normalized.endsWith('.gif')) return 'gif';
+  if (mimeType === 'image/bmp' || normalized.endsWith('.bmp')) return 'bmp';
+  return null;
+}
+
+async function readLocalExportMedia(rawSrc: string, documentPath?: string) {
+  const filePath = resolveExportMediaPath(rawSrc, documentPath);
+  if (!filePath) return null;
+  const bytes = await readFile(filePath);
+  return {
+    filePath,
+    bytes,
+    mimeType: getExportMediaMimeType(filePath),
+  };
 }
 
 async function inlineCssUrls(css: string) {
@@ -823,7 +968,8 @@ async function renderMermaidImage(source: string, contentTheme: ContentTheme) {
           candidate,
           renderSandbox,
         );
-        const image = await svgToPngDataUrl(svg).catch(() => null);
+        const docxSvg = prepareSvgForDocx(svg);
+        const image = await svgToPngDataUrl(docxSvg).catch(() => null);
         if (image) {
           return {
             type: 'png',
@@ -835,9 +981,9 @@ async function renderMermaidImage(source: string, contentTheme: ContentTheme) {
 
         return {
           type: 'svg',
-          data: svgToDataUrl(svg),
+          data: svgToDataUrl(docxSvg),
           fallback: dataUrlToBytes(TRANSPARENT_PNG_DATA_URL),
-          ...getSvgSize(svg),
+          ...getSvgSize(docxSvg),
         } satisfies MermaidDocxImage;
       } catch {
         // Try the next Mermaid rendering variant before falling back.
@@ -850,14 +996,82 @@ async function renderMermaidImage(source: string, contentTheme: ContentTheme) {
   return null;
 }
 
-async function inlineImages(root: HTMLElement) {
+async function renderMarkdownImage(source: string, documentPath?: string): Promise<ExportDocxImage | null> {
+  const media = await readLocalExportMedia(source, documentPath).catch(() => null);
+  if (!media) return null;
+
+  if (media.mimeType === 'image/svg+xml') {
+    const svgText = new TextDecoder().decode(media.bytes);
+    const docxSvg = prepareSvgForDocx(svgText);
+    const image = await svgToPngDataUrl(docxSvg).catch(() => null);
+    if (image) {
+      return {
+        type: 'png',
+        data: dataUrlToBytes(image.dataUrl),
+        width: image.width,
+        height: image.height,
+      };
+    }
+
+    return {
+      type: 'svg',
+      data: svgToDataUrl(docxSvg),
+      fallback: dataUrlToBytes(TRANSPARENT_PNG_DATA_URL),
+      ...getSvgSize(docxSvg),
+    };
+  }
+
+  const type = getDocxRasterType(media.mimeType, media.filePath);
+  if (!type) return null;
+
+  const size = await getImageSize(bytesToDataUrl(media.bytes, media.mimeType)).catch(() => ({
+    width: 640,
+    height: 360,
+  }));
+
+  return {
+    type,
+    data: media.bytes,
+    width: size.width,
+    height: size.height,
+  };
+}
+
+function createDocxImageRun(
+  docx: DocxModule,
+  image: ExportDocxImage | MermaidDocxImage,
+  altText: { title: string; description: string; name: string },
+) {
+  const { ImageRun } = docx;
+  const width = Math.min(500, image.width);
+  const height = Math.round(width * (image.height / image.width));
+  return new ImageRun({
+    type: image.type,
+    data: image.data,
+    ...(image.type === 'svg'
+      ? { fallback: { type: 'png', data: image.fallback } }
+      : {}),
+    transformation: { width, height },
+    altText,
+  } as any);
+}
+
+async function inlineImages(root: HTMLElement, input: ExportDocumentInput) {
   const images = Array.from(root.querySelectorAll<HTMLImageElement>('img'));
   await Promise.all(images.map(async (image) => {
-    if (!image.src || image.src.startsWith('data:')) return;
+    const rawSrc = image.getAttribute('src') ?? '';
+    if (!rawSrc || rawSrc.startsWith('data:')) return;
     try {
-      const response = await fetch(image.src);
+      const localMedia = await readLocalExportMedia(rawSrc, input.documentPath);
+      if (localMedia) {
+        image.setAttribute('src', bytesToDataUrl(localMedia.bytes, localMedia.mimeType));
+        return;
+      }
+
+      if (!/^https?:\/\//i.test(rawSrc) && !rawSrc.startsWith('//')) return;
+      const response = await fetch(rawSrc.startsWith('//') ? `${window.location.protocol}${rawSrc}` : rawSrc);
       if (!response.ok) return;
-      image.src = await blobToDataUrl(await response.blob());
+      image.setAttribute('src', await blobToDataUrl(await response.blob()));
     } catch {
       // Leave the original src when it cannot be fetched.
     }
@@ -911,7 +1125,7 @@ async function createRenderedExportNode(input: ExportDocumentInput, options: { h
   try {
     reportProgress(input, exportProgressMessages.renderDiagrams);
     await renderMermaidPlaceholders(root, input.contentTheme);
-    await inlineImages(root);
+    await inlineImages(root, input);
     if ('fonts' in document) {
       await document.fonts.ready;
     }
@@ -1244,6 +1458,10 @@ async function inlineToRuns(
     })));
     return nested.flat();
   }
+  if (node.type === 'image') {
+    const label = String(node.alt || node.title || node.url || '');
+    return label ? splitMarkedText(docx, label, { ...style, italics: true, color: theme.muted }) : [];
+  }
   if (node.value && typeof node.value === 'string') return splitMarkedText(docx, node.value, style);
   const nested = await Promise.all((node.children ?? []).map((child: any) => inlineToRuns(docx, child, theme, style)));
   return nested.flat();
@@ -1262,6 +1480,60 @@ async function paragraphFromInlineChildren(
   });
 }
 
+async function paragraphBlocksFromInlineChildren(
+  docx: DocxModule,
+  children: any[],
+  theme: DocxTheme,
+  documentPath?: string,
+) {
+  const { AlignmentType, Paragraph, TextRun } = docx;
+  if (!children.some((child) => child?.type === 'image')) {
+    return [await paragraphFromInlineChildren(docx, children, theme)];
+  }
+
+  const blocks: DocxBlock[] = [];
+  let pendingInline: any[] = [];
+  const flushInline = async () => {
+    if (pendingInline.length === 0) return;
+    blocks.push(await paragraphFromInlineChildren(docx, pendingInline, theme));
+    pendingInline = [];
+  };
+
+  for (const child of children) {
+    if (child?.type !== 'image') {
+      pendingInline.push(child);
+      continue;
+    }
+
+    await flushInline();
+    const image = await renderMarkdownImage(String(child.url ?? ''), documentPath);
+    if (!image) {
+      const fallback = String(child.alt || child.title || child.url || '图片无法导出');
+      blocks.push(new Paragraph({
+        children: [new TextRun({ text: fallback, italics: true, color: theme.muted })],
+        spacing: { after: 180, line: 330 },
+      }));
+      continue;
+    }
+
+    const alt = String(child.alt || child.title || 'Markdown image');
+    blocks.push(new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 120, after: 220 },
+      children: [
+        createDocxImageRun(docx, image, {
+          title: alt,
+          description: alt,
+          name: alt,
+        }),
+      ],
+    }));
+  }
+
+  await flushInline();
+  return blocks;
+}
+
 function isInlineMdastNode(node: any) {
   return [
     'text',
@@ -1272,6 +1544,7 @@ function isInlineMdastNode(node: any) {
     'link',
     'break',
     'html',
+    'image',
   ].includes(node?.type);
 }
 
@@ -1281,6 +1554,7 @@ async function tableCellToDocxBlocks(
   theme: DocxTheme,
   contentTheme: ContentTheme,
   isHeader: boolean,
+  documentPath?: string,
 ) {
   const { Paragraph, TextRun } = docx;
   if (children.length === 0) {
@@ -1296,7 +1570,7 @@ async function tableCellToDocxBlocks(
     ];
   }
 
-  const blocks = await mdastToDocxBlocks(docx, children, theme, contentTheme);
+  const blocks = await mdastToDocxBlocks(docx, children, theme, contentTheme, 0, documentPath);
   return blocks.length > 0 ? blocks : [new Paragraph('')];
 }
 
@@ -1473,12 +1747,12 @@ async function mdastToDocxBlocks(
   theme: DocxTheme,
   contentTheme: ContentTheme,
   listDepth = 0,
+  documentPath?: string,
 ): Promise<DocxBlock[]> {
   const {
     AlignmentType,
     BorderStyle,
     HeadingLevel,
-    ImageRun,
     Paragraph,
     ShadingType,
     Table,
@@ -1510,7 +1784,7 @@ async function mdastToDocxBlocks(
     }
 
     if (node.type === 'paragraph') {
-      blocks.push(await paragraphFromInlineChildren(docx, node.children ?? [], theme));
+      blocks.push(...await paragraphBlocksFromInlineChildren(docx, node.children ?? [], theme, documentPath));
       continue;
     }
 
@@ -1537,25 +1811,15 @@ async function mdastToDocxBlocks(
       if (isMermaidSource(String(node.value ?? ''), node.lang)) {
         const image = await renderMermaidImage(String(node.value ?? ''), contentTheme);
         if (image) {
-          const width = Math.min(500, image.width);
-          const height = Math.round(width * (image.height / image.width));
           blocks.push(new Paragraph({
             alignment: AlignmentType.CENTER,
             spacing: { before: 180, after: 220 },
             children: [
-              new ImageRun({
-                type: image.type,
-                data: image.data,
-                ...(image.type === 'svg'
-                  ? { fallback: { type: 'png', data: image.fallback } }
-                  : {}),
-                transformation: { width, height },
-                altText: {
-                  title: 'Mermaid diagram',
-                  description: 'Mermaid diagram exported from Prism',
-                  name: 'Mermaid diagram',
-                },
-              } as any),
+              createDocxImageRun(docx, image, {
+                title: 'Mermaid diagram',
+                description: 'Mermaid diagram exported from Prism',
+                name: 'Mermaid diagram',
+              }),
             ],
           }));
           continue;
@@ -1591,7 +1855,7 @@ async function mdastToDocxBlocks(
           spacing: { after: 100, line: 330 },
         }));
         const nested = (item.children ?? []).filter((child: any) => child.type !== 'paragraph');
-        blocks.push(...await mdastToDocxBlocks(docx, nested, theme, contentTheme, listDepth + 1));
+        blocks.push(...await mdastToDocxBlocks(docx, nested, theme, contentTheme, listDepth + 1, documentPath));
       }
       continue;
     }
@@ -1602,7 +1866,7 @@ async function mdastToDocxBlocks(
         const cells = [];
         for (const cell of row.children ?? []) {
           cells.push(new TableCell({
-            children: await tableCellToDocxBlocks(docx, cell.children ?? [], theme, contentTheme, rowIndex === 0),
+            children: await tableCellToDocxBlocks(docx, cell.children ?? [], theme, contentTheme, rowIndex === 0, documentPath),
             shading: rowIndex === 0 ? { type: ShadingType.CLEAR, fill: theme.fill } : undefined,
             margins: { top: 110, bottom: 110, left: 140, right: 140 },
             verticalAlign: VerticalAlignTable.TOP,
@@ -1672,7 +1936,7 @@ export async function exportDocx(input: ExportDocumentInput, outputPath?: string
     ? createDocxTocBlocks(docx, buildExportTocItemsFromMdast(tree.children ?? []), theme)
     : [];
   reportProgress(input, exportProgressMessages.renderDiagrams);
-  const bodyBlocks = await mdastToDocxBlocks(docx, tree.children ?? [], theme, input.contentTheme);
+  const bodyBlocks = await mdastToDocxBlocks(docx, tree.children ?? [], theme, input.contentTheme, 0, input.documentPath);
   const blocks = [...tocBlocks, ...bodyBlocks];
   const { Document, Packer, Paragraph } = docx;
   const fonts = [];

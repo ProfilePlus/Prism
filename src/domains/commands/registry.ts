@@ -473,9 +473,12 @@ async function handleExport(
     });
     if (!outputPath) return;
 
+    setExportProgress(lastProgress);
+
     const exported = await exportDocument(resolveExportOptions({
       content: doc.content,
       filename: doc.name,
+      documentPath: doc.path,
       settings: exportSettings,
       onProgress: (message) => {
         lastProgress = message;

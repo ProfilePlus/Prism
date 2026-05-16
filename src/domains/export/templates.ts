@@ -93,6 +93,7 @@ function resolveDocxFont(settings: SettingsState, policy: DocxFontPolicy = setti
 export function resolveExportOptions(input: {
   content: string;
   filename: string;
+  documentPath?: string;
   settings: SettingsState;
   onProgress?: (message: string) => void;
   onWarning?: (message: string) => void;
@@ -112,6 +113,7 @@ export function resolveExportOptions(input: {
   return {
     content: parsed.content,
     filename: input.filename,
+    documentPath: input.documentPath,
     title: frontMatter?.title,
     author: frontMatter?.author,
     date: frontMatter?.date,

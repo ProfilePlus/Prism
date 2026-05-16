@@ -28,6 +28,7 @@ import type { ExportDocumentInput } from './types';
 import { DEFAULT_SETTINGS } from '../settings/types';
 
 const fsMock = vi.hoisted(() => ({
+  readFile: vi.fn(async (_path: string) => new Uint8Array()),
   writeFile: vi.fn(async (_path: string, _contents: Uint8Array) => undefined),
   writeTextFile: vi.fn(async (_path: string, _contents: string) => undefined),
 }));
@@ -101,6 +102,7 @@ $$
 `;
 
 function resetFsMockImplementations() {
+  fsMock.readFile.mockImplementation(async (_path: string) => new Uint8Array());
   fsMock.writeTextFile.mockImplementation(async (_path: string, _contents: string) => undefined);
   fsMock.writeFile.mockImplementation(async (_path: string, _contents: Uint8Array) => undefined);
 }
@@ -110,6 +112,7 @@ describe('export pipeline html', () => {
   let originalFonts: unknown;
 
   beforeEach(() => {
+    fsMock.readFile.mockClear();
     fsMock.writeTextFile.mockClear();
     fsMock.writeFile.mockClear();
     mermaidMock.initialize.mockClear();
@@ -218,6 +221,27 @@ describe('export pipeline html', () => {
       '正在生成 HTML 文件',
       '正在写入 HTML 文件',
     ]);
+  });
+
+  it('inlines relative local svg images from the markdown document directory', async () => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"><text>Local SVG</text></svg>';
+    fsMock.readFile.mockImplementationOnce(async (targetPath: string) => {
+      expect(targetPath).toBe('/tmp/prism-doc/assets/logo.svg');
+      return new TextEncoder().encode(svg);
+    });
+
+    await exportHtml(createInput({
+      content: '# Local image\n\n![Logo](assets/logo.svg)',
+      documentPath: '/tmp/prism-doc/article.md',
+    } as Partial<ExportDocumentInput>), '/tmp/local-svg.html');
+
+    const html = fsMock.writeTextFile.mock.calls[0][1] as string;
+    expect(fsMock.readFile).toHaveBeenCalledWith('/tmp/prism-doc/assets/logo.svg');
+    expect(html).toContain('src="data:image/svg+xml;base64,');
+    expect(Buffer.from(html.match(/src="data:image\/svg\+xml;base64,([^"]+)"/)?.[1] ?? '', 'base64').toString('utf8'))
+      .toContain('Local SVG');
+    expect(html).not.toContain('src="assets/logo.svg"');
+    expect(html).not.toContain('<div id="root"></div>');
   });
 
   it('isolates Mermaid parser error artifacts during html export', async () => {
@@ -705,6 +729,10 @@ describe('export pipeline image progress', () => {
 });
 
 describe('export pipeline docx header and footer', () => {
+  beforeEach(() => {
+    fsMock.readFile.mockClear();
+  });
+
   it('writes configured header and footer tokens to docx parts', async () => {
     fsMock.writeFile.mockClear();
 
@@ -778,6 +806,63 @@ describe('export pipeline docx header and footer', () => {
     expect(documentXml).toContain('已完成');
     expect(documentXml).toContain('☐');
     expect(documentXml).toContain('待确认');
+  });
+
+  it('embeds relative local svg images in docx output', async () => {
+    fsMock.writeFile.mockClear();
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="120"><text>Local Docx SVG</text></svg>';
+    fsMock.readFile.mockImplementationOnce(async (targetPath: string) => {
+      expect(targetPath).toBe('/tmp/prism-doc/assets/logo.svg');
+      return new TextEncoder().encode(svg);
+    });
+
+    await exportDocx(createInput({
+      content: '# Local image\n\n![Logo](assets/logo.svg)',
+      documentPath: '/tmp/prism-doc/article.md',
+    } as Partial<ExportDocumentInput>), '/tmp/image.docx');
+
+    const { default: JSZip } = await import('jszip');
+    const bytes = fsMock.writeFile.mock.calls[0][1] as Uint8Array;
+    const zip = await JSZip.loadAsync(bytes);
+    const documentXml = await zip.file('word/document.xml')?.async('string');
+    const mediaFiles = Object.keys(zip.files).filter((filePath) => filePath.startsWith('word/media/'));
+
+    expect(fsMock.readFile).toHaveBeenCalledWith('/tmp/prism-doc/assets/logo.svg');
+    expect(documentXml).toContain('<w:drawing>');
+    expect(mediaFiles.some((filePath) => /\.(png|svg)$/.test(filePath))).toBe(true);
+  });
+
+  it('removes Mermaid foreignObject labels from docx svg fallback output', async () => {
+    fsMock.writeFile.mockClear();
+    mermaidMock.render.mockResolvedValueOnce({
+      svg: [
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80">',
+        '<g class="node" transform="translate(60,40)">',
+        '<rect x="-40" y="-20" width="80" height="40"></rect>',
+        '<g class="label" transform="translate(-18,-10)">',
+        '<foreignObject width="36" height="20">',
+        '<div xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel"><p>节点</p></span></div>',
+        '</foreignObject>',
+        '</g>',
+        '</g>',
+        '</svg>',
+      ].join(''),
+    });
+
+    await exportDocx(createInput({
+      content: '# Mermaid\n\n```mermaid\ngraph TD\nA[节点]-->B[结束]\n```',
+    }), '/tmp/mermaid.docx');
+
+    const { default: JSZip } = await import('jszip');
+    const bytes = fsMock.writeFile.mock.calls[0][1] as Uint8Array;
+    const zip = await JSZip.loadAsync(bytes);
+    const svgFile = Object.keys(zip.files).find((filePath) => filePath.startsWith('word/media/') && filePath.endsWith('.svg'));
+    expect(svgFile).toBeTruthy();
+    const svg = await zip.file(svgFile!)?.async('string');
+
+    expect(svg).toContain('节点');
+    expect(svg).toContain('<text');
+    expect(svg).not.toContain('<foreignObject');
   });
 
   it('reports diagnostic progress stages for docx export', async () => {

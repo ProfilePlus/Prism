@@ -14,6 +14,7 @@ export type ExportFormat = 'html' | 'pdf' | 'docx' | 'png';
 export interface ExportDocumentInput {
   content: string;
   filename: string;
+  documentPath?: string;
   title?: string;
   author?: string;
   date?: string;

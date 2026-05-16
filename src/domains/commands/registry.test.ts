@@ -753,6 +753,7 @@ describe('command registry', () => {
     window.removeEventListener('prism-export-progress', progressListener);
 
     expect(progressListener.mock.calls.map(([event]) => event.detail)).toEqual([
+      { visible: true, message: '准备导出' },
       { visible: true, message: '正在解析 Markdown' },
       { visible: true, message: '正在写入 PDF 文件' },
       { visible: false },
@@ -843,6 +844,7 @@ describe('command registry', () => {
     const failureToast = showToast.mock.calls.find(([toast]) => typeof toast !== 'string' && toast.title === 'PDF 导出失败')?.[0] as any;
     expect(failureToast.actions.map((action: any) => action.label)).toEqual(['查看诊断', '重试']);
     expect(progressListener.mock.calls.map(([event]) => event.detail)).toEqual([
+      { visible: true, message: '准备导出' },
       { visible: true, message: '正在写入 PDF 文件' },
       { visible: false },
     ]);
