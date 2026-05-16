@@ -323,13 +323,11 @@ end run"#;
 fn move_existing_path_to_trash(target_path: &Path) -> Result<(), String> {
     match move_existing_path_to_finder_trash(target_path) {
         Ok(()) => Ok(()),
-        Err(finder_error) => {
-            move_existing_path_to_user_trash(target_path)
-                .map(|_| ())
-                .map_err(|fallback_error| {
-                    format!("{finder_error}; ~/.Trash fallback failed: {fallback_error}")
-                })
-        }
+        Err(finder_error) => move_existing_path_to_user_trash(target_path)
+            .map(|_| ())
+            .map_err(|fallback_error| {
+                format!("{finder_error}; ~/.Trash fallback failed: {fallback_error}")
+            }),
     }
 }
 
@@ -373,8 +371,7 @@ fn move_existing_path_to_user_trash_dir(
     target_path: &Path,
     trash_dir: &Path,
 ) -> Result<PathBuf, String> {
-    std::fs::create_dir_all(trash_dir)
-        .map_err(|err| format!("无法创建系统废纸篓目录: {err}"))?;
+    std::fs::create_dir_all(trash_dir).map_err(|err| format!("无法创建系统废纸篓目录: {err}"))?;
     let file_name = target_path
         .file_name()
         .ok_or("无法识别待删除文件名")?
@@ -466,6 +463,49 @@ fn grant_workspace_directory_scope(app: AppHandle, path: String) -> Result<(), S
 fn move_path_to_trash(path: String) -> Result<(), String> {
     let target_path = canonicalize_existing_path(&path)?;
     move_existing_path_to_trash(&target_path)
+}
+
+#[tauri::command]
+fn open_path_with_system(path: String) -> Result<(), String> {
+    let target_path = canonicalize_existing_path(&path)?;
+
+    #[cfg(target_os = "macos")]
+    let mut command = {
+        let mut command = Command::new("open");
+        command.arg(&target_path);
+        command
+    };
+
+    #[cfg(target_os = "windows")]
+    let mut command = {
+        let mut command = Command::new("cmd");
+        command.arg("/C").arg("start").arg("").arg(&target_path);
+        command
+    };
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let mut command = {
+        let mut command = Command::new("xdg-open");
+        command.arg(&target_path);
+        command
+    };
+
+    let output = command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(|err| format!("无法打开导出文件: {err}"))?;
+
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stderr = first_non_empty_line(&output.stderr);
+    Err(if stderr.is_empty() {
+        format!("无法打开导出文件: {}", output.status)
+    } else {
+        format!("无法打开导出文件: {stderr}")
+    })
 }
 
 #[tauri::command]
@@ -646,9 +686,18 @@ mod tests {
             .expect("fallback should move file to trash dir");
 
         assert!(!source.exists());
-        assert_eq!(destination.file_name().and_then(|value| value.to_str()), Some("draft 1.md"));
-        assert_eq!(fs::read_to_string(destination).expect("read moved file"), "move me");
-        assert_eq!(fs::read_to_string(existing).expect("read existing file"), "existing");
+        assert_eq!(
+            destination.file_name().and_then(|value| value.to_str()),
+            Some("draft 1.md")
+        );
+        assert_eq!(
+            fs::read_to_string(destination).expect("read moved file"),
+            "move me"
+        );
+        assert_eq!(
+            fs::read_to_string(existing).expect("read existing file"),
+            "existing"
+        );
 
         let _ = fs::remove_dir_all(source_dir);
         let _ = fs::remove_dir_all(trash_dir);
@@ -694,6 +743,7 @@ pub fn run() {
             grant_markdown_file_scope,
             grant_workspace_directory_scope,
             move_path_to_trash,
+            open_path_with_system,
             read_legacy_settings_config
         ])
         .build(tauri::generate_context!())

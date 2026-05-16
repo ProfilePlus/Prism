@@ -101,6 +101,12 @@ function emitInlineFormat(format: string): void {
   window.dispatchEvent(new CustomEvent('prism-format', { detail: { format } }));
 }
 
+function waitForExportProgressPaint() {
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+  });
+}
+
 function emitHeading(level: string): void {
   window.dispatchEvent(new CustomEvent('prism-heading', { detail: { level } }));
 }
@@ -433,6 +439,18 @@ function showExportPathActionError(context: CommandContext, title: string, error
   });
 }
 
+async function openExportedPath(path: string) {
+  try {
+    await openPath(path);
+  } catch (primaryError) {
+    try {
+      await invoke('open_path_with_system', { path });
+    } catch {
+      throw primaryError;
+    }
+  }
+}
+
 async function handleExport(
   format: ExportFormat,
   context: CommandContext,
@@ -474,6 +492,7 @@ async function handleExport(
     if (!outputPath) return;
 
     setExportProgress(lastProgress);
+    await waitForExportProgressPaint();
 
     const exported = await exportDocument(resolveExportOptions({
       content: doc.content,
@@ -518,7 +537,7 @@ async function handleExport(
             label: '打开',
             onClick: async () => {
               try {
-                await openPath(completedOutputPath);
+                await openExportedPath(completedOutputPath);
               } catch (error) {
                 showExportPathActionError(context, '打开导出文件失败', error);
               }

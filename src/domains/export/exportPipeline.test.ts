@@ -11,6 +11,8 @@ const canvasRenderMock = vi.hoisted(() => {
   const dataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
   return {
     render: vi.fn(async () => ({
+      width: 320,
+      height: 200,
       toDataURL: () => dataUrl,
     })),
   };
@@ -510,6 +512,8 @@ describe('export pipeline image progress', () => {
   const originalImage = globalThis.Image;
   const originalCreateElement = document.createElement.bind(document);
   let createElementSpy: { mockRestore: () => void } | null = null;
+  let getContextSpy: { mockRestore: () => void } | null = null;
+  let toDataUrlSpy: { mockRestore: () => void } | null = null;
   let originalFonts: unknown;
 
   beforeEach(() => {
@@ -558,6 +562,18 @@ describe('export pipeline image progress', () => {
         window.setTimeout(() => this.onload?.(new Event('load')), 0);
       }
     } as typeof Image;
+    getContextSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      scale: vi.fn(),
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      fillText: vi.fn(),
+      measureText: vi.fn((text: string) => ({ width: text.length * 7 })),
+    } as unknown as CanvasRenderingContext2D);
+    toDataUrlSpy = vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockImplementation((type?: string) => (
+      type === 'image/jpeg'
+        ? 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2w=='
+        : 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII='
+    ));
   });
 
   afterEach(() => {
@@ -569,6 +585,10 @@ describe('export pipeline image progress', () => {
     globalThis.Image = originalImage;
     createElementSpy?.mockRestore();
     createElementSpy = null;
+    getContextSpy?.mockRestore();
+    getContextSpy = null;
+    toDataUrlSpy?.mockRestore();
+    toDataUrlSpy = null;
     if (originalFonts) {
       Object.defineProperty(document, 'fonts', {
         configurable: true,
@@ -618,6 +638,32 @@ describe('export pipeline image progress', () => {
       '正在写入 PNG 文件',
     ]);
     expect(canvasRenderMock.render).toHaveBeenCalled();
+  });
+
+  it('does not reload the generated png data url to determine export size', async () => {
+    fsMock.writeFile.mockClear();
+    globalThis.Image = class {
+      onload: ((event: Event) => void) | null = null;
+      onerror: ((event: Event) => void) | null = null;
+
+      set src(_value: string) {
+        window.setTimeout(() => this.onerror?.(new Event('error')), 0);
+      }
+    } as typeof Image;
+    canvasRenderMock.render.mockResolvedValueOnce({
+      width: 640,
+      height: 1200,
+      toDataURL: () => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
+    });
+
+    await exportPng(createInput(), '/tmp/no-reload.png');
+
+    expect(fsMock.writeFile).toHaveBeenCalledWith('/tmp/no-reload.png', expect.any(Uint8Array));
+  });
+
+  it('caps raster export scale for very tall documents', () => {
+    expect(__exportPipelineTesting.getSafeRasterScale(980, 60_000, 2)).toBeLessThan(0.3);
+    expect(__exportPipelineTesting.getSafeRasterScale(980, 2_000, 2)).toBe(2);
   });
 
   it('reports diagnostic progress stages for pdf export', async () => {
@@ -719,7 +765,7 @@ describe('export pipeline image progress', () => {
       expect(documentXml).toContain('Prism Export Smoke');
       expect(documentXml).toContain('项目');
       expect(documentXml).not.toContain('graph TD');
-      expect(mediaFiles.some((filePath) => /\.(png|svg)$/.test(filePath))).toBe(true);
+      expect(mediaFiles.some((filePath) => /\.(png|jpe?g|svg)$/.test(filePath))).toBe(true);
 
       expect(warnings.some((message) => message.includes('Pandoc 未检测成功'))).toBe(true);
     } finally {
@@ -729,8 +775,40 @@ describe('export pipeline image progress', () => {
 });
 
 describe('export pipeline docx header and footer', () => {
+  const originalImage = globalThis.Image;
+  let getContextSpy: { mockRestore: () => void } | null = null;
+  let toDataUrlSpy: { mockRestore: () => void } | null = null;
+
   beforeEach(() => {
     fsMock.readFile.mockClear();
+    globalThis.Image = class {
+      onload: ((event: Event) => void) | null = null;
+      onerror: ((event: Event) => void) | null = null;
+
+      set src(_value: string) {
+        window.setTimeout(() => this.onload?.(new Event('load')), 0);
+      }
+    } as typeof Image;
+    getContextSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      scale: vi.fn(),
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      fillText: vi.fn(),
+      measureText: vi.fn((text: string) => ({ width: text.length * 7 })),
+    } as unknown as CanvasRenderingContext2D);
+    toDataUrlSpy = vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockImplementation((type?: string) => (
+      type === 'image/jpeg'
+        ? 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2w=='
+        : 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII='
+    ));
+  });
+
+  afterEach(() => {
+    globalThis.Image = originalImage;
+    getContextSpy?.mockRestore();
+    getContextSpy = null;
+    toDataUrlSpy?.mockRestore();
+    toDataUrlSpy = null;
   });
 
   it('writes configured header and footer tokens to docx parts', async () => {
@@ -782,7 +860,7 @@ describe('export pipeline docx header and footer', () => {
     expect(documentXml).toContain('项目');
     expect(documentXml).toContain('const title');
     expect(documentXml).not.toContain('graph TD');
-    expect(mediaFiles.some((path) => /\.(png|svg)$/.test(path))).toBe(true);
+    expect(mediaFiles.some((path) => /\.(png|jpe?g|svg)$/.test(path))).toBe(true);
     expect(headerXml).toContain('导出验收文档');
     expect(footerXml).toContain('demo.md');
     expect(footerXml).toContain('PAGE');
@@ -829,10 +907,11 @@ describe('export pipeline docx header and footer', () => {
 
     expect(fsMock.readFile).toHaveBeenCalledWith('/tmp/prism-doc/assets/logo.svg');
     expect(documentXml).toContain('<w:drawing>');
-    expect(mediaFiles.some((filePath) => /\.(png|svg)$/.test(filePath))).toBe(true);
+    expect(mediaFiles.some((filePath) => /\.jpe?g$/.test(filePath))).toBe(true);
+    expect(mediaFiles.some((filePath) => /\.svg$/.test(filePath))).toBe(false);
   });
 
-  it('removes Mermaid foreignObject labels from docx svg fallback output', async () => {
+  it('rasterizes Mermaid foreignObject labels for docx output', async () => {
     fsMock.writeFile.mockClear();
     mermaidMock.render.mockResolvedValueOnce({
       svg: [
@@ -856,13 +935,12 @@ describe('export pipeline docx header and footer', () => {
     const { default: JSZip } = await import('jszip');
     const bytes = fsMock.writeFile.mock.calls[0][1] as Uint8Array;
     const zip = await JSZip.loadAsync(bytes);
-    const svgFile = Object.keys(zip.files).find((filePath) => filePath.startsWith('word/media/') && filePath.endsWith('.svg'));
-    expect(svgFile).toBeTruthy();
-    const svg = await zip.file(svgFile!)?.async('string');
+    const mediaFiles = Object.keys(zip.files).filter((filePath) => filePath.startsWith('word/media/'));
+    const documentXml = await zip.file('word/document.xml')?.async('string');
 
-    expect(svg).toContain('节点');
-    expect(svg).toContain('<text');
-    expect(svg).not.toContain('<foreignObject');
+    expect(documentXml).toContain('<w:drawing>');
+    expect(mediaFiles.some((filePath) => /\.jpe?g$/.test(filePath))).toBe(true);
+    expect(mediaFiles.some((filePath) => /\.svg$/.test(filePath))).toBe(false);
   });
 
   it('reports diagnostic progress stages for docx export', async () => {

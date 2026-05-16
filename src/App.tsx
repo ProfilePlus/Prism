@@ -92,6 +92,12 @@ function delay(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+function emitExportProgress(message: string | null) {
+  window.dispatchEvent(new CustomEvent('prism-export-progress', {
+    detail: message ? { visible: true, message } : { visible: false },
+  }));
+}
+
 async function resolveDefaultExportDirectory(input: {
   defaultLocation: ExportDefaultLocation;
   customDirectory: string;
@@ -593,6 +599,9 @@ function App() {
       }
     }
 
+    if (saveDialog.kind === 'export') {
+      emitExportProgress('准备导出');
+    }
     closeSaveDialog(targetPath);
   }, [closeSaveDialog, saveDialog]);
 

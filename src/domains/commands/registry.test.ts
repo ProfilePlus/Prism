@@ -34,7 +34,16 @@ const recoveryMock = vi.hoisted(() => ({
   createRecoverySnapshot: vi.fn(),
 }));
 
+const invokeMock = vi.hoisted(() => vi.fn());
+const openerMock = vi.hoisted(() => ({
+  openPath: vi.fn(),
+  openUrl: vi.fn(),
+  revealItemInDir: vi.fn(),
+}));
+
 vi.mock('@tauri-apps/plugin-fs', () => fsMock);
+vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
+vi.mock('@tauri-apps/plugin-opener', () => openerMock);
 
 vi.mock('../document/services/recovery', () => recoveryMock);
 
@@ -169,6 +178,14 @@ describe('command registry', () => {
     recoveryMock.clearRecoverySnapshotsForDocument.mockResolvedValue(undefined);
     recoveryMock.createRecoverySnapshot.mockReset();
     recoveryMock.createRecoverySnapshot.mockResolvedValue(null);
+    invokeMock.mockReset();
+    invokeMock.mockResolvedValue(undefined);
+    openerMock.openPath.mockReset();
+    openerMock.openPath.mockResolvedValue(undefined);
+    openerMock.openUrl.mockReset();
+    openerMock.openUrl.mockResolvedValue(undefined);
+    openerMock.revealItemInDir.mockReset();
+    openerMock.revealItemInDir.mockResolvedValue(undefined);
   });
 
   it('defines each command id once', () => {
@@ -649,6 +666,12 @@ describe('command registry', () => {
     }));
     const successToast = showToast.mock.calls.find(([toast]) => typeof toast !== 'string' && toast.title === 'PDF 导出完成')?.[0] as any;
     expect(successToast.actions.map((action: any) => action.label)).toEqual(['打开', '显示位置']);
+    openerMock.openPath.mockRejectedValueOnce(new Error('opener failed'));
+
+    await successToast.actions[0].onClick();
+
+    expect(openerMock.openPath).toHaveBeenCalledWith('/tmp/report-copy.pdf');
+    expect(invokeMock).toHaveBeenCalledWith('open_path_with_system', { path: '/tmp/report-copy.pdf' });
   });
 
   it('overwrites the previous export path without reopening the save dialog', async () => {

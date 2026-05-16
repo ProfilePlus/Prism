@@ -36,12 +36,10 @@ type HeaderFooterTextPart =
   | { type: 'page' }
   | { type: 'pages' };
 type MermaidDocxImage =
-  | { type: 'png'; data: Uint8Array; width: number; height: number }
-  | { type: 'svg'; data: string; fallback: Uint8Array; width: number; height: number };
+  | { type: RasterDocxImageType; data: Uint8Array; width: number; height: number };
 type RasterDocxImageType = 'png' | 'jpg' | 'gif' | 'bmp';
 type ExportDocxImage =
-  | { type: RasterDocxImageType; data: Uint8Array; width: number; height: number }
-  | { type: 'svg'; data: string; fallback: Uint8Array; width: number; height: number };
+  | { type: RasterDocxImageType; data: Uint8Array; width: number; height: number };
 type ExportFileLabel = 'HTML' | 'PDF' | 'PNG' | 'Word';
 interface PandocCitationHtmlResult {
   html: string;
@@ -59,6 +57,9 @@ const exportProgressMessages = {
   writeFile: (label: ExportFileLabel) => `正在写入 ${label} 文件`,
 } as const;
 type CitationPlaceholderContext = 'html' | 'builtIn';
+
+const MAX_EXPORT_CANVAS_DIMENSION = 16_000;
+const MAX_EXPORT_CANVAS_AREA = 64_000_000;
 
 function stripMarkdownExtension(filename: string) {
   return filename.replace(/\.(md|markdown|txt)$/i, '') || 'Untitled';
@@ -389,18 +390,6 @@ function dataUrlToBytes(dataUrl: string) {
   return bytes;
 }
 
-const TRANSPARENT_PNG_DATA_URL =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
-
-function svgToDataUrl(svg: string) {
-  const bytes = new TextEncoder().encode(svg);
-  let binary = '';
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
-  return `data:image/svg+xml;base64,${btoa(binary)}`;
-}
-
 function getSvgSize(svg: string) {
   const svgDocument = new DOMParser().parseFromString(svg, 'image/svg+xml');
   const element = svgDocument.documentElement;
@@ -680,6 +669,14 @@ function normalizeRasterComputedColors(root: HTMLElement) {
   });
 }
 
+function getSafeRasterScale(width: number, height: number, requestedScale = 2) {
+  const normalizedWidth = Math.max(1, width);
+  const normalizedHeight = Math.max(1, height);
+  const dimensionScale = MAX_EXPORT_CANVAS_DIMENSION / Math.max(normalizedWidth, normalizedHeight);
+  const areaScale = Math.sqrt(MAX_EXPORT_CANVAS_AREA / (normalizedWidth * normalizedHeight));
+  return Math.max(0.1, Math.min(requestedScale, dimensionScale, areaScale));
+}
+
 async function collectExportCss(
   options: Pick<ExportDocumentInput, 'pdfPaper' | 'pdfMargin'> & { rasterSafe?: boolean } = {},
 ) {
@@ -894,7 +891,14 @@ async function renderMermaidPlaceholders(root: HTMLElement, contentTheme: Conten
   }));
 }
 
-async function svgToPngDataUrl(svgText: string) {
+async function svgToRasterDataUrl(
+  svgText: string,
+  options: {
+    mimeType?: 'image/png' | 'image/jpeg';
+    quality?: number;
+  } = {},
+) {
+  const mimeType = options.mimeType ?? 'image/png';
   const container = document.createElement('div');
   container.style.position = 'fixed';
   container.style.left = '-12000px';
@@ -907,7 +911,14 @@ async function svgToPngDataUrl(svgText: string) {
     const svg = container.querySelector('svg');
     if (!svg) return null;
     normalizeMermaidSvg(svg);
-    const box = svg.getBBox();
+    const box = (() => {
+      try {
+        return svg.getBBox();
+      } catch {
+        const size = getSvgSize(new XMLSerializer().serializeToString(svg));
+        return { width: size.width, height: size.height };
+      }
+    })();
     const width = Math.max(320, Math.ceil(box.width + 56));
     const height = Math.max(180, Math.ceil(box.height + 56));
     svg.setAttribute('width', String(width));
@@ -929,16 +940,31 @@ async function svgToPngDataUrl(svgText: string) {
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('无法创建 Mermaid 图片画布');
       ctx.scale(2, 2);
-      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-preview') || '#ffffff';
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-preview').trim() || '#ffffff';
       ctx.fillRect(0, 0, width, height);
       ctx.drawImage(image, 0, 0, width, height);
-      return { dataUrl: canvas.toDataURL('image/png'), width, height };
+      const dataUrl = canvas.toDataURL(mimeType, options.quality);
+      if (!dataUrl.startsWith(`data:${mimeType}`)) {
+        throw new Error('SVG 栅格化结果无效');
+      }
+      return { dataUrl, width, height };
     } finally {
       URL.revokeObjectURL(url);
     }
   } finally {
     container.remove();
   }
+}
+
+async function svgToDocxJpegImage(svgText: string) {
+  const image = await svgToRasterDataUrl(svgText, { mimeType: 'image/jpeg', quality: 0.95 });
+  if (!image) throw new Error('SVG 栅格化结果为空');
+  return {
+    type: 'jpg' as const,
+    data: dataUrlToBytes(image.dataUrl),
+    width: image.width,
+    height: image.height,
+  };
 }
 
 async function renderMermaidImage(source: string, contentTheme: ContentTheme) {
@@ -969,22 +995,10 @@ async function renderMermaidImage(source: string, contentTheme: ContentTheme) {
           renderSandbox,
         );
         const docxSvg = prepareSvgForDocx(svg);
-        const image = await svgToPngDataUrl(docxSvg).catch(() => null);
+        const image = await svgToDocxJpegImage(docxSvg).catch(() => null);
         if (image) {
-          return {
-            type: 'png',
-            data: dataUrlToBytes(image.dataUrl),
-            width: image.width,
-            height: image.height,
-          } satisfies MermaidDocxImage;
+          return image satisfies MermaidDocxImage;
         }
-
-        return {
-          type: 'svg',
-          data: svgToDataUrl(docxSvg),
-          fallback: dataUrlToBytes(TRANSPARENT_PNG_DATA_URL),
-          ...getSvgSize(docxSvg),
-        } satisfies MermaidDocxImage;
       } catch {
         // Try the next Mermaid rendering variant before falling back.
       } finally {
@@ -1003,22 +1017,7 @@ async function renderMarkdownImage(source: string, documentPath?: string): Promi
   if (media.mimeType === 'image/svg+xml') {
     const svgText = new TextDecoder().decode(media.bytes);
     const docxSvg = prepareSvgForDocx(svgText);
-    const image = await svgToPngDataUrl(docxSvg).catch(() => null);
-    if (image) {
-      return {
-        type: 'png',
-        data: dataUrlToBytes(image.dataUrl),
-        width: image.width,
-        height: image.height,
-      };
-    }
-
-    return {
-      type: 'svg',
-      data: svgToDataUrl(docxSvg),
-      fallback: dataUrlToBytes(TRANSPARENT_PNG_DATA_URL),
-      ...getSvgSize(docxSvg),
-    };
+    return svgToDocxJpegImage(docxSvg).catch(() => null);
   }
 
   const type = getDocxRasterType(media.mimeType, media.filePath);
@@ -1048,9 +1047,6 @@ function createDocxImageRun(
   return new ImageRun({
     type: image.type,
     data: image.data,
-    ...(image.type === 'svg'
-      ? { fallback: { type: 'png', data: image.fallback } }
-      : {}),
     transformation: { width, height },
     altText,
   } as any);
@@ -1357,9 +1353,18 @@ async function createRenderedPng(input: ExportDocumentInput, options: { scale?: 
     await nextFrame();
     normalizeRasterComputedColors(target);
 
+    const requestedScale = options.scale ?? 2;
+    const scale = getSafeRasterScale(width, height, requestedScale);
+    if (scale < requestedScale) {
+      reportWarning(
+        input,
+        `当前文档较长，图像导出已自动降至 ${Number(scale.toFixed(2))}x，避免系统画布尺寸限制。`,
+      );
+    }
+
     const canvas = await html2canvas(target, {
       backgroundColor: normalizeCssColorFunctionsForRaster(getComputedStyle(target).backgroundColor) || '#ffffff',
-      scale: options.scale ?? 2,
+      scale,
       useCORS: true,
       logging: false,
       width,
@@ -1370,8 +1375,14 @@ async function createRenderedPng(input: ExportDocumentInput, options: { scale?: 
       scrollY: 0,
     });
     const dataUrl = canvas.toDataURL('image/png');
-    const size = await getImageSize(dataUrl);
-    return { dataUrl, ...size };
+    if (!dataUrl.startsWith('data:image/png')) {
+      throw new Error(`导出画布超出系统限制 (${Math.ceil(width * scale)} x ${Math.ceil(height * scale)})`);
+    }
+    return {
+      dataUrl,
+      width: canvas.width || Math.ceil(width * scale),
+      height: canvas.height || Math.ceil(height * scale),
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : err instanceof Event ? err.type : String(err);
     throw new Error(`图像渲染失败: ${message}`);
@@ -2030,6 +2041,7 @@ export const __exportPipelineTesting = {
   getPdfHeaderY,
   getPdfPageNumberLabel,
   getPdfPageNumberY,
+  getSafeRasterScale,
   normalizeCssColorFunctionsForRaster,
   normalizePdfChromeText,
   stripRasterUnsafeColorDeclarations,
