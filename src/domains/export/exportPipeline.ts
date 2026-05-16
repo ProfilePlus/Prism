@@ -656,6 +656,30 @@ function getMermaidConfig(contentTheme: ContentTheme) {
   return getMermaidThemeConfig(contentTheme);
 }
 
+function getMermaidExportConfig(contentTheme: ContentTheme) {
+  return {
+    ...getMermaidConfig(contentTheme),
+    suppressErrorRendering: true,
+  };
+}
+
+function createMermaidExportRenderSandbox() {
+  const sandbox = document.createElement('div');
+  sandbox.dataset.prismExportMermaidSandbox = 'true';
+  sandbox.setAttribute('aria-hidden', 'true');
+  Object.assign(sandbox.style, {
+    position: 'absolute',
+    inset: '0 auto auto -10000px',
+    width: '800px',
+    height: '600px',
+    overflow: 'hidden',
+    visibility: 'hidden',
+    pointerEvents: 'none',
+  });
+  document.body.appendChild(sandbox);
+  return sandbox;
+}
+
 function normalizeMermaidSvg(svg: SVGSVGElement) {
   svg.style.display = 'block';
   svg.style.marginInline = 'auto';
@@ -694,7 +718,7 @@ async function renderMermaidPlaceholders(root: HTMLElement, contentTheme: Conten
   if (placeholders.length === 0) return;
 
   const { default: mermaid } = await import('mermaid');
-  mermaid.initialize(getMermaidConfig(contentTheme) as any);
+  mermaid.initialize(getMermaidExportConfig(contentTheme) as any);
 
   if ('fonts' in document) {
     try {
@@ -708,8 +732,9 @@ async function renderMermaidPlaceholders(root: HTMLElement, contentTheme: Conten
     const encoded = placeholder.getAttribute('data-mermaid');
     if (!encoded) return;
     const source = decodeURIComponent(encoded);
+    const renderSandbox = createMermaidExportRenderSandbox();
     try {
-      const { svg } = await mermaid.render(`prism-export-mermaid-${Date.now()}-${index}`, source);
+      const { svg } = await mermaid.render(`prism-export-mermaid-${Date.now()}-${index}`, source, renderSandbox);
       placeholder.innerHTML = svg;
       placeholder.style.display = 'flex';
       placeholder.style.justifyContent = 'center';
@@ -718,6 +743,8 @@ async function renderMermaidPlaceholders(root: HTMLElement, contentTheme: Conten
       if (svgEl) normalizeMermaidSvg(svgEl);
     } catch (err) {
       placeholder.innerHTML = `<pre>Mermaid 渲染失败: ${escapeHtml(String(err))}</pre>`;
+    } finally {
+      renderSandbox.remove();
     }
   }));
 }
@@ -781,6 +808,7 @@ async function renderMermaidImage(source: string, contentTheme: ContentTheme) {
   for (const [configIndex, htmlLabels] of [false, true].entries()) {
     mermaid.initialize({
       ...config,
+      suppressErrorRendering: true,
       flowchart: {
         ...config.flowchart,
         htmlLabels,
@@ -788,10 +816,12 @@ async function renderMermaidImage(source: string, contentTheme: ContentTheme) {
     });
 
     for (const [sourceIndex, candidate] of candidates.entries()) {
+      const renderSandbox = createMermaidExportRenderSandbox();
       try {
         const { svg } = await mermaid.render(
           `prism-docx-mermaid-${Date.now()}-${configIndex}-${sourceIndex}-${Math.random().toString(36).slice(2)}`,
           candidate,
+          renderSandbox,
         );
         const image = await svgToPngDataUrl(svg).catch(() => null);
         if (image) {
@@ -811,6 +841,8 @@ async function renderMermaidImage(source: string, contentTheme: ContentTheme) {
         } satisfies MermaidDocxImage;
       } catch {
         // Try the next Mermaid rendering variant before falling back.
+      } finally {
+        renderSandbox.remove();
       }
     }
   }

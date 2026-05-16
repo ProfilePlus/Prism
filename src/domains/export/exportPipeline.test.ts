@@ -3,7 +3,7 @@ import { mkdir, readFile, stat, writeFile as writeNodeFile } from 'node:fs/promi
 import path from 'node:path';
 const mermaidMock = vi.hoisted(() => ({
   initialize: vi.fn(),
-  render: vi.fn(async () => ({
+  render: vi.fn(async (_id?: string, _code?: string, _container?: Element) => ({
     svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40"><text>Golden Mermaid</text></svg>',
   })),
 }));
@@ -218,6 +218,33 @@ describe('export pipeline html', () => {
       '正在生成 HTML 文件',
       '正在写入 HTML 文件',
     ]);
+  });
+
+  it('isolates Mermaid parser error artifacts during html export', async () => {
+    let renderContainer: Element | undefined;
+    let sandboxWasConnectedDuringRender = false;
+    mermaidMock.render.mockImplementationOnce(async (_id, _code, container?: Element) => {
+      renderContainer = container;
+      sandboxWasConnectedDuringRender = container?.isConnected ?? false;
+      const artifact = document.createElement('svg');
+      artifact.dataset.testid = 'mermaid-export-error-artifact';
+      artifact.textContent = 'Syntax error in text';
+      (container ?? document.body).appendChild(artifact);
+      throw new Error('Syntax error in text');
+    });
+
+    await exportHtml(createInput({
+      content: '# Bad diagram\n\n```mermaid\ngraph TD\n  A -->\n```',
+    }), '/tmp/bad-mermaid.html');
+
+    expect(renderContainer).toBeInstanceOf(HTMLElement);
+    expect((renderContainer as HTMLElement).dataset.prismExportMermaidSandbox).toBe('true');
+    expect(sandboxWasConnectedDuringRender).toBe(true);
+    expect((renderContainer as HTMLElement).isConnected).toBe(false);
+    expect(document.body.querySelector('[data-testid="mermaid-export-error-artifact"]')).toBeNull();
+    const html = fsMock.writeTextFile.mock.calls[0][1] as string;
+    expect(html).toContain('Mermaid 渲染失败');
+    expect(html).toContain('Syntax error in text');
   });
 
   it('uses pandoc citeproc html when HTML export has detected pandoc and bibliography settings', async () => {
@@ -771,5 +798,33 @@ describe('export pipeline docx header and footer', () => {
       '正在写入 Word 文件',
     ]);
     expect(mermaidMock.render).toHaveBeenCalled();
+  });
+
+  it('isolates Mermaid parser error artifacts during docx image rendering retries', async () => {
+    fsMock.writeFile.mockClear();
+    mermaidMock.render.mockClear();
+    let renderContainer: Element | undefined;
+    let sandboxWasConnectedDuringRender = false;
+    mermaidMock.render.mockImplementationOnce(async (_id, _code, container?: Element) => {
+      renderContainer = container;
+      sandboxWasConnectedDuringRender = container?.isConnected ?? false;
+      const artifact = document.createElement('svg');
+      artifact.dataset.testid = 'mermaid-docx-error-artifact';
+      artifact.textContent = 'Syntax error in text';
+      (container ?? document.body).appendChild(artifact);
+      throw new Error('Syntax error in text');
+    });
+
+    await exportDocx(createInput({
+      content: '# Intro\n\n```mermaid\ngraph TD\n  A --> B\n```',
+    }), '/tmp/retry.docx');
+
+    expect(renderContainer).toBeInstanceOf(HTMLElement);
+    expect((renderContainer as HTMLElement).dataset.prismExportMermaidSandbox).toBe('true');
+    expect(sandboxWasConnectedDuringRender).toBe(true);
+    expect((renderContainer as HTMLElement).isConnected).toBe(false);
+    expect(document.body.querySelector('[data-testid="mermaid-docx-error-artifact"]')).toBeNull();
+    expect(mermaidMock.render).toHaveBeenCalledTimes(2);
+    expect(fsMock.writeFile).toHaveBeenCalledTimes(1);
   });
 });
