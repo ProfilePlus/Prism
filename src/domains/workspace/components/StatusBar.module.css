@@ -87,17 +87,15 @@
   border-color: color-mix(in srgb, var(--c-void) 18%, var(--c-fog));
 }
 
-.exportStatusIcon {
+.exportStatusSpinner {
   width: 13px;
   height: 13px;
-  display: inline-flex;
+  display: inline-block;
   flex: 0 0 auto;
+  border: 1.6px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
   animation: prism-status-export-spin 1.2s linear infinite;
-}
-
-.exportStatusIcon svg {
-  width: 13px;
-  height: 13px;
 }
 
 .exportStatusText {

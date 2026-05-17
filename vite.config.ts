@@ -13,6 +13,10 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
+      input: {
+        main: 'index.html',
+        exportWorker: 'export-worker.html',
+      },
       output: {
         manualChunks(id) {
           if (id.includes('/src/domains/export/exportPipeline.ts')) {

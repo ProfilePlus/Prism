@@ -225,6 +225,52 @@ describe('export pipeline html', () => {
     ]);
   });
 
+  it('keeps html export moving when animation frames are throttled', async () => {
+    vi.useFakeTimers();
+    globalThis.requestAnimationFrame = vi.fn(() => 1) as unknown as typeof requestAnimationFrame;
+
+    try {
+      const exportPromise = exportHtml(createInput({
+        content: '# Intro\n\n```mermaid\ngraph TD\nA-->B\n```',
+      }), '/tmp/throttled-frame.html');
+      await vi.runAllTimersAsync();
+      await exportPromise;
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(fsMock.writeTextFile).toHaveBeenCalledWith(
+      '/tmp/throttled-frame.html',
+      expect.stringContaining('Golden Mermaid'),
+    );
+  });
+
+  it('reports per-diagram progress for multi Mermaid exports', async () => {
+    const onProgress = vi.fn();
+
+    await exportHtml(createInput({
+      content: [
+        '# Intro',
+        '',
+        '```mermaid',
+        'graph TD',
+        'A-->B',
+        '```',
+        '',
+        '```mermaid',
+        'graph TD',
+        'B-->C',
+        '```',
+      ].join('\n'),
+      onProgress,
+    }), '/tmp/multi-mermaid.html');
+
+    expect(onProgress.mock.calls.map(([message]) => message)).toEqual(expect.arrayContaining([
+      '正在渲染图表 1 / 2',
+      '正在渲染图表 2 / 2',
+    ]));
+  });
+
   it('inlines relative local svg images from the markdown document directory', async () => {
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"><text>Local SVG</text></svg>';
     fsMock.readFile.mockImplementationOnce(async (targetPath: string) => {

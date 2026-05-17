@@ -1,32 +1,29 @@
 import type { ExportDocumentInput, ExportFormat } from './types';
+import { exportDocumentLocal } from './localExport';
 
 export type { ExportDocumentInput, ExportFormat } from './types';
 export { getExportFormatLabel } from './types';
 export { EXPORT_TEMPLATES, resolveExportOptions } from './templates';
+
+type PrismExportWindow = Window & {
+  __TAURI_INTERNALS__?: unknown;
+  __PRISM_EXPORT_WORKER__?: boolean;
+};
+
+function shouldUseIsolatedExportWebview(outputPath?: string) {
+  if (!outputPath || typeof window === 'undefined') return false;
+  const runtimeWindow = window as PrismExportWindow;
+  return Boolean(runtimeWindow.__TAURI_INTERNALS__) && !runtimeWindow.__PRISM_EXPORT_WORKER__;
+}
 
 export async function exportDocument(
   input: ExportDocumentInput,
   format: ExportFormat,
   outputPath?: string,
 ) {
-  switch (format) {
-    case 'html': {
-      const { exportHtmlAdapter } = await import('./adapters/html');
-      return exportHtmlAdapter(input, outputPath);
-    }
-    case 'pdf': {
-      const { exportPdfAdapter } = await import('./adapters/pdf');
-      return exportPdfAdapter(input, outputPath);
-    }
-    case 'docx': {
-      const { exportDocxAdapter } = await import('./adapters/docx');
-      return exportDocxAdapter(input, outputPath);
-    }
-    case 'png': {
-      const { exportPngAdapter } = await import('./adapters/png');
-      return exportPngAdapter(input, outputPath);
-    }
-    default:
-      throw new Error('不支持的导出格式');
+  if (shouldUseIsolatedExportWebview(outputPath)) {
+    const { exportDocumentInIsolatedWebview } = await import('./isolatedWebviewExport');
+    return exportDocumentInIsolatedWebview(input, format, outputPath);
   }
+  return exportDocumentLocal(input, format, outputPath);
 }

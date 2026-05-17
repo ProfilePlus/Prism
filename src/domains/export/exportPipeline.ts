@@ -64,6 +64,8 @@ const PDF_EXPORT_RASTER_SCALE = 2;
 const PDF_EXPORT_MAX_PAGES = 500;
 const PDF_EXPORT_PAGE_RENDER_TIMEOUT_MS = 30_000;
 const PDF_EXPORT_MAX_RENDER_VIEWPORT_HEIGHT = 4_096;
+const EXPORT_MERMAID_RENDER_TIMEOUT_MS = 20_000;
+const EXPORT_FONT_READY_TIMEOUT_MS = 3_000;
 
 function normalizeExportRasterScale(scale: unknown, fallback = 2) {
   if (typeof scale !== 'number' || !Number.isFinite(scale)) return fallback;
@@ -93,8 +95,22 @@ function getExportTitle(input: Pick<ExportDocumentInput, 'filename' | 'title'>) 
   return input.title?.trim() || stripMarkdownExtension(input.filename);
 }
 
-function nextFrame() {
-  return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+function nextFrame(timeoutMs = 250) {
+  return new Promise<void>((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      resolve();
+    };
+    const timeout = window.setTimeout(finish, timeoutMs);
+    if (typeof window.requestAnimationFrame !== 'function') {
+      finish();
+      return;
+    }
+    window.requestAnimationFrame(() => window.requestAnimationFrame(finish));
+  });
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {
@@ -891,7 +907,7 @@ function normalizeMermaidSvg(svg: SVGSVGElement) {
   }
 }
 
-async function renderMermaidPlaceholders(root: HTMLElement, contentTheme: ContentTheme) {
+async function renderMermaidPlaceholders(root: HTMLElement, contentTheme: ContentTheme, input: ExportDocumentInput) {
   const placeholders = Array.from(root.querySelectorAll<HTMLElement>('.mermaid-placeholder'));
   if (placeholders.length === 0) return;
 
@@ -900,19 +916,26 @@ async function renderMermaidPlaceholders(root: HTMLElement, contentTheme: Conten
 
   if ('fonts' in document) {
     try {
-      await document.fonts.ready;
+      await withTimeout(document.fonts.ready, EXPORT_FONT_READY_TIMEOUT_MS, '导出字体加载超时');
     } catch {
       // Font readiness is best effort.
     }
   }
 
-  await Promise.all(placeholders.map(async (placeholder, index) => {
+  for (const [index, placeholder] of placeholders.entries()) {
     const encoded = placeholder.getAttribute('data-mermaid');
-    if (!encoded) return;
+    if (!encoded) continue;
     const source = decodeURIComponent(encoded);
     const renderSandbox = createMermaidExportRenderSandbox();
+    if (placeholders.length > 1) {
+      reportProgress(input, `正在渲染图表 ${index + 1} / ${placeholders.length}`);
+    }
     try {
-      const { svg } = await mermaid.render(`prism-export-mermaid-${Date.now()}-${index}`, source, renderSandbox);
+      const { svg } = await withTimeout(
+        mermaid.render(`prism-export-mermaid-${Date.now()}-${index}`, source, renderSandbox),
+        EXPORT_MERMAID_RENDER_TIMEOUT_MS,
+        `Mermaid 图表 ${index + 1} 渲染超时`,
+      );
       placeholder.innerHTML = svg;
       placeholder.style.display = 'flex';
       placeholder.style.justifyContent = 'center';
@@ -924,7 +947,8 @@ async function renderMermaidPlaceholders(root: HTMLElement, contentTheme: Conten
     } finally {
       renderSandbox.remove();
     }
-  }));
+    await nextFrame();
+  }
 }
 
 async function svgToRasterDataUrl(
@@ -966,12 +990,16 @@ async function svgToRasterDataUrl(
     const url = URL.createObjectURL(blob);
 
     try {
-      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error('Mermaid SVG 转图片失败'));
-        img.src = url;
-      });
+      const image = await withTimeout(
+        new Promise<HTMLImageElement>((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error('Mermaid SVG 转图片失败'));
+          img.src = url;
+        }),
+        EXPORT_MERMAID_RENDER_TIMEOUT_MS,
+        'Mermaid SVG 转图片超时',
+      );
       const canvas = document.createElement('canvas');
       assertExportCanvasWithinLimits(width, height, scale, 'SVG 栅格化');
       canvas.width = Math.ceil(width * scale);
@@ -1031,10 +1059,14 @@ async function renderMermaidImage(source: string, contentTheme: ContentTheme, sc
     for (const [sourceIndex, candidate] of candidates.entries()) {
       const renderSandbox = createMermaidExportRenderSandbox();
       try {
-        const { svg } = await mermaid.render(
-          `prism-docx-mermaid-${Date.now()}-${configIndex}-${sourceIndex}-${Math.random().toString(36).slice(2)}`,
-          candidate,
-          renderSandbox,
+        const { svg } = await withTimeout(
+          mermaid.render(
+            `prism-docx-mermaid-${Date.now()}-${configIndex}-${sourceIndex}-${Math.random().toString(36).slice(2)}`,
+            candidate,
+            renderSandbox,
+          ),
+          EXPORT_MERMAID_RENDER_TIMEOUT_MS,
+          `Mermaid 图表 ${sourceIndex + 1} 渲染超时`,
         );
         const docxSvg = prepareSvgForDocx(svg);
         const image = await svgToDocxPngImage(docxSvg, scale).catch(() => null);
@@ -1195,12 +1227,16 @@ async function createRenderedExportNode(input: ExportDocumentInput, options: { h
 
   try {
     reportProgress(input, exportProgressMessages.renderDiagrams);
-    await renderMermaidPlaceholders(root, input.contentTheme);
+    await renderMermaidPlaceholders(root, input.contentTheme, input);
     await inlineImages(root, input);
     if ('fonts' in document) {
-      await document.fonts.ready;
+      try {
+        await withTimeout(document.fonts.ready, EXPORT_FONT_READY_TIMEOUT_MS, '导出字体加载超时');
+      } catch {
+        // Font readiness is best effort.
+      }
     }
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    await nextFrame();
     return root;
   } catch (err) {
     root.remove();

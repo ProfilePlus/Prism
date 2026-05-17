@@ -237,7 +237,7 @@
 - `src/domains/commands/registry.ts` 包含“按上次设置导出”和“覆盖上次导出文件”，并把导出失败诊断加入 stage、template、front matter、TOC、纸张、页眉页脚、DOCX 字体、citation / Pandoc 状态。
 - `src/domains/export/exportPipeline.ts` 有 HTML / PDF / PNG / DOCX 分支、Pandoc citeproc HTML 分支、回退 warning、导出进度 stage。
 - `src/domains/export/exportPipeline.ts` 会在 Pandoc citeproc HTML 注入导出 DOM 前清理 fragment，移除 `<script>`、事件属性、inline style 和危险 URL，避免外部 Pandoc 路径绕过内置 Markdown HTML 安全策略。
-- `src/domains/export/index.ts` 会按导出格式动态加载 adapter；`vite.config.ts` 将 `exportPipeline`、`docx`、`pdf-lib`、`html2canvas` 拆为按需 chunk，主入口 JS 从约 `2,620.04 kB / gzip 834.05 kB` 降到 `1,950.05 kB / gzip 632.95 kB`，避免导出工作台完整链路拖入启动首包。
+- `src/domains/export/index.ts` 会按导出格式动态加载 adapter；Tauri 主窗口指定输出路径时会把实际导出渲染迁到独立 WebView，避免 PDF / PNG / HTML / DOCX 导出占满主编辑窗口；`vite.config.ts` 将 `exportPipeline`、`docx`、`pdf-lib`、`html2canvas` 拆为按需 chunk，主入口 JS 从约 `2,620.04 kB / gzip 834.05 kB` 降到 `1,950.05 kB / gzip 632.95 kB`，避免导出工作台完整链路拖入启动首包。
 - `exportPipeline.test.ts` 覆盖 HTML/PDF/PNG/DOCX 基础导出、TOC、front matter、header/footer、DOCX golden fixture、progress stage、Pandoc citeproc 和回退。
 - `exportPipeline.test.ts` 覆盖 DOCX GFM task list 产物级 XML：已完成任务导出为 `☑`，未完成任务导出为 `☐`，避免退化成普通项目符号。
 - `exportPipeline.test.ts` 已新增复杂导出产物 smoke：同一份复杂 Markdown 会写出 `.codex-smoke/complex-export/out/complex-export.html|pdf|png|docx`，并读取产物检查 HTML 结构、PDF A4 页面、PNG 签名、DOCX XML / media 与 Mermaid 非源码输出。
@@ -245,7 +245,10 @@
 - `src/domains/commands/registry.test.ts` 覆盖导出进度事件接线：pipeline progress 会派发 `prism-export-progress` 可见事件，成功或失败后都会派发 `{ visible: false }` 清理进度状态。
 - `src/domains/commands/registry.ts` 会把导出失败前产生的 pipeline warning 汇总到可复制失败诊断中，避免 Pandoc / CSL / citekey 回退原因只以 toast 出现后丢失；`registry.test.ts` 覆盖 warning 汇总进入诊断文本。
 - `src/App.recovery.test.tsx` 覆盖 App 层导出进度与失败诊断：`prism-export-progress` 事件会展示/隐藏进度状态并清理旧失败浮层；`prism-export-failure` 事件会展示诊断浮层，诊断文本可复制到系统剪贴板，并显示复制成功 toast。
+- `src/domains/export/isolatedWebviewExport.ts` 将独立导出 WebView 停在主窗口背后的极小可见窗口，启用 `backgroundThrottling: disabled`，并加入 90 秒无进度 watchdog；`isolatedWebviewExport.test.ts` 覆盖 worker 不再离屏隐藏、无进度会失败并清理 worker。
+- `src/domains/export/exportPipeline.ts` 为 `requestAnimationFrame` 等待增加 timer fallback，Mermaid 多图导出按 `正在渲染图表 N / 总数` 报告进度，并给 DOCX Mermaid 图片链路增加 render / 图片加载超时；`exportPipeline.test.ts` 覆盖 rAF 不回调时 HTML 导出仍能完成，以及多 Mermaid 的逐图进度。
 - `docs/verification/prism-complex-export-smoke.md` 记录自动化 pipeline 产物 smoke、命令入口集成 smoke 和真实 Prism UI 四格式导出 smoke 通过；2026-05-15 通过当前 `.app` 应用内导出菜单生成 `ui-raster-fixed.html|pdf|png|docx`，并用 `file`、`pdf-lib`、`sips`、`jszip`、`textutil` 和 Quick Look thumbnail 检查产物。
+- `docs/verification/prism-complex-export-smoke.md` 记录 2026-05-17 独立导出 WebView 卡死修复 smoke：真实 `.app` 曾在 HTML 导出 `preview-heavy.md` 时停在“正在渲染图表”并 20 分钟后超时；修复后通过命令面板导出 `preview-heavy-webview-smoke-fixed.html`，文件在几秒内生成，HTML 中有 20 个 Mermaid SVG，1 个 fixture 内故意非法 Mermaid 以单图 fallback 落地，没有阻断整份导出。
 - `src/domains/export/exportPipeline.ts` 已修复真实 PDF / PNG 导出暴露的 `html2canvas` 现代 CSS color function 兼容问题：栅格导出 iframe 使用 raster-safe CSS，并在截图前把 computed `color(...)` 归一为 `rgb(...)` / `rgba(...)`；HTML 导出保持完整主题 CSS。
 - `docs/verification/prism-pandoc-citation-html-smoke.md` 记录 Pandoc smoke 方案和本机阻塞。
 
@@ -253,7 +256,7 @@
 
 - 自动测试强：导出 pipeline、命令入口和设置归一化覆盖广；HTML 导出已覆盖 Pandoc 返回 HTML 的安全清理；导出进度事件、App 层进度 UI、失败诊断浮层、warning 汇总和复制路径已有回归；导出 pipeline 已从主入口 chunk 拆出，降低启动首包压力。
 - 自动化产物 smoke 中等偏强：复杂 Markdown 已可生成并读取 HTML/PDF/PNG/DOCX 产物；PNG 自动化仍使用 `html2canvas` 测试替身，但真实 UI smoke 已补同一 fixture 的 PDF / PNG 文件级结果。
-- 真实导出 UI smoke 较强：当前 `.app` 通过真实导出菜单生成 HTML / PDF / PNG / DOCX；PDF 用 `pdf-lib` 确认 2 页 A4，PNG 用 `sips` 确认 2054 x 3316，DOCX 用 `jszip`、`textutil` 和 Quick Look thumbnail 确认可解析、保留中文 / 表格 / 任务列表且 Mermaid 未退化为源码。
+- 真实导出 UI smoke 较强：当前 `.app` 通过真实导出菜单生成 HTML / PDF / PNG / DOCX；PDF 用 `pdf-lib` 确认 2 页 A4，PNG 用 `sips` 确认 2054 x 3316，DOCX 用 `jszip`、`textutil` 和 Quick Look thumbnail 确认可解析、保留中文 / 表格 / 任务列表且 Mermaid 未退化为源码。独立 WebView 导出也已用真实 `.app` 复测重媒体 HTML 导出，不再长期卡在“正在渲染图表”。
 - Pandoc 真实验证弱：本机 `pandoc --version` 为 `command not found`，未生成 citeproc 实际 HTML。
 
 ### 缺口
@@ -420,7 +423,7 @@
 - `src/domains/editor/components/TypographyDiagnosticsPanel.test.tsx` 覆盖 250 条诊断长列表的首尾渲染、晚段跳源码和 Escape 关闭。
 - `src/domains/settings/normalize.test.ts` 覆盖旧 `settingsVersion` 配置升级到当前版本、旧字体字段迁移到 `FontSource`、临时 PDF 页眉页脚字段迁移到通用页面字段且不泄漏旧 key，以及缺失 Pandoc / citation / exportHistory / lastSession 时回填安全默认值。
 - `src/domains/commands/exportCommand.integration.test.ts` 覆盖命令入口四格式导出：`exportHtml`、`exportPdf`、`exportPng`、`exportDocx` 都通过真实 export domain 写出产物并记录 history。
-- `docs/verification/prism-complex-export-smoke.md` 记录真实 Prism UI 四格式导出 smoke：通过当前 `.app` 应用内导出菜单生成 HTML / PDF / PNG / DOCX；PDF 为 2 页 A4，PNG 为 2054 x 3316，DOCX 可由 `jszip`、`textutil` 和 Quick Look 解析，Mermaid 未退化为源码；本轮同时修复 PDF / PNG 栅格导出对现代 CSS color function 的兼容性问题。
+- `docs/verification/prism-complex-export-smoke.md` 记录真实 Prism UI 四格式导出 smoke：通过当前 `.app` 应用内导出菜单生成 HTML / PDF / PNG / DOCX；PDF 为 2 页 A4，PNG 为 2054 x 3316，DOCX 可由 `jszip`、`textutil` 和 Quick Look 解析，Mermaid 未退化为源码；本轮同时修复 PDF / PNG 栅格导出对现代 CSS color function 的兼容性问题。2026-05-17 补充独立导出 WebView 卡死修复 smoke：重媒体 HTML 导出曾 20 分钟超时，修复后几秒内生成 `preview-heavy-webview-smoke-fixed.html`，含 20 个 Mermaid SVG 和 1 个单图 fallback。
 - `docs/verification/prism-professional-writing-smoke.md` 补齐专业写作能力 smoke 入口。
 - `src/domains/commands/registry.test.ts` 覆盖插件市场、deep link、云同步、移动端、实时协作、图谱和完整 WYSIWYG 等延后能力不会出现在菜单或命令面板。
 - 最新验证：导出聚焦测试 `npm test -- --run src/domains/commands/exportCommand.integration.test.ts src/domains/commands/registry.test.ts src/domains/export/exportPipeline.test.ts` 通过 3 files / 45 tests；`npm test -- --run` 通过 55 files / 319 tests；`npm run build` 通过，仅有既有 Vite large chunk warning；`git diff --check` 通过。

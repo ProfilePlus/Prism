@@ -362,3 +362,45 @@ Checkpoint：
 - `npm test -- --run src/domains/commands/exportCommand.integration.test.ts src/domains/commands/registry.test.ts src/domains/export/exportPipeline.test.ts`：通过，3 files / 45 tests。
 - `npm test -- --run`：通过，55 files / 319 tests。
 - `npm run build`：通过，仅有既有 Vite large chunk warning。
+
+### 2026-05-17 独立导出 WebView 卡死修复 smoke
+
+背景：
+
+- 目标：验证导出任务迁入独立 WebView 后，复杂 Mermaid 文档不会长期停在“正在导出 / 正在渲染图表”。
+- 失败复现：真实 Prism `.app` 导出 `.codex-smoke/preview-heavy/preview-heavy.md` 为 HTML 时，进度停在“正在渲染图表”，20 分钟后失败。
+- 失败诊断：
+  - 时间：`2026-05-17T07:04:49.003Z`
+  - 格式：`HTML (html)`
+  - 阶段：`正在渲染图表`
+  - 输出路径：`.codex-smoke/preview-heavy/preview-heavy-webview-smoke.html`
+  - 错误：`独立导出 WebView 执行超时，请拆分文档或减少复杂图表后重试。`
+
+修复：
+
+- 独立导出 WebView 不再创建到 `-32000px` 离屏位置，改为停在主窗口背后的 `24 x 24` 极小可见窗口，并保持 `backgroundThrottling: disabled`，避免 WebKit 把导出上下文判定为隐藏后暂停 `requestAnimationFrame` / timer / 布局回调。
+- 导出管线的 `nextFrame()` 增加 timer fallback，`requestAnimationFrame` 被节流或不回调时仍会继续推进。
+- Mermaid 渲染改为逐个图表报告进度：`正在渲染图表 1 / N`，独立 WebView 主控增加 90 秒无进度 watchdog，避免用户只能等 20 分钟才看到失败。
+- DOCX Mermaid 图片链路也增加 Mermaid render / SVG 图片加载超时，避免 Word 导出在同类异步渲染点无期限等待。
+
+真实 UI 复测：
+
+- 构建：`npm run tauri:build:app-smoke`
+- App：`src-tauri/target/release/bundle/macos/Prism.app`
+- 输入：`.codex-smoke/preview-heavy/preview-heavy.md`
+- 操作：通过命令面板执行 `导出为 HTML`，输出文件名改为 `preview-heavy-webview-smoke-fixed.html`。
+- 结果：文件在几秒内生成，不再停留在“正在渲染图表”。
+- 产物：`.codex-smoke/preview-heavy/preview-heavy-webview-smoke-fixed.html`
+- 文件大小：`76M`
+- 内容检查：
+  - `svgCount = 20`
+  - `mermaidFailures = 1`
+  - 失败的 1 个 Mermaid 是 fixture 内尾部故意保留的非法 Mermaid，已按单图 fallback 写入错误文本，没有阻断整份 HTML 导出。
+
+验证命令：
+
+- `npm test -- --run src/domains/export/isolatedWebviewExport.test.ts src/domains/export/index.test.ts src/domains/export/exportPipeline.test.ts src/domains/commands/registry.test.ts src/domains/workspace/components/StatusBar.test.tsx`：通过，5 files / 69 tests。
+- `npm test -- --run`：通过，59 files / 353 tests。
+- `npm run build`：通过，仅有既有 Vite large chunk warning。
+- `git diff --check`：通过。
+- `npm run tauri:build:app-smoke`：通过，生成 `src-tauri/target/release/bundle/macos/Prism.app`。
