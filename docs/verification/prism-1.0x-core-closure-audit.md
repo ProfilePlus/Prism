@@ -28,7 +28,7 @@
 | 不引入禁用能力 | `rg` 未发现插件市场、云同步、移动端、图谱或完整 WYSIWYG 实现入口；计划中仍标为非目标 | 已满足 |
 | 每批先说明目标和影响面 | 每批开工前均先说明目标和影响面；近期批次分别限定在 recovery App 接线、预览长文 smoke、写作效率事件接线、导出失败诊断、专业写作诊断与审计刷新 | 已完成 |
 | 产出本地审计文档 | `docs/verification/prism-1.0x-core-closure-audit.md` | 已完成 |
-| 运行验证命令 | 最新 `npm test -- --run` 通过 55 files / 315 tests；`npm run build` 通过，仅有既有 Vite large chunk warning；`git diff --check` 通过；历史 Rust / Tauri 相关批次已补 `cargo test`、`cargo check` 或 Tauri build 记录 | 已通过 |
+| 运行验证命令 | 最新 `npm test -- --run` 通过 59 files / 358 tests；`npm run build` 通过，仅有既有 Vite large chunk warning；`git diff --check` 通过；`cd src-tauri && cargo fmt --check && cargo check` 通过；`npm run tauri:build:app-smoke` 通过 | 已通过 |
 | Tauri build gate | `npm run tauri:build:app-smoke` 通过并生成 `.app`；`npm run tauri:build` 完成前端 build、Rust release 编译和 `.app` bundle 后失败在已知 DMG `bundle_dmg.sh` 或 updater 签名环境；`npm run release:mac-dmg:skip-finder` + `hdiutil verify` 通过 | 已验证并记录限制 |
 
 ## 3. 总体结论
@@ -52,9 +52,9 @@
 | 文件安全与发布可信核心路径有证据 | 保存状态、外部修改冲突、recovery、App 层 recovery modal 接线、macOS App-only 真实 crash / restart recovery smoke、fs scope、macOS Prism UI 文件树删除到废纸篓、release checklist、updater manifest、macOS fallback DMG、Windows release smoke 文档 | 自动化与 macOS 运行时 smoke 较强，但正式签名 / 公证 / Windows release 环境未闭环 |
 | 写作效率核心路径有证据 | 图片 helper、Markdown 链接补全/诊断、轻量 `[[note]]` 工作区内链补全、表格、列表、模板、快速打开、字数统计、CodeMirror 全局命令事件接线、paste / normal-drop / Alt-drop DOM 接线测试、Alt-drop 缺路径提示、列表 keymap 组件级回归、链接补全上下文组件回归、macOS 真实 `.app` 系统剪贴板图片粘贴、快速打开、链接补全/诊断、表格命令、列表续写/退出、PRD 模板插入、大纲搜索和选区统计 smoke | 自动化较强，macOS 主要写作路径已补真实桌面证据；macOS Finder 拖拽已尝试但当前自动化工具无法安全完成，Finder / Explorer 拖拽、Option / Alt 原路径和 Windows 桌面路径仍未闭环 |
 | 预览同步与 HTML 安全有证据 | source-line mapping、点击跳源码、长文 / 重媒体 mapping、内容更新后 source-line 刷新、10 万字符级 Markdown -> HTML smoke、Mermaid 队列、KaTeX/Mermaid 错误定位、链接安全清理测试、macOS 真实 `.app` 长文分栏滚动 / 预览点击 / 尾部错误区 / 单次输入预览刷新 / undo history / `Cmd+Down` 跳文末同步 / 本地图片重媒体 / System Events 键盘突发输入 smoke | 自动化中等偏强，macOS 真实 drift、单次输入撤销、重媒体渲染和突发输入证据已补；30 秒人工连续输入和精确帧率 / CPU 量化未闭环 |
-| 导出工作台可靠性有证据 | HTML/PDF/PNG/DOCX pipeline、golden fixture、复杂导出产物 smoke、命令入口四格式集成 smoke、真实 Prism UI 四格式导出、PDF / PNG 栅格颜色兼容修复、DOCX task list、Pandoc 回退、安全清理测试、导出进度事件、App 层进度 UI / 失败诊断复制测试 | 自动化和 macOS 真实 UI smoke 较强；真实 Pandoc citeproc 仍受环境阻塞 |
+| 导出工作台可靠性有证据 | HTML/PDF/PNG/DOCX pipeline、golden fixture、复杂导出产物 smoke、命令入口四格式集成 smoke、真实 Prism UI 四格式导出、PDF / PNG 栅格颜色兼容修复、PDF WebKit 矢量主链路、DOCX task list、Pandoc 回退、安全清理测试、导出进度事件、App 层进度 UI / 失败诊断复制测试 | 自动化和 macOS 真实 UI smoke 较强；PDF 已从图片 PDF 主链路改为 macOS WebKit 矢量 PDF capture；真实 Pandoc citeproc 仍受环境阻塞 |
 | 专业扩展有证据 | citation settings、Pandoc citeproc 分支、citekey / suppress-author 占位、邮箱/代码语境误报防护、专业写作 smoke 文档、中文排版 10 万字符级 micro benchmark、排版诊断 250 条长列表组件回归 | 自动化中等偏强，但本机缺 Pandoc，真实 citeproc 未闭环 |
-| 每批验证 gate 通过 | 最近多批均执行 `npm test -- --run`、`npm run build`、`git diff --check` 并通过；最新全量为 55 files / 319 tests；涉及 Tauri 的历史批次已记录 build / fallback DMG 结果 | 已满足当前自动化 gate |
+| 每批验证 gate 通过 | 最近多批均执行 `npm test -- --run`、`npm run build`、`git diff --check` 并通过；最新全量为 59 files / 358 tests；本批涉及 Tauri/WebKit command，已补 `cargo fmt --check && cargo check` 和 `npm run tauri:build:app-smoke` | 已满足当前自动化 gate |
 | 无剩余必需工作 | Finder / Explorer 图片拖拽与 Option / Alt 原路径、30 秒人工连续输入量化、Pandoc、签名公证、Windows release 仍未完成 | 未满足产品全量完成；满足新版 goal 停止条件 2 |
 
 因此，当前状态应表述为：本机可执行的 1.0.x 本地写作体验 checkpoint 已推进到只剩外部 / 人工阻塞，可以按新版 goal 停止条件收束；但不能对外宣称 Prism 1.0.x 全量任务全部完成。
@@ -247,10 +247,13 @@
 - `src/App.recovery.test.tsx` 覆盖 App 层导出进度与失败诊断：`prism-export-progress` 事件会展示/隐藏进度状态并清理旧失败浮层；`prism-export-failure` 事件会展示诊断浮层，诊断文本可复制到系统剪贴板，并显示复制成功 toast。
 - `src/domains/export/isolatedWebviewExport.ts` 将独立导出 WebView 停在主窗口背后的极小可见窗口，启用 `backgroundThrottling: disabled`，并加入 90 秒无进度 watchdog；`isolatedWebviewExport.test.ts` 覆盖 worker 不再离屏隐藏、无进度会失败并清理 worker。
 - `src/domains/export/exportPipeline.ts` 为 `requestAnimationFrame` 等待增加 timer fallback，Mermaid 多图导出按 `正在渲染图表 N / 总数` 报告进度，并给 DOCX Mermaid 图片链路增加 render / 图片加载超时；`exportPipeline.test.ts` 覆盖 rAF 不回调时 HTML 导出仍能完成，以及多 Mermaid 的逐图进度。
-- `src/domains/export/exportPipeline.ts` 将长文 PDF 从“每页一次 `html2canvas`”优化为“最多 8 页一批渲染后无损切片”，保持用户选择的 2x / 3x / 4x 清晰度，不恢复自动降级；`exportPipeline.test.ts` 覆盖长 PDF 会合批渲染、PDF 页数仍大于渲染批次数、每次渲染仍使用 2x scale。
+- `src/domains/export/exportPipeline.ts` 将 macOS / Tauri export worker 内的 PDF 默认主链路改为 WebKit `createPDFWithConfiguration` capture；旧 `html2canvas -> PNG pages -> pdf-lib` 只作为明确 warning fallback。长文 WebKit capture 按最多 8 页 / 12,000 CSS px 一批执行，再用 `pdf-lib.embedPdf()` 分页到 A4 / Letter；页眉页脚和页码只叠加小型 chrome，不重新栅格化整页。
+- `src-tauri/src/lib.rs` 新增 async `capture_current_webview_pdf` command，macOS 通过 `WKWebView.createPDFWithConfiguration_completionHandler` 写出临时 capture PDF；非 macOS 当前返回平台未接入错误，由前端 warning fallback 到 raster，避免破坏跨平台构建。
+- `src/domains/commands/registry.ts` 给导出前的 `waitForExportProgressPaint()` 增加 timer fallback，避免 WebKit 暂停 `requestAnimationFrame` 时真实 UI 卡在“准备导出”。
 - `docs/verification/prism-complex-export-smoke.md` 记录自动化 pipeline 产物 smoke、命令入口集成 smoke 和真实 Prism UI 四格式导出 smoke 通过；2026-05-15 通过当前 `.app` 应用内导出菜单生成 `ui-raster-fixed.html|pdf|png|docx`，并用 `file`、`pdf-lib`、`sips`、`jszip`、`textutil` 和 Quick Look thumbnail 检查产物。
 - `docs/verification/prism-complex-export-smoke.md` 记录 2026-05-17 独立导出 WebView 卡死修复 smoke：真实 `.app` 曾在 HTML 导出 `preview-heavy.md` 时停在“正在渲染图表”并 20 分钟后超时；修复后通过命令面板导出 `preview-heavy-webview-smoke-fixed.html`，文件在几秒内生成，HTML 中有 20 个 Mermaid SVG，1 个 fixture 内故意非法 Mermaid 以单图 fallback 落地，没有阻断整份导出。
-- `docs/verification/prism-complex-export-smoke.md` 记录 2026-05-17 PDF 长文速度优化：49 页级 PDF 的瓶颈是逐页 `html2canvas` 重渲染，修复后长文会以批次进度推进，例如 `正在生成 PDF 页面 1-8 / 49`。
+- `docs/verification/prism-pdf-export-performance.md` 记录 2026-05-17 PDF 性能重构：官方资料研究、方案矩阵、失败过的 `printOperationWithPrintInfo` 路线、WebKit `createPDFWithConfiguration` 选型、raster fallback、before / after 文件级对比和真实 app smoke 证据。
+- `docs/verification/prism-complex-export-smoke.md` 记录 2026-05-17 PDF WebKit 矢量主链路 smoke：`preview-heavy-webkit-smoke.pdf` 约 475K、51 页 A4、PDFKit 可提取正文、`/Font = 7`、`/Subtype /Image = 0`，第 1 / 26 / 51 页渲染截图可见正文、本地 SVG、Mermaid 图、KaTeX 和尾部错误诊断；旧 raster 对比文件为 5.0M、50 个 image object、0 个 font object、文本提取为空。
 - `src/domains/export/exportPipeline.ts` 已修复真实 PDF / PNG 导出暴露的 `html2canvas` 现代 CSS color function 兼容问题：栅格导出 iframe 使用 raster-safe CSS，并在截图前把 computed `color(...)` 归一为 `rgb(...)` / `rgba(...)`；HTML 导出保持完整主题 CSS。
 - `docs/verification/prism-pandoc-citation-html-smoke.md` 记录 Pandoc smoke 方案和本机阻塞。
 
@@ -258,7 +261,7 @@
 
 - 自动测试强：导出 pipeline、命令入口和设置归一化覆盖广；HTML 导出已覆盖 Pandoc 返回 HTML 的安全清理；导出进度事件、App 层进度 UI、失败诊断浮层、warning 汇总和复制路径已有回归；导出 pipeline 已从主入口 chunk 拆出，降低启动首包压力。
 - 自动化产物 smoke 中等偏强：复杂 Markdown 已可生成并读取 HTML/PDF/PNG/DOCX 产物；PNG 自动化仍使用 `html2canvas` 测试替身，但真实 UI smoke 已补同一 fixture 的 PDF / PNG 文件级结果。
-- 真实导出 UI smoke 较强：当前 `.app` 通过真实导出菜单生成 HTML / PDF / PNG / DOCX；PDF 用 `pdf-lib` 确认 2 页 A4，PNG 用 `sips` 确认 2054 x 3316，DOCX 用 `jszip`、`textutil` 和 Quick Look thumbnail 确认可解析、保留中文 / 表格 / 任务列表且 Mermaid 未退化为源码。独立 WebView 导出也已用真实 `.app` 复测重媒体 HTML 导出，不再长期卡在“正在渲染图表”。PDF 长文批量渲染已有自动化回归，真实 49 页耗时仍建议发布前人工复测一次。
+- 真实导出 UI smoke 较强：当前 `.app` 通过真实导出菜单生成 HTML / PDF / PNG / DOCX；PDF 用 `pdf-lib` 确认 2 页 A4，PNG 用 `sips` 确认 2054 x 3316，DOCX 用 `jszip`、`textutil` 和 Quick Look thumbnail 确认可解析、保留中文 / 表格 / 任务列表且 Mermaid 未退化为源码。独立 WebView 导出也已用真实 `.app` 复测重媒体 HTML 导出，不再长期卡在“正在渲染图表”。长文 PDF 已通过 WebKit 矢量主链路生成 51 页 A4，PDFKit 可提取正文，且不是整页 image PDF；包含 `waitForExportProgressPaint()` 修复的新构建已真实 UI 复测，不再停在“准备导出”，约 57 秒更新输出文件。
 - Pandoc 真实验证弱：本机 `pandoc --version` 为 `command not found`，未生成 citeproc 实际 HTML。
 
 ### 缺口
@@ -428,7 +431,7 @@
 - `docs/verification/prism-complex-export-smoke.md` 记录真实 Prism UI 四格式导出 smoke：通过当前 `.app` 应用内导出菜单生成 HTML / PDF / PNG / DOCX；PDF 为 2 页 A4，PNG 为 2054 x 3316，DOCX 可由 `jszip`、`textutil` 和 Quick Look 解析，Mermaid 未退化为源码；本轮同时修复 PDF / PNG 栅格导出对现代 CSS color function 的兼容性问题。2026-05-17 补充独立导出 WebView 卡死修复 smoke：重媒体 HTML 导出曾 20 分钟超时，修复后几秒内生成 `preview-heavy-webview-smoke-fixed.html`，含 20 个 Mermaid SVG 和 1 个单图 fallback。
 - `docs/verification/prism-professional-writing-smoke.md` 补齐专业写作能力 smoke 入口。
 - `src/domains/commands/registry.test.ts` 覆盖插件市场、deep link、云同步、移动端、实时协作、图谱和完整 WYSIWYG 等延后能力不会出现在菜单或命令面板。
-- 最新验证：导出聚焦测试 `npm test -- --run src/domains/commands/exportCommand.integration.test.ts src/domains/commands/registry.test.ts src/domains/export/exportPipeline.test.ts` 通过 3 files / 45 tests；`npm test -- --run` 通过 55 files / 319 tests；`npm run build` 通过，仅有既有 Vite large chunk warning；`git diff --check` 通过。
+- 最新验证：导出聚焦测试 `npm test -- --run src/domains/export/exportPipeline.test.ts src/domains/export/index.test.ts src/domains/export/isolatedWebviewExport.test.ts src/domains/commands/registry.test.ts` 通过 4 files / 69 tests；`npm test -- --run` 通过 59 files / 358 tests；`npm run build` 通过，仅有既有 Vite large chunk warning；`cd src-tauri && cargo fmt --check && cargo check` 通过；`git diff --check` 通过；`npm run tauri:build:app-smoke` 通过。
 
 ### 未完成项
 

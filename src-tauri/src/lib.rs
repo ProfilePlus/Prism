@@ -2,6 +2,8 @@ use serde::Serialize;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};
+#[cfg(target_os = "macos")]
+use std::sync::mpsc;
 use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -508,6 +510,178 @@ fn open_path_with_system(path: String) -> Result<(), String> {
     })
 }
 
+fn validate_pdf_output_path(path: &str) -> Result<PathBuf, String> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Err("PDF 输出路径不能为空".to_string());
+    }
+    let target_path = PathBuf::from(trimmed);
+    if target_path.exists() && target_path.is_dir() {
+        return Err("PDF 输出路径不能是文件夹".to_string());
+    }
+    if let Some(parent) = target_path.parent() {
+        if !parent.as_os_str().is_empty() && !parent.exists() {
+            return Err("PDF 输出目录不存在".to_string());
+        }
+    }
+    if target_path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| extension.eq_ignore_ascii_case("pdf"))
+        != Some(true)
+    {
+        return Err("PDF 输出路径必须以 .pdf 结尾".to_string());
+    }
+    Ok(target_path)
+}
+
+fn validate_pdf_capture_rect(x: f64, y: f64, width: f64, height: f64) -> Result<(), String> {
+    if !x.is_finite() || !y.is_finite() || !width.is_finite() || !height.is_finite() {
+        return Err("PDF 捕获区域包含非法数值".to_string());
+    }
+    if width <= 0.0 || height <= 0.0 {
+        return Err("PDF 捕获区域尺寸必须大于 0".to_string());
+    }
+    if width > 20_000.0 || height > 200_000.0 {
+        return Err("PDF 捕获区域过大，请拆分文档后重试".to_string());
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+async fn capture_current_webview_pdf_macos(
+    webview_window: tauri::WebviewWindow,
+    output_path: PathBuf,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    use objc2::MainThreadMarker;
+    use objc2_core_foundation::{CGPoint, CGRect, CGSize};
+    use objc2_foundation::{NSData, NSError};
+    use objc2_web_kit::{WKPDFConfiguration, WKWebView};
+    use std::ptr::NonNull;
+
+    const CREATE_PDF_TIMEOUT: Duration = Duration::from_secs(90);
+
+    let output_path_for_capture = output_path.clone();
+    let (tx, rx) = mpsc::channel();
+    webview_window
+        .with_webview(move |platform_webview| {
+            let result = (|| -> Result<(), String> {
+                if output_path_for_capture.exists() {
+                    std::fs::remove_file(&output_path_for_capture)
+                        .map_err(|err| format!("无法覆盖已有 PDF 文件: {err}"))?;
+                }
+
+                let mtm = MainThreadMarker::new()
+                    .ok_or_else(|| "WebKit PDF 捕获必须在主线程执行".to_string())?;
+                let configuration = unsafe { WKPDFConfiguration::new(mtm) };
+                unsafe {
+                    configuration.setRect(CGRect {
+                        origin: CGPoint { x, y },
+                        size: CGSize { width, height },
+                    });
+                }
+
+                let output_path_for_callback = output_path_for_capture.clone();
+                let tx_callback = tx.clone();
+                let completion =
+                    block2::RcBlock::new(move |pdf_data: *mut NSData, error: *mut NSError| {
+                        let result = (|| -> Result<(), String> {
+                            if !error.is_null() {
+                                let description =
+                                    unsafe { (&*error).localizedDescription().to_string() };
+                                return Err(format!("WebKit PDF 捕获失败: {description}"));
+                            }
+                            if pdf_data.is_null() {
+                                return Err("WebKit PDF 捕获未返回数据".to_string());
+                            }
+
+                            let data = unsafe { &*pdf_data };
+                            let length = data.length() as usize;
+                            if length == 0 {
+                                return Err("WebKit PDF 捕获返回空数据".to_string());
+                            }
+
+                            let mut bytes = vec![0_u8; length];
+                            let buffer = NonNull::new(bytes.as_mut_ptr().cast())
+                                .ok_or_else(|| "无法分配 PDF 捕获缓冲区".to_string())?;
+                            unsafe {
+                                data.getBytes_length(buffer, length);
+                            }
+                            std::fs::write(&output_path_for_callback, bytes)
+                                .map_err(|err| format!("无法写入 WebKit PDF 捕获文件: {err}"))?;
+                            Ok(())
+                        })();
+                        let _ = tx_callback.send(result);
+                    });
+
+                // SAFETY: Tauri's with_webview provides the platform WKWebView pointer for the
+                // current export worker window; createPDF is asynchronous and reports completion
+                // through the copied block.
+                unsafe {
+                    let wk_webview = &*platform_webview.inner().cast::<WKWebView>();
+                    wk_webview.createPDFWithConfiguration_completionHandler(
+                        Some(&configuration),
+                        &completion,
+                    );
+                }
+                Ok(())
+            })();
+            if let Err(error) = result {
+                let _ = tx.send(Err(error));
+            }
+        })
+        .map_err(|err| format!("无法访问导出 WebView: {err}"))?;
+
+    tauri::async_runtime::spawn_blocking(move || {
+        rx.recv_timeout(CREATE_PDF_TIMEOUT)
+            .map_err(|_| "WebKit PDF 捕获超时".to_string())?
+    })
+    .await
+    .map_err(|err| format!("WebKit PDF 捕获任务失败: {err}"))?
+}
+
+#[cfg(not(target_os = "macos"))]
+async fn capture_current_webview_pdf_platform(
+    _webview_window: tauri::WebviewWindow,
+    _output_path: PathBuf,
+    _x: f64,
+    _y: f64,
+    _width: f64,
+    _height: f64,
+) -> Result<(), String> {
+    Err("当前平台暂未接入 Prism WebView PDF 捕获引擎".to_string())
+}
+
+#[cfg(target_os = "macos")]
+async fn capture_current_webview_pdf_platform(
+    webview_window: tauri::WebviewWindow,
+    output_path: PathBuf,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    capture_current_webview_pdf_macos(webview_window, output_path, x, y, width, height).await
+}
+
+#[tauri::command]
+async fn capture_current_webview_pdf(
+    webview_window: tauri::WebviewWindow,
+    output_path: String,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    let target_path = validate_pdf_output_path(&output_path)?;
+    validate_pdf_capture_rect(x, y, width, height)?;
+    capture_current_webview_pdf_platform(webview_window, target_path, x, y, width, height).await
+}
+
 #[tauri::command]
 fn read_legacy_settings_config(app: AppHandle) -> Result<Option<String>, String> {
     let app_data = app.path().app_data_dir().map_err(|err| err.to_string())?;
@@ -744,6 +918,7 @@ pub fn run() {
             grant_workspace_directory_scope,
             move_path_to_trash,
             open_path_with_system,
+            capture_current_webview_pdf,
             read_legacy_settings_config
         ])
         .build(tauri::generate_context!())

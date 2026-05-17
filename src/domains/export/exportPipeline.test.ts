@@ -29,8 +29,14 @@ import { EXPORT_GOLDEN_DOCX_MARKDOWN, EXPORT_GOLDEN_MARKDOWN } from './goldenFix
 import type { ExportDocumentInput } from './types';
 import { DEFAULT_SETTINGS } from '../settings/types';
 
+type PrismRuntimeWindow = Window & {
+  __TAURI_INTERNALS__?: unknown;
+  __PRISM_EXPORT_WORKER__?: boolean;
+};
+
 const fsMock = vi.hoisted(() => ({
   readFile: vi.fn(async (_path: string) => new Uint8Array()),
+  remove: vi.fn(async (_path: string) => undefined),
   writeFile: vi.fn(async (_path: string, _contents: Uint8Array) => undefined),
   writeTextFile: vi.fn(async (_path: string, _contents: string) => undefined),
 }));
@@ -120,6 +126,13 @@ describe('export pipeline html', () => {
     mermaidMock.initialize.mockClear();
     mermaidMock.render.mockClear();
     invokeMock.mockReset();
+    fsMock.remove.mockClear();
+    delete (window as PrismRuntimeWindow).__TAURI_INTERNALS__;
+    delete (window as PrismRuntimeWindow).__PRISM_EXPORT_WORKER__;
+    document.documentElement.removeAttribute('data-content-theme');
+    document.head.querySelectorAll('[data-prism-native-pdf]').forEach((element) => element.remove());
+    document.body.className = '';
+    document.body.replaceChildren();
     originalFonts = (document as any).fonts;
     Object.defineProperty(document, 'fonts', {
       configurable: true,
@@ -570,6 +583,14 @@ describe('export pipeline image progress', () => {
     mermaidMock.initialize.mockClear();
     mermaidMock.render.mockClear();
     canvasRenderMock.render.mockClear();
+    invokeMock.mockReset();
+    fsMock.remove.mockClear();
+    delete (window as PrismRuntimeWindow).__TAURI_INTERNALS__;
+    delete (window as PrismRuntimeWindow).__PRISM_EXPORT_WORKER__;
+    document.documentElement.removeAttribute('data-content-theme');
+    document.head.querySelectorAll('[data-prism-native-pdf]').forEach((element) => element.remove());
+    document.body.className = '';
+    document.body.replaceChildren();
     originalFonts = (document as any).fonts;
     Object.defineProperty(document, 'fonts', {
       configurable: true,
@@ -827,6 +848,202 @@ describe('export pipeline image progress', () => {
       '正在写入 PDF 文件',
     ]);
     expect(canvasRenderMock.render).toHaveBeenCalled();
+  });
+
+  it('uses the WebKit PDF engine inside the Tauri export worker before raster fallback', async () => {
+    (window as PrismRuntimeWindow).__TAURI_INTERNALS__ = {};
+    (window as PrismRuntimeWindow).__PRISM_EXPORT_WORKER__ = true;
+    invokeMock.mockResolvedValueOnce(undefined);
+    const { PDFDocument, StandardFonts } = await import('pdf-lib');
+    const sourcePdf = await PDFDocument.create();
+    const sourceFont = await sourcePdf.embedFont(StandardFonts.Helvetica);
+    sourcePdf.addPage([980, 1400]).drawText('Vector PDF source', {
+      x: 24,
+      y: 1360,
+      size: 12,
+      font: sourceFont,
+    });
+    fsMock.readFile.mockResolvedValueOnce(new Uint8Array(await sourcePdf.save()));
+    const onProgress = vi.fn();
+    const warnings: string[] = [];
+
+    await exportPdf(createInput({
+      onProgress,
+      onWarning: (message) => warnings.push(message),
+      pdfPaper: 'letter',
+      pdfMargin: 'wide',
+    }), '/tmp/native.pdf');
+
+    expect(warnings).toEqual([]);
+    expect(invokeMock).toHaveBeenCalledWith('capture_current_webview_pdf', {
+      outputPath: '/tmp/native.webkit-capture-1.pdf',
+      x: expect.any(Number),
+      y: expect.any(Number),
+      width: expect.any(Number),
+      height: expect.any(Number),
+    });
+    expect(canvasRenderMock.render).not.toHaveBeenCalled();
+    expect(fsMock.writeFile).toHaveBeenCalledWith('/tmp/native.pdf', expect.any(Uint8Array));
+    expect(fsMock.remove).toHaveBeenCalledWith('/tmp/native.webkit-capture-1.pdf');
+    expect(onProgress.mock.calls.map(([message]) => message)).toEqual([
+      '正在准备 WebKit PDF 文档',
+      '正在解析 Markdown',
+      '正在应用导出主题',
+      '正在渲染图表',
+      '正在调用 WebKit PDF 引擎',
+      '正在捕获 PDF 页面 1 / 1',
+      '正在写入 PDF 文件',
+    ]);
+    expect(document.body.querySelector('.prism-export-document')).not.toBeNull();
+    expect(document.head.querySelector('[data-prism-native-pdf]')).not.toBeNull();
+  });
+
+  it('keeps native PDF content and overlays only small chrome when headers or page numbers are enabled', async () => {
+    (window as PrismRuntimeWindow).__TAURI_INTERNALS__ = {};
+    (window as PrismRuntimeWindow).__PRISM_EXPORT_WORKER__ = true;
+    invokeMock.mockResolvedValueOnce(undefined);
+    const { PDFDocument, StandardFonts } = await import('pdf-lib');
+    const pdf = await PDFDocument.create();
+    const sourceFont = await pdf.embedFont(StandardFonts.Helvetica);
+    pdf.addPage([980, 1200]).drawText('Vector PDF source', {
+      x: 24,
+      y: 1160,
+      size: 12,
+      font: sourceFont,
+    });
+    const sourceBytes = new Uint8Array(await pdf.save());
+    fsMock.readFile
+      .mockResolvedValueOnce(sourceBytes)
+      .mockResolvedValueOnce(sourceBytes);
+    const warnings: string[] = [];
+
+    await exportPdf(createInput({
+      onWarning: (message) => warnings.push(message),
+      pageHeaderFooter: true,
+      pageHeaderText: '{title}',
+      pageFooterText: '{filename} · {page}/{pages}',
+      pdfPageNumbers: true,
+      title: '导出标题',
+    }), '/tmp/native-chrome.pdf');
+
+    expect(warnings).toEqual([]);
+    expect(canvasRenderMock.render).not.toHaveBeenCalled();
+    expect(fsMock.readFile).toHaveBeenCalledWith('/tmp/native-chrome.webkit-capture-1.pdf');
+    expect(fsMock.readFile).toHaveBeenCalledWith('/tmp/native-chrome.pdf');
+    expect(fsMock.writeFile).toHaveBeenCalledWith('/tmp/native-chrome.pdf', expect.any(Uint8Array));
+    const lastWrite = fsMock.writeFile.mock.calls.at(-1);
+    const updated = await PDFDocument.load(lastWrite?.[1] as Uint8Array);
+    expect(updated.getPageCount()).toBe(1);
+  });
+
+  it('captures long native PDF documents in bounded batches without rasterizing pages', async () => {
+    const scrollHeightDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight');
+    const scrollWidthDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollWidth');
+    const getBoundingClientRectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function getBoundingClientRect(this: HTMLElement) {
+        if (this.classList?.contains('prism-export-document')) {
+          return {
+            x: 0,
+            y: 0,
+            top: 0,
+            left: 0,
+            right: 980,
+            bottom: 18_000,
+            width: 980,
+            height: 18_000,
+            toJSON: () => ({}),
+          } as DOMRect;
+        }
+        return {
+          x: 0,
+          y: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: 0,
+          height: 0,
+          toJSON: () => ({}),
+        } as DOMRect;
+      });
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+      configurable: true,
+      get() {
+        return (this as HTMLElement).classList?.contains('prism-export-document') ? 18_000 : 0;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, 'scrollWidth', {
+      configurable: true,
+      get() {
+        return (this as HTMLElement).classList?.contains('prism-export-document') ? 980 : 0;
+      },
+    });
+
+    try {
+      (window as PrismRuntimeWindow).__TAURI_INTERNALS__ = {};
+      (window as PrismRuntimeWindow).__PRISM_EXPORT_WORKER__ = true;
+      invokeMock.mockResolvedValue(undefined);
+      const { PDFDocument, StandardFonts } = await import('pdf-lib');
+      const sourcePdf = await PDFDocument.create();
+      const sourceFont = await sourcePdf.embedFont(StandardFonts.Helvetica);
+      sourcePdf.addPage([980, 12_000]).drawText('Vector batch source', {
+        x: 24,
+        y: 11_960,
+        size: 12,
+        font: sourceFont,
+      });
+      fsMock.readFile.mockResolvedValue(new Uint8Array(await sourcePdf.save()));
+      const progress: string[] = [];
+
+      await exportPdf(createInput({
+        onProgress: (message) => progress.push(message),
+      }), '/tmp/native-long.pdf');
+
+      expect(invokeMock).toHaveBeenCalledTimes(2);
+      expect(invokeMock).toHaveBeenNthCalledWith(1, 'capture_current_webview_pdf', expect.objectContaining({
+        outputPath: '/tmp/native-long.webkit-capture-1.pdf',
+      }));
+      expect(invokeMock).toHaveBeenNthCalledWith(2, 'capture_current_webview_pdf', expect.objectContaining({
+        outputPath: '/tmp/native-long.webkit-capture-2.pdf',
+      }));
+      expect(canvasRenderMock.render).not.toHaveBeenCalled();
+      expect(fsMock.remove).toHaveBeenCalledWith('/tmp/native-long.webkit-capture-1.pdf');
+      expect(fsMock.remove).toHaveBeenCalledWith('/tmp/native-long.webkit-capture-2.pdf');
+      expect(progress).toContain('正在捕获 PDF 页面 1-8 / 13');
+      expect(progress).toContain('正在捕获 PDF 页面 9-13 / 13');
+      const write = fsMock.writeFile.mock.calls.find(([targetPath]) => targetPath === '/tmp/native-long.pdf');
+      const pdf = await PDFDocument.load(write?.[1] as Uint8Array);
+      expect(pdf.getPageCount()).toBe(13);
+    } finally {
+      getBoundingClientRectSpy.mockRestore();
+      if (scrollHeightDescriptor) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollHeight', scrollHeightDescriptor);
+      } else {
+        delete (HTMLElement.prototype as unknown as Record<string, unknown>).scrollHeight;
+      }
+      if (scrollWidthDescriptor) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollWidth', scrollWidthDescriptor);
+      } else {
+        delete (HTMLElement.prototype as unknown as Record<string, unknown>).scrollWidth;
+      }
+    }
+  });
+
+  it('falls back to the raster PDF engine with a warning when WebKit capture fails', async () => {
+    (window as PrismRuntimeWindow).__TAURI_INTERNALS__ = {};
+    (window as PrismRuntimeWindow).__PRISM_EXPORT_WORKER__ = true;
+    invokeMock.mockRejectedValueOnce(new Error('native unavailable'));
+    const warnings: string[] = [];
+
+    await exportPdf(createInput({
+      onWarning: (message) => warnings.push(message),
+    }), '/tmp/fallback.pdf');
+
+    expect(warnings).toEqual([
+      'WebKit PDF 引擎不可用，已回退兼容导出管线：native unavailable',
+    ]);
+    expect(canvasRenderMock.render).toHaveBeenCalled();
+    expect(fsMock.writeFile).toHaveBeenCalledWith('/tmp/fallback.pdf', expect.any(Uint8Array));
   });
 
   it('writes complex export smoke artifacts for all supported formats', async () => {

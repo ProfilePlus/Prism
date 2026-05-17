@@ -1,4 +1,4 @@
-import { readFile, writeFile, writeTextFile } from '@tauri-apps/plugin-fs';
+import { readFile, remove, writeFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { invoke } from '@tauri-apps/api/core';
 import { readCustomFontBytes } from '../settings/fontService';
 import type {
@@ -58,10 +58,27 @@ const exportProgressMessages = {
   parseMarkdown: '正在解析 Markdown',
   renderDiagrams: '正在渲染图表',
   applyTheme: '正在应用导出主题',
+  prepareNativePdf: '正在准备 WebKit PDF 文档',
+  printNativePdf: '正在调用 WebKit PDF 引擎',
+  applyPdfChrome: '正在补充 PDF 页眉页脚',
   generateFile: (label: ExportFileLabel) => `正在生成 ${label} 文件`,
   writeFile: (label: ExportFileLabel) => `正在写入 ${label} 文件`,
 } as const;
 type CitationPlaceholderContext = 'html' | 'builtIn';
+type PrismRuntimeWindow = Window & {
+  __TAURI_INTERNALS__?: unknown;
+  __PRISM_EXPORT_WORKER__?: boolean;
+};
+interface WebkitPdfCaptureLayout {
+  rect: { x: number; y: number; width: number; height: number };
+  pageCssHeight: number;
+  pageCount: number;
+  pageWidth: number;
+  pageHeight: number;
+  contentWidth: number;
+  contentHeight: number;
+  margins: typeof pdfPageMarginsPoints[keyof typeof pdfPageMarginsPoints];
+}
 
 const MAX_EXPORT_CANVAS_DIMENSION = 16_000;
 const MAX_EXPORT_CANVAS_AREA = 64_000_000;
@@ -70,6 +87,9 @@ const PDF_EXPORT_MAX_PAGES = 500;
 const PDF_EXPORT_BATCH_RENDER_TIMEOUT_MS = 60_000;
 const PDF_EXPORT_MAX_RENDER_VIEWPORT_HEIGHT = 4_096;
 const PDF_EXPORT_MAX_PAGES_PER_BATCH = 8;
+const WEBKIT_PDF_CAPTURE_WIDTH = 980;
+const WEBKIT_PDF_MAX_CAPTURE_HEIGHT = 12_000;
+const WEBKIT_PDF_MAX_PAGES_PER_CAPTURE = 8;
 const EXPORT_MERMAID_RENDER_TIMEOUT_MS = 20_000;
 const EXPORT_FONT_READY_TIMEOUT_MS = 3_000;
 
@@ -150,6 +170,12 @@ function reportProgress(input: ExportDocumentInput, message: string) {
 
 function reportWarning(input: ExportDocumentInput, message: string) {
   input.onWarning?.(message);
+}
+
+function isTauriExportWorkerRuntime() {
+  if (typeof window === 'undefined') return false;
+  const runtimeWindow = window as PrismRuntimeWindow;
+  return Boolean(runtimeWindow.__TAURI_INTERNALS__ && runtimeWindow.__PRISM_EXPORT_WORKER__);
 }
 
 function getErrorMessage(error: unknown) {
@@ -1463,10 +1489,278 @@ export async function exportHtml(input: ExportDocumentInput, outputPath?: string
   return true;
 }
 
-export async function exportPdf(input: ExportDocumentInput, outputPath?: string) {
-  const targetPath = await getExportOutputPath(outputPath);
-  if (!targetPath) return false;
+function getWebkitPdfCapturePath(targetPath: string, batchIndex: number) {
+  const suffix = `.webkit-capture-${batchIndex + 1}.pdf`;
+  return targetPath.toLowerCase().endsWith('.pdf')
+    ? `${targetPath.slice(0, -4)}${suffix}`
+    : `${targetPath}${suffix}`;
+}
 
+function getWebkitPdfCaptureProgressMessage(startPage: number, endPage: number, pageCount: number) {
+  return startPage === endPage
+    ? `正在捕获 PDF 页面 ${startPage} / ${pageCount}`
+    : `正在捕获 PDF 页面 ${startPage}-${endPage} / ${pageCount}`;
+}
+
+function maskPdfPageMargins(
+  page: any,
+  pageWidth: number,
+  pageHeight: number,
+  margins: WebkitPdfCaptureLayout['margins'],
+  color: any,
+) {
+  page.drawRectangle({ x: 0, y: 0, width: pageWidth, height: margins.bottom, color });
+  page.drawRectangle({
+    x: 0,
+    y: pageHeight - margins.top,
+    width: pageWidth,
+    height: margins.top,
+    color,
+  });
+  page.drawRectangle({ x: 0, y: 0, width: margins.left, height: pageHeight, color });
+  page.drawRectangle({
+    x: pageWidth - margins.right,
+    y: 0,
+    width: margins.right,
+    height: pageHeight,
+    color,
+  });
+}
+
+async function prepareWebkitPdfCaptureDocument(input: ExportDocumentInput): Promise<WebkitPdfCaptureLayout> {
+  reportProgress(input, exportProgressMessages.prepareNativePdf);
+  const pandocCitation = await renderPandocCitationHtml(input);
+  if (!pandocCitation.attempted) reportCitationPlaceholderWarning(input);
+  const node = await createRenderedExportNode(input, { html: pandocCitation.html });
+  try {
+    const css = await collectExportCss(input);
+    const clone = node.cloneNode(true) as HTMLElement;
+    clone.removeAttribute('style');
+    clone.style.position = 'static';
+    clone.style.opacity = '1';
+    clone.style.pointerEvents = 'auto';
+
+    document.documentElement.setAttribute('data-content-theme', input.contentTheme);
+    document.title = getExportTitle(input);
+    document.head.querySelectorAll('[data-prism-native-pdf]').forEach((element) => element.remove());
+
+    const style = document.createElement('style');
+    style.dataset.prismNativePdf = 'true';
+    style.textContent = `
+      ${css}
+      html, body {
+        width: 100%;
+        min-height: 100%;
+        overflow: visible !important;
+        background: #fff !important;
+      }
+      body.prism-native-pdf-export {
+        margin: 0 !important;
+      }
+      body.prism-native-pdf-export > .prism-export-document {
+        position: static !important;
+        width: ${WEBKIT_PDF_CAPTURE_WIDTH}px !important;
+        max-width: none !important;
+        margin: 0 !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+      }
+    `;
+    document.head.appendChild(style);
+    document.body.className = [
+      document.body.classList.contains('dark') ? 'dark' : '',
+      'prism-native-pdf-export',
+    ].filter(Boolean).join(' ');
+    document.body.replaceChildren(clone);
+    if ('fonts' in document) {
+      try {
+        await withTimeout(document.fonts.ready, EXPORT_FONT_READY_TIMEOUT_MS, '导出字体加载超时');
+      } catch {
+        // Native print can still proceed with platform font fallback.
+      }
+    }
+    await nextFrame();
+    const target = document.body.querySelector<HTMLElement>('.prism-export-document');
+    if (!target) throw new Error('无法准备 WebKit PDF 捕获文档');
+
+    const rect = target.getBoundingClientRect();
+    const width = Math.max(
+      WEBKIT_PDF_CAPTURE_WIDTH,
+      Math.ceil(rect.width),
+      Math.ceil(target.scrollWidth),
+    );
+    const height = Math.max(
+      1,
+      Math.ceil(rect.height),
+      Math.ceil(target.scrollHeight),
+      Math.ceil(document.body.scrollHeight),
+      Math.ceil(document.documentElement.scrollHeight),
+    );
+    const paper = pdfPageSizePoints[input.pdfPaper ?? 'a4'];
+    const margins = pdfPageMarginsPoints[input.pdfMargin ?? 'standard'];
+    const contentWidth = paper.width - margins.left - margins.right;
+    const contentHeight = paper.height - margins.top - margins.bottom;
+    const cssPxToPdfPoint = contentWidth / width;
+    const pageCssHeight = Math.max(1, contentHeight / cssPxToPdfPoint);
+    const pageCount = Math.max(1, Math.ceil(height / pageCssHeight));
+    if (!Number.isFinite(pageCssHeight) || !Number.isFinite(pageCount)) {
+      throw new Error('WebKit PDF 页面尺寸计算失败');
+    }
+    if (pageCount > PDF_EXPORT_MAX_PAGES) {
+      throw new Error(`PDF 页数过多（${pageCount} 页，最大 ${PDF_EXPORT_MAX_PAGES} 页），请拆分文档或改用 HTML 导出。`);
+    }
+
+    return {
+      rect: {
+        x: Math.max(0, Math.floor(rect.left + window.scrollX)),
+        y: Math.max(0, Math.floor(rect.top + window.scrollY)),
+        width,
+        height,
+      },
+      pageCssHeight,
+      pageCount,
+      pageWidth: paper.width,
+      pageHeight: paper.height,
+      contentWidth,
+      contentHeight,
+      margins,
+    };
+  } finally {
+    node.remove();
+  }
+}
+
+async function overlayPdfChrome(input: ExportDocumentInput, targetPath: string) {
+  if (!input.pageHeaderFooter && !input.pdfPageNumbers) return;
+
+  reportProgress(input, exportProgressMessages.applyPdfChrome);
+  const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
+  const bytes = await readFile(targetPath);
+  const pdf = await PDFDocument.load(bytes);
+  const pageCount = pdf.getPageCount();
+  const margins = pdfPageMarginsPoints[input.pdfMargin ?? 'standard'];
+  const pageNumberFont = input.pdfPageNumbers
+    ? await pdf.embedFont(StandardFonts.Helvetica)
+    : null;
+
+  for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+    const page = pdf.getPage(pageIndex);
+    const { width: pageWidth, height: pageHeight } = page.getSize();
+    const contentWidth = Math.max(1, pageWidth - margins.left - margins.right);
+
+    if (input.pageHeaderFooter) {
+      const headerText = formatPdfHeaderFooterText(input.pageHeaderText, input, pageIndex, pageCount);
+      const footerText = formatPdfHeaderFooterText(input.pageFooterText, input, pageIndex, pageCount);
+      const headerImage = createPdfChromeTextImage(headerText, contentWidth);
+      if (headerImage) {
+        const embeddedHeader = await pdf.embedPng(dataUrlToBytes(headerImage.dataUrl));
+        page.drawImage(embeddedHeader, {
+          x: (pageWidth - headerImage.width) / 2,
+          y: getPdfHeaderY(pageHeight, margins.top, headerImage.height),
+          width: headerImage.width,
+          height: headerImage.height,
+        });
+      }
+
+      const footerImage = createPdfChromeTextImage(
+        footerText,
+        input.pdfPageNumbers ? contentWidth * 0.42 : contentWidth,
+      );
+      if (footerImage) {
+        const embeddedFooter = await pdf.embedPng(dataUrlToBytes(footerImage.dataUrl));
+        page.drawImage(embeddedFooter, {
+          x: margins.left,
+          y: getPdfFooterY(margins.bottom),
+          width: footerImage.width,
+          height: footerImage.height,
+        });
+      }
+    }
+
+    if (pageNumberFont) {
+      const label = getPdfPageNumberLabel(pageIndex, pageCount);
+      const size = 8;
+      const textWidth = pageNumberFont.widthOfTextAtSize(label, size);
+      page.drawText(label, {
+        x: (pageWidth - textWidth) / 2,
+        y: getPdfPageNumberY(margins.bottom),
+        size,
+        font: pageNumberFont,
+        color: rgb(0.45, 0.45, 0.45),
+      });
+    }
+  }
+
+  await writeFile(targetPath, await pdf.save());
+}
+
+async function exportPdfWithWebkitCapture(input: ExportDocumentInput, targetPath: string) {
+  const layout = await prepareWebkitPdfCaptureDocument(input);
+  reportProgress(input, exportProgressMessages.printNativePdf);
+
+  const { PDFDocument, rgb } = await import('pdf-lib');
+  const pdf = await PDFDocument.create();
+  const marginMask = rgb(1, 1, 1);
+  let pageIndex = 0;
+  let batchIndex = 0;
+  const tempPaths: string[] = [];
+
+  try {
+    while (pageIndex < layout.pageCount) {
+      const pagesByHeight = Math.max(1, Math.floor(WEBKIT_PDF_MAX_CAPTURE_HEIGHT / layout.pageCssHeight));
+      const pagesPerCapture = Math.max(1, Math.min(WEBKIT_PDF_MAX_PAGES_PER_CAPTURE, pagesByHeight));
+      const batchEndPage = Math.min(layout.pageCount, pageIndex + pagesPerCapture);
+      const batchStartY = Math.floor(pageIndex * layout.pageCssHeight);
+      const batchEndY = Math.min(layout.rect.height, Math.ceil(batchEndPage * layout.pageCssHeight));
+      const batchHeight = Math.max(1, batchEndY - batchStartY);
+      const capturePath = getWebkitPdfCapturePath(targetPath, batchIndex);
+      tempPaths.push(capturePath);
+
+      reportProgress(input, getWebkitPdfCaptureProgressMessage(pageIndex + 1, batchEndPage, layout.pageCount));
+      await invoke('capture_current_webview_pdf', {
+        outputPath: capturePath,
+        x: layout.rect.x,
+        y: layout.rect.y + batchStartY,
+        width: layout.rect.width,
+        height: batchHeight,
+      });
+
+      const captureBytes = await readFile(capturePath);
+      const [embeddedPage] = await pdf.embedPdf(captureBytes);
+      if (!embeddedPage) throw new Error('WebKit PDF 捕获结果为空');
+
+      const scale = layout.contentWidth / embeddedPage.width;
+      const embeddedWidth = embeddedPage.width * scale;
+      const embeddedHeight = embeddedPage.height * scale;
+
+      for (let splitPageIndex = pageIndex; splitPageIndex < batchEndPage; splitPageIndex += 1) {
+        const page = pdf.addPage([layout.pageWidth, layout.pageHeight]);
+        const offsetWithinBatch = (splitPageIndex - pageIndex) * layout.contentHeight;
+        page.drawPage(embeddedPage, {
+          x: layout.margins.left,
+          y: layout.pageHeight - layout.margins.top - embeddedHeight + offsetWithinBatch,
+          width: embeddedWidth,
+          height: embeddedHeight,
+        });
+        maskPdfPageMargins(page, layout.pageWidth, layout.pageHeight, layout.margins, marginMask);
+      }
+
+      pageIndex = batchEndPage;
+      batchIndex += 1;
+      await nextFrame();
+    }
+
+    reportProgress(input, exportProgressMessages.writeFile('PDF'));
+    await writeFile(targetPath, await pdf.save());
+  } finally {
+    await Promise.all(tempPaths.map((path) => remove(path).catch(() => undefined)));
+  }
+
+  await overlayPdfChrome(input, targetPath);
+  return true;
+}
+
+async function exportPdfRaster(input: ExportDocumentInput, targetPath: string) {
   reportCitationPlaceholderWarning(input);
   const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
   const paper = pdfPageSizePoints[input.pdfPaper ?? 'a4'];
@@ -1557,6 +1851,24 @@ export async function exportPdf(input: ExportDocumentInput, outputPath?: string)
   reportProgress(input, exportProgressMessages.writeFile('PDF'));
   await writeFile(targetPath, bytes);
   return true;
+}
+
+export async function exportPdf(input: ExportDocumentInput, outputPath?: string) {
+  const targetPath = await getExportOutputPath(outputPath);
+  if (!targetPath) return false;
+
+  if (isTauriExportWorkerRuntime()) {
+    try {
+      return await exportPdfWithWebkitCapture(input, targetPath);
+    } catch (error) {
+      reportWarning(
+        input,
+        `WebKit PDF 引擎不可用，已回退兼容导出管线：${getErrorMessage(error)}`,
+      );
+    }
+  }
+
+  return exportPdfRaster(input, targetPath);
 }
 
 async function createRenderedPdfPages(

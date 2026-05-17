@@ -782,6 +782,49 @@ describe('command registry', () => {
     ]);
   });
 
+  it('continues export when requestAnimationFrame stalls before the first progress paint', async () => {
+    const originalRequestAnimationFrame = window.requestAnimationFrame;
+    vi.useFakeTimers();
+    window.requestAnimationFrame = vi.fn(() => 1) as unknown as typeof window.requestAnimationFrame;
+    const baseContext = createCommandContext();
+    const requestExportPath = vi.fn().mockResolvedValue('/tmp/report.pdf');
+    const context = createCommandContext({
+      documentStore: {
+        ...baseContext.documentStore,
+        currentDocument: {
+          path: '/tmp/report.md',
+          name: 'report.md',
+          content: '# Report',
+          isDirty: false,
+          lastKnownMtime: null,
+          lastKnownSize: null,
+          lastSavedAt: 0,
+          saveError: null,
+          viewMode: 'edit',
+          scrollState: { editorRatio: 0, previewRatio: 0 },
+          saveStatus: 'saved',
+        },
+      },
+      settingsStore: baseContext.settingsStore,
+      requestExportPath,
+    });
+
+    try {
+      const runPromise = runCommand('exportPdf', context);
+      await vi.advanceTimersByTimeAsync(260);
+      await runPromise;
+    } finally {
+      window.requestAnimationFrame = originalRequestAnimationFrame;
+      vi.useRealTimers();
+    }
+
+    expect(exportMock.exportDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ filename: 'report.md' }),
+      'pdf',
+      '/tmp/report.pdf',
+    );
+  });
+
   it('applies the quality selected in the export save dialog to the current export only', async () => {
     const baseContext = createCommandContext();
     const requestExportPath = vi.fn().mockResolvedValue({

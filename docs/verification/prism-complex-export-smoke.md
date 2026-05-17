@@ -425,3 +425,43 @@ Checkpoint：
 
 - `npm test -- --run src/domains/export/exportPipeline.test.ts`：通过，1 file / 37 tests。
 - `npm test -- --run src/domains/export/exportPipeline.test.ts src/domains/export/index.test.ts src/domains/export/isolatedWebviewExport.test.ts src/domains/commands/exportCommand.integration.test.ts`：通过，4 files / 44 tests。
+
+### 2026-05-17 PDF WebKit 矢量主链路重构
+
+背景：
+
+- 上一版“8 页一批 raster”只减少了 `html2canvas` 调用次数，本质仍是图片 PDF，不能满足“清晰度不能降 / 文字可选 / SVG 与 Mermaid 保持矢量”的目标。
+- 官方资料与桌面分发取舍见 `docs/verification/prism-pdf-export-performance.md`。当前 macOS 最合理方案是 `WKWebView.createPDFWithConfiguration`，而不是内置 Chromium / Playwright sidecar。
+- 旧 `WKWebView.printOperationWithPrintInfo` smoke 失败：Prism 进程长时间高 CPU，PDF 文件持续增长且无完成信号，因此不作为默认链路。
+
+实现：
+
+- `src-tauri/src/lib.rs` 新增 async Tauri command `capture_current_webview_pdf`，macOS 使用 `WKWebView.createPDFWithConfiguration_completionHandler` 捕获当前 export worker WebView。
+- `src/domains/export/exportPipeline.ts` 在 Tauri export worker 中优先走 WebKit PDF capture；非 macOS 或 capture 失败时才 warning fallback 到旧 raster。
+- 长文按最多 8 页 / 12,000 CSS px 一批 capture，前端用 `pdf-lib.embedPdf()` 重新分页到 A4 / Letter；页眉页脚和页码只做小型 overlay，不把整页重新栅格化。
+- 临时 `*.webkit-capture-N.pdf` 成功或失败后都会清理。
+- 真实 UI 复测又发现“准备导出”前置等待可能因 `requestAnimationFrame` 不回调而卡住；`src/domains/commands/registry.ts` 已给 `waitForExportProgressPaint()` 增加 timer fallback，并补单测。新构建复测已确认不再停在“准备导出”。
+
+真实 app smoke：
+
+- App：`src-tauri/target/release/bundle/macos/Prism.app`
+- 输入：`.codex-smoke/preview-heavy/preview-heavy.md`
+- 输出：`.codex-smoke/preview-heavy/preview-heavy-webkit-smoke.pdf`
+- 输出大小：约 `475K`
+- 页数：`51`
+- 页面尺寸：A4，`595 x 842`
+- PDFKit 可提取正文；文件内 `/Font = 7`、`/Subtype /Image = 0`，不是旧的整页图片 PDF。
+- 第 1、26、51 页 PDFKit / Quick Look 渲染截图可见正文、本地 SVG、Mermaid 图、KaTeX 和尾部错误诊断。
+- `find .codex-smoke/preview-heavy -name '*webkit-capture-*.pdf'` 无残留。
+- `open preview-heavy-webkit-smoke.pdf` 与 `open -R preview-heavy-webkit-smoke.pdf` 均返回 0。
+- 新构建真实 UI 覆盖导出计时：`date +%s = 1779031584` 触发，文件 mtime 为 `1779031641`，约 `57s` 后输出更新为 `474,871 bytes`。
+
+对比：
+
+- 旧 raster 产物：`.codex-smoke/preview-heavy/preview-heavy-raster-before-native.pdf`，`5.0M`，50 页，`/Subtype /Image = 50`，`/Font = 0`，PDFKit 文本提取为空。
+- 新 WebKit 产物：`.codex-smoke/preview-heavy/preview-heavy-webkit-smoke.pdf`，约 `475K`，51 页，`/Subtype /Image = 0`，`/Font = 7`，PDFKit 可提取正文。
+
+验证命令：
+
+- `npm test -- --run src/domains/export/exportPipeline.test.ts`：通过，1 file / 41 tests。
+- `npm test -- --run src/domains/commands/registry.test.ts`：通过，1 file / 22 tests。

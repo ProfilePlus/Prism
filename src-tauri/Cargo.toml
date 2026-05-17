@@ -28,3 +28,10 @@ tauri-plugin-fs = "2"
 tauri-plugin-opener = "2.5.3"
 tauri-plugin-updater = "2"
 trash = "=4.1.1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6.4"
+block2 = "0.6.2"
+objc2-core-foundation = "0.3.2"
+objc2-foundation = { version = "0.3.2", features = ["NSData", "NSError", "NSObject", "NSString"] }
+objc2-web-kit = { version = "0.3.2", features = ["WKPDFConfiguration", "WKWebView", "block2"] }

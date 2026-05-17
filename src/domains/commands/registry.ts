@@ -102,9 +102,21 @@ function emitInlineFormat(format: string): void {
   window.dispatchEvent(new CustomEvent('prism-format', { detail: { format } }));
 }
 
-function waitForExportProgressPaint() {
+function waitForExportProgressPaint(timeoutMs = 250) {
   return new Promise<void>((resolve) => {
-    window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      resolve();
+    };
+    const timeout = window.setTimeout(finish, timeoutMs);
+    if (typeof window.requestAnimationFrame !== 'function') {
+      finish();
+      return;
+    }
+    window.requestAnimationFrame(() => window.requestAnimationFrame(finish));
   });
 }
 
