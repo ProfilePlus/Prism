@@ -30,8 +30,9 @@
 
 - `src/domains/export/goldenFixture.ts` 提供包含 front matter、中文、表格、代码、Mermaid、KaTeX 的 golden fixture。
 - `src/domains/export/exportPipeline.test.ts` 覆盖 HTML golden 导出，检查 TOC、heading anchor、表格、代码高亮、KaTeX、Mermaid 渲染。
-- `src/domains/export/exportPipeline.test.ts` 覆盖 DOCX golden 导出，检查 TOC、中文、表格、代码、页眉页脚、页码，并确认 Mermaid 源码不会原样进入 DOCX 且 `word/media/` 中存在图片。
+- `src/domains/export/exportPipeline.test.ts` 覆盖 DOCX golden 导出，检查 TOC、中文、表格、代码、页眉页脚、页码、表格 / 代码块 dxa 宽度，并确认 Mermaid 源码不会原样进入 DOCX 且 `word/media/` 中存在图片。
 - `src/domains/export/exportPipeline.test.ts` 覆盖 DOCX GFM task list 导出，检查已完成 / 未完成任务分别写成可读的 `☑` / `☐` 标记。
+- `src/domains/export/exportPipeline.test.ts` 覆盖 DOCX SVG + PNG fallback、Mermaid root-level `htmlLabels: false` + SVG fallback、KaTeX / HTML 块视觉 fallback。
 - `src/domains/export/exportPipeline.test.ts` 覆盖 PNG / PDF / DOCX / HTML progress stage。
 - `src/domains/commands/registry.test.ts` 覆盖导出进度事件接线：pipeline `onProgress` 会变成 `prism-export-progress` 事件，导出成功或失败后都会发送 `{ visible: false }` 清理进度状态。
 - `src/domains/export/templates.test.ts` 覆盖 front matter 覆盖导出设置、模板默认值、DOCX 字体策略、citation / pandoc 设置传递。
@@ -179,8 +180,10 @@ $$
 ### DOCX
 
 - Word / Pages / LibreOffice 至少一种能打开文件。
-- 标题、正文、表格、代码块、引用块、任务列表可读。
-- Mermaid 不应以原始 `graph TD` 源码出现在正文中；应以图片或可接受 fallback 呈现。
+- 标题、正文、表格、代码块、引用块、任务列表可读，表格和代码块不能竖排。
+- 本地 SVG 应进入 `word/media/`，并带 PNG fallback。
+- Mermaid 不应以原始 `graph TD` 源码出现在正文中；应以图表或图片 fallback 呈现，节点文字、箭头和边标签可见。
+- KaTeX / HTML 块等非文字视觉内容应以图片 fallback 呈现，不能静默空白。
 - 页眉页脚包含标题、文件名和页码。
 - 中文不乱码。
 
@@ -258,7 +261,18 @@ npm test -- --run src/domains/export/exportPipeline.test.ts
   - `vendor-docx-LHXn8vCj.js`：`407.22 kB`，gzip `119.22 kB`。
   - `vendor-pdf-CWvVLaQp.js`：`437.04 kB`，gzip `180.61 kB`。
   - `vendor-html2canvas-QH1iLAAe.js`：`202.38 kB`，gzip `48.04 kB`。
-- `npm test -- --run src/domains/commands/registry.test.ts src/domains/export/exportPipeline.test.ts`：通过，2 files / 41 tests。
+
+### 2026-05-18 DOCX 富内容导出保真
+
+- 方案记录见 `docs/verification/prism-docx-rich-export-smoke.md`。
+- `src/domains/export/exportPipeline.ts` 将 DOCX 导出改为混合策略：正文结构继续原生 DOCX，SVG / Mermaid 写入 SVG + PNG fallback，KaTeX / HTML 块按 Prism 预览主题渲染为 PNG fallback。
+- Mermaid DOCX 渲染优先 root-level `htmlLabels: false`，同时保留 `flowchart.htmlLabels: false`，避免 Word 兼容性差的 `foreignObject` 标签导致节点文字丢失。
+- 表格和代码块都写入基于页面内容宽度的 dxa `tblW` / `tcW` / `tblGrid`，避免 Quick Look / Word 把列宽按默认 `100` twips 解释成竖排。
+- `npm test -- --run src/domains/export/exportPipeline.test.ts`：通过，1 file / 42 tests。
+- `npm run tauri:build:app-smoke`：通过，生成当前 `src-tauri/target/release/bundle/macos/Prism.app`。
+- 真实 `.app` 通过底部导出菜单生成 `.codex-smoke/docx-rich-export/docx-rich-export.docx`；`jszip` 检查 `drawingCount 5`、`hasSvg true`、`hasPng true`、`containsGraphSource false`、`containsTaskDone true`、`containsTaskTodo true`、`containsTableText true`、`containsCodeText true`。
+- Quick Look thumbnail 可见本地 SVG、正常宽度表格、正常宽度代码块和 Mermaid 图，Mermaid 节点文字与边标签可见。
+- `npm test -- --run`：通过，59 files / 359 tests。
 - `npm run build`：通过；Vite large chunk warning 仍存在，主要来自 `export-pipeline` 与 Mermaid 相关异步 chunk，但导出链路已不再位于主入口 chunk。
 
 ### 2026-05-15 真实 UI 尝试

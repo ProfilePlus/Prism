@@ -254,6 +254,7 @@
 - `docs/verification/prism-complex-export-smoke.md` 记录 2026-05-17 独立导出 WebView 卡死修复 smoke：真实 `.app` 曾在 HTML 导出 `preview-heavy.md` 时停在“正在渲染图表”并 20 分钟后超时；修复后通过命令面板导出 `preview-heavy-webview-smoke-fixed.html`，文件在几秒内生成，HTML 中有 20 个 Mermaid SVG，1 个 fixture 内故意非法 Mermaid 以单图 fallback 落地，没有阻断整份导出。
 - `docs/verification/prism-pdf-export-performance.md` 记录 2026-05-17 PDF 性能重构：官方资料研究、方案矩阵、失败过的 `printOperationWithPrintInfo` 路线、WebKit `createPDFWithConfiguration` 选型、raster fallback、before / after 文件级对比和真实 app smoke 证据。
 - `docs/verification/prism-complex-export-smoke.md` 记录 2026-05-17 PDF WebKit 矢量主链路 smoke：`preview-heavy-webkit-smoke.pdf` 约 475K、51 页 A4、PDFKit 可提取正文、`/Font = 7`、`/Subtype /Image = 0`，第 1 / 26 / 51 页渲染截图可见正文、本地 SVG、Mermaid 图、KaTeX 和尾部错误诊断；旧 raster 对比文件为 5.0M、50 个 image object、0 个 font object、文本提取为空。
+- `docs/verification/prism-docx-rich-export-smoke.md` 记录 2026-05-18 DOCX 富内容导出重构：正文结构保留原生 DOCX，SVG / Mermaid 写入 SVG + PNG fallback，KaTeX / HTML 块按视觉 fallback 写入 PNG；真实 `.app` 导出 `docx-rich-export.docx` 后，`jszip` 检查 `drawingCount 5`、`hasSvg true`、`hasPng true`、`containsGraphSource false`、任务列表 / 表格 / 代码文本存在，Quick Look thumbnail 可见本地 SVG、正常宽度表格、正常宽度代码块和 Mermaid 节点文字 / 边标签。
 - `src/domains/export/exportPipeline.ts` 已修复真实 PDF / PNG 导出暴露的 `html2canvas` 现代 CSS color function 兼容问题：栅格导出 iframe 使用 raster-safe CSS，并在截图前把 computed `color(...)` 归一为 `rgb(...)` / `rgba(...)`；HTML 导出保持完整主题 CSS。
 - `docs/verification/prism-pandoc-citation-html-smoke.md` 记录 Pandoc smoke 方案和本机阻塞。
 
@@ -261,12 +262,12 @@
 
 - 自动测试强：导出 pipeline、命令入口和设置归一化覆盖广；HTML 导出已覆盖 Pandoc 返回 HTML 的安全清理；导出进度事件、App 层进度 UI、失败诊断浮层、warning 汇总和复制路径已有回归；导出 pipeline 已从主入口 chunk 拆出，降低启动首包压力。
 - 自动化产物 smoke 中等偏强：复杂 Markdown 已可生成并读取 HTML/PDF/PNG/DOCX 产物；PNG 自动化仍使用 `html2canvas` 测试替身，但真实 UI smoke 已补同一 fixture 的 PDF / PNG 文件级结果。
-- 真实导出 UI smoke 较强：当前 `.app` 通过真实导出菜单生成 HTML / PDF / PNG / DOCX；PDF 用 `pdf-lib` 确认 2 页 A4，PNG 用 `sips` 确认 2054 x 3316，DOCX 用 `jszip`、`textutil` 和 Quick Look thumbnail 确认可解析、保留中文 / 表格 / 任务列表且 Mermaid 未退化为源码。独立 WebView 导出也已用真实 `.app` 复测重媒体 HTML 导出，不再长期卡在“正在渲染图表”。长文 PDF 已通过 WebKit 矢量主链路生成 51 页 A4，PDFKit 可提取正文，且不是整页 image PDF；包含 `waitForExportProgressPaint()` 修复的新构建已真实 UI 复测，不再停在“准备导出”，约 57 秒更新输出文件。
+- 真实导出 UI smoke 较强：当前 `.app` 通过真实导出菜单生成 HTML / PDF / PNG / DOCX；PDF 用 `pdf-lib` 确认 2 页 A4，PNG 用 `sips` 确认 2054 x 3316，DOCX 用 `jszip`、`textutil` 和 Quick Look thumbnail 确认可解析、保留中文 / 表格 / 任务列表且 Mermaid 未退化为源码。DOCX 富内容 smoke 已补 SVG + PNG fallback、Mermaid 图、KaTeX / HTML drawing、表格和代码块宽度证据。独立 WebView 导出也已用真实 `.app` 复测重媒体 HTML 导出，不再长期卡在“正在渲染图表”。长文 PDF 已通过 WebKit 矢量主链路生成 51 页 A4，PDFKit 可提取正文，且不是整页 image PDF；包含 `waitForExportProgressPaint()` 修复的新构建已真实 UI 复测，不再停在“准备导出”，约 57 秒更新输出文件。
 - Pandoc 真实验证弱：本机 `pandoc --version` 为 `command not found`，未生成 citeproc 实际 HTML。
 
 ### 缺口
 
-- DOCX Mermaid 和 task list 已有自动化与真实 UI 产物级检查，确认 Mermaid 不以源码留在正文且存在 media 文件，GFM task list 保留可读勾选状态；Word / Pages 的逐页人工视觉检查仍可作为发布前补充。
+- DOCX Mermaid、SVG、KaTeX / HTML fallback、表格 / 代码块宽度和 task list 已有自动化与真实 UI 产物级检查，确认 Mermaid 不以源码留在正文且存在 SVG / PNG media，GFM task list 保留可读勾选状态；Word / Pages 的逐页人工视觉检查仍可作为发布前补充。
 - PDF / PNG 导出已通过真实 UI 文件级检查；人工逐页视觉审阅仍可作为发布前补充。
 - 真实 Pandoc citeproc 依赖本机安装 Pandoc，当前阻塞。
 

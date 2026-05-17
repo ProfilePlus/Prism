@@ -35,11 +35,17 @@ type HeaderFooterTextPart =
   | { type: 'text'; value: string }
   | { type: 'page' }
   | { type: 'pages' };
-type MermaidDocxImage =
-  | { type: RasterDocxImageType; data: Uint8Array; width: number; height: number };
 type RasterDocxImageType = 'png' | 'jpg' | 'gif' | 'bmp';
-type ExportDocxImage =
-  | { type: RasterDocxImageType; data: Uint8Array; width: number; height: number };
+type RasterDocxImage = { type: RasterDocxImageType; data: Uint8Array; width: number; height: number };
+type SvgDocxImage = {
+  type: 'svg';
+  data: string;
+  fallback: RasterDocxImage;
+  width: number;
+  height: number;
+};
+type ExportDocxImage = RasterDocxImage | SvgDocxImage;
+type MermaidDocxImage = ExportDocxImage;
 type ExportFileLabel = 'HTML' | 'PDF' | 'PNG' | 'Word';
 interface PdfRenderedPage {
   data: Uint8Array;
@@ -92,6 +98,8 @@ const WEBKIT_PDF_MAX_CAPTURE_HEIGHT = 12_000;
 const WEBKIT_PDF_MAX_PAGES_PER_CAPTURE = 8;
 const EXPORT_MERMAID_RENDER_TIMEOUT_MS = 20_000;
 const EXPORT_FONT_READY_TIMEOUT_MS = 3_000;
+const DOCX_VISUAL_BLOCK_RENDER_TIMEOUT_MS = 60_000;
+const DOCX_VISUAL_BLOCK_WIDTH = 760;
 
 function normalizeExportRasterScale(scale: unknown, fallback = 2) {
   if (typeof scale !== 'number' || !Number.isFinite(scale)) return fallback;
@@ -349,6 +357,12 @@ const docxPageMarginsTwips = {
   standard: { top: 1020, right: 1020, bottom: 1134, left: 1020 },
   wide: { top: 1418, right: 1418, bottom: 1588, left: 1418 },
 } as const;
+
+function getDocxContentWidthTwips(input?: Pick<ExportDocumentInput, 'pdfPaper' | 'pdfMargin'>) {
+  const pageSize = docxPageSizeTwips[input?.pdfPaper ?? 'a4'];
+  const pageMargin = docxPageMarginsTwips[input?.pdfMargin ?? 'standard'];
+  return Math.max(3600, pageSize.width - pageMargin.left - pageMargin.right);
+}
 
 function getPdfPageNumberLabel(pageIndex: number, pageCount: number) {
   return `${pageIndex + 1} / ${pageCount}`;
@@ -993,6 +1007,19 @@ function getMermaidExportConfig(contentTheme: ContentTheme) {
   };
 }
 
+function getMermaidDocxConfig(contentTheme: ContentTheme, htmlLabels: boolean) {
+  const config = getMermaidConfig(contentTheme) as any;
+  return {
+    ...config,
+    htmlLabels,
+    suppressErrorRendering: true,
+    flowchart: {
+      ...config.flowchart,
+      htmlLabels,
+    },
+  };
+}
+
 function createMermaidExportRenderSandbox() {
   const sandbox = document.createElement('div');
   sandbox.dataset.prismExportMermaidSandbox = 'true';
@@ -1173,9 +1200,21 @@ async function svgToDocxPngImage(svgText: string, scale = 2) {
   };
 }
 
+async function svgToDocxImage(svgText: string, scale = 2): Promise<SvgDocxImage> {
+  const docxSvg = prepareSvgForDocx(svgText);
+  const fallback = await svgToDocxPngImage(docxSvg, scale);
+  const size = getSvgSize(docxSvg);
+  return {
+    type: 'svg',
+    data: bytesToDataUrl(new TextEncoder().encode(docxSvg), 'image/svg+xml'),
+    fallback,
+    width: Math.max(size.width, fallback.width),
+    height: Math.max(size.height, fallback.height),
+  };
+}
+
 async function renderMermaidImage(source: string, contentTheme: ContentTheme, scale = 2) {
   const { default: mermaid } = await import('mermaid');
-  const config = getMermaidConfig(contentTheme) as any;
   const candidates = [
     source,
     source.replace(/<br\s*\/?>/gi, '<br/>'),
@@ -1183,14 +1222,7 @@ async function renderMermaidImage(source: string, contentTheme: ContentTheme, sc
   ];
 
   for (const [configIndex, htmlLabels] of [false, true].entries()) {
-    mermaid.initialize({
-      ...config,
-      suppressErrorRendering: true,
-      flowchart: {
-        ...config.flowchart,
-        htmlLabels,
-      },
-    });
+    mermaid.initialize(getMermaidDocxConfig(contentTheme, htmlLabels));
 
     for (const [sourceIndex, candidate] of candidates.entries()) {
       const renderSandbox = createMermaidExportRenderSandbox();
@@ -1204,8 +1236,7 @@ async function renderMermaidImage(source: string, contentTheme: ContentTheme, sc
           EXPORT_MERMAID_RENDER_TIMEOUT_MS,
           `Mermaid 图表 ${sourceIndex + 1} 渲染超时`,
         );
-        const docxSvg = prepareSvgForDocx(svg);
-        const image = await svgToDocxPngImage(docxSvg, scale).catch(() => null);
+        const image = await svgToDocxImage(svg, scale).catch(() => null);
         if (image) {
           return image satisfies MermaidDocxImage;
         }
@@ -1230,8 +1261,7 @@ async function renderMarkdownImage(
 
   if (media.mimeType === 'image/svg+xml') {
     const svgText = new TextDecoder().decode(media.bytes);
-    const docxSvg = prepareSvgForDocx(svgText);
-    return svgToDocxPngImage(docxSvg, scale).catch(() => null);
+    return svgToDocxImage(svgText, scale).catch(() => null);
   }
 
   const type = getDocxRasterType(media.mimeType, media.filePath);
@@ -1258,12 +1288,150 @@ function createDocxImageRun(
   const { ImageRun } = docx;
   const width = Math.min(500, image.width);
   const height = Math.round(width * (image.height / image.width));
+  if (image.type === 'svg') {
+    return new ImageRun({
+      type: 'svg',
+      data: image.data,
+      fallback: {
+        type: image.fallback.type,
+        data: image.fallback.data,
+      },
+      transformation: { width, height },
+      altText,
+    } as any);
+  }
+
   return new ImageRun({
     type: image.type,
     data: image.data,
     transformation: { width, height },
     altText,
   } as any);
+}
+
+async function renderDocxVisualHtmlFragment(
+  input: ExportDocumentInput,
+  html: string,
+  scale: number,
+  options: { label: string; inline?: boolean },
+): Promise<RasterDocxImage | null> {
+  const root = document.createElement('div');
+  root.className = [
+    'prism-export-document',
+    `prism-export-template--${input.templateId ?? 'theme'}`,
+    'preview-compat',
+    `preview-compat--${input.contentTheme}`,
+  ].join(' ');
+  Object.assign(root.style, {
+    position: 'fixed',
+    left: '-12000px',
+    top: '0',
+    width: `${DOCX_VISUAL_BLOCK_WIDTH}px`,
+    pointerEvents: 'none',
+    background: getComputedStyle(document.documentElement).getPropertyValue('--bg-preview').trim() || '#ffffff',
+  });
+  root.innerHTML = [
+    `<div id="write" class="${writeClassByTheme[input.contentTheme]}">`,
+    `<div data-prism-docx-visual-target="true">${html}</div>`,
+    '</div>',
+  ].join('');
+  document.body.appendChild(root);
+
+  try {
+    await inlineImages(root, input);
+    if ('fonts' in document) {
+      try {
+        await withTimeout(document.fonts.ready, EXPORT_FONT_READY_TIMEOUT_MS, '导出字体加载超时');
+      } catch {
+        // Font readiness is best effort for visual fallback blocks.
+      }
+    }
+    await nextFrame();
+
+    const target = root.querySelector<HTMLElement>('[data-prism-docx-visual-target="true"]');
+    if (!target) return null;
+    Object.assign(target.style, {
+      display: options.inline ? 'inline-block' : 'block',
+      width: options.inline ? 'auto' : '100%',
+      maxWidth: `${DOCX_VISUAL_BLOCK_WIDTH}px`,
+      background: getComputedStyle(document.documentElement).getPropertyValue('--bg-preview').trim() || '#ffffff',
+      padding: options.inline ? '2px 4px' : '12px 16px',
+      boxSizing: 'border-box',
+    });
+    normalizeRasterComputedColors(target);
+
+    const rect = target.getBoundingClientRect();
+    const width = Math.max(
+      options.inline ? 120 : 320,
+      Math.ceil(rect.width || target.scrollWidth || (options.inline ? 240 : DOCX_VISUAL_BLOCK_WIDTH)),
+    );
+    const height = Math.max(
+      options.inline ? 48 : 120,
+      Math.ceil(rect.height || target.scrollHeight || (options.inline ? 80 : 180)),
+    );
+    assertExportCanvasWithinLimits(width, height, scale, `DOCX ${options.label}`);
+
+    const { default: html2canvas } = await import('html2canvas');
+    const canvas = await withTimeout(
+      html2canvas(target, {
+        backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg-preview').trim() || '#ffffff',
+        scale,
+        width,
+        height,
+        windowWidth: width,
+        windowHeight: height,
+        scrollX: 0,
+        scrollY: 0,
+      }),
+      DOCX_VISUAL_BLOCK_RENDER_TIMEOUT_MS,
+      `DOCX ${options.label}渲染超时`,
+    );
+
+    return {
+      type: 'png',
+      data: await canvasToPngBytes(canvas, `DOCX ${options.label}图像生成失败`),
+      width,
+      height,
+    };
+  } catch (err) {
+    reportWarning(input, `Word ${options.label}无法渲染为图片，已回退为文本：${getErrorMessage(err)}`);
+    return null;
+  } finally {
+    root.remove();
+  }
+}
+
+async function renderDocxMathImage(
+  input: ExportDocumentInput,
+  source: string,
+  displayMode: boolean,
+  scale: number,
+) {
+  try {
+    const katex = await import('katex');
+    const html = katex.default.renderToString(source, {
+      displayMode,
+      throwOnError: false,
+      strict: 'ignore',
+      trust: false,
+      output: 'htmlAndMathml',
+    });
+    return renderDocxVisualHtmlFragment(input, html, scale, {
+      label: displayMode ? '块级公式' : '行内公式',
+      inline: !displayMode,
+    });
+  } catch (err) {
+    reportWarning(input, `Word 公式渲染失败，已回退为 TeX 文本：${getErrorMessage(err)}`);
+    return null;
+  }
+}
+
+async function renderDocxHtmlBlockImage(input: ExportDocumentInput, source: string, scale: number) {
+  const sanitized = sanitizeExportHtmlFragment(source).trim();
+  if (!sanitized) return null;
+  return renderDocxVisualHtmlFragment(input, sanitized, scale, {
+    label: 'HTML 块',
+  });
 }
 
 function rewriteOpenXmlNumericAttribute(xml: string, tagName: string, attrName: string) {
@@ -2084,11 +2252,30 @@ async function inlineToRuns(
   node: any,
   theme: DocxTheme,
   style: RunStyle = {},
+  input?: ExportDocumentInput,
+  imageScale = 2,
 ): Promise<DocxInline[]> {
   const { ShadingType, TextRun, UnderlineType } = docx;
   if (!node) return [];
   if (node.type === 'text') return splitMarkedText(docx, node.value ?? '', style);
   if (node.type === 'break') return [new TextRun({ text: '', break: 1 })];
+  if (node.type === 'inlineMath') {
+    const source = String(node.value ?? '');
+    const image = input ? await renderDocxMathImage(input, source, false, imageScale) : null;
+    if (image) {
+      return [createDocxImageRun(docx, image, {
+        title: 'Inline math',
+        description: source,
+        name: 'Inline math',
+      })];
+    }
+    return [new TextRun({
+      ...style,
+      text: `$${source}$`,
+      font: theme.codeFont,
+      color: theme.accent,
+    })];
+  }
   if (node.type === 'inlineCode') {
     return [new TextRun({
       ...style,
@@ -2099,15 +2286,15 @@ async function inlineToRuns(
     })];
   }
   if (node.type === 'strong') {
-    const nested = await Promise.all((node.children ?? []).map((child: any) => inlineToRuns(docx, child, theme, { ...style, bold: true })));
+    const nested = await Promise.all((node.children ?? []).map((child: any) => inlineToRuns(docx, child, theme, { ...style, bold: true }, input, imageScale)));
     return nested.flat();
   }
   if (node.type === 'emphasis') {
-    const nested = await Promise.all((node.children ?? []).map((child: any) => inlineToRuns(docx, child, theme, { ...style, italics: true })));
+    const nested = await Promise.all((node.children ?? []).map((child: any) => inlineToRuns(docx, child, theme, { ...style, italics: true }, input, imageScale)));
     return nested.flat();
   }
   if (node.type === 'delete') {
-    const nested = await Promise.all((node.children ?? []).map((child: any) => inlineToRuns(docx, child, theme, { ...style, strike: true })));
+    const nested = await Promise.all((node.children ?? []).map((child: any) => inlineToRuns(docx, child, theme, { ...style, strike: true }, input, imageScale)));
     return nested.flat();
   }
   if (node.type === 'link') {
@@ -2115,7 +2302,7 @@ async function inlineToRuns(
       ...style,
       color: theme.accent,
       underline: { type: UnderlineType.SINGLE },
-    })));
+    }, input, imageScale)));
     return nested.flat();
   }
   if (node.type === 'image') {
@@ -2123,7 +2310,7 @@ async function inlineToRuns(
     return label ? splitMarkedText(docx, label, { ...style, italics: true, color: theme.muted }) : [];
   }
   if (node.value && typeof node.value === 'string') return splitMarkedText(docx, node.value, style);
-  const nested = await Promise.all((node.children ?? []).map((child: any) => inlineToRuns(docx, child, theme, style)));
+  const nested = await Promise.all((node.children ?? []).map((child: any) => inlineToRuns(docx, child, theme, style, input, imageScale)));
   return nested.flat();
 }
 
@@ -2132,10 +2319,12 @@ async function paragraphFromInlineChildren(
   children: any[],
   theme: DocxTheme,
   style: RunStyle = {},
+  input?: ExportDocumentInput,
+  imageScale = 2,
 ) {
   const { Paragraph } = docx;
   return new Paragraph({
-    children: (await Promise.all(children.map((child) => inlineToRuns(docx, child, theme, style)))).flat(),
+    children: (await Promise.all(children.map((child) => inlineToRuns(docx, child, theme, style, input, imageScale)))).flat(),
     spacing: { after: 180, line: 330 },
   });
 }
@@ -2146,17 +2335,18 @@ async function paragraphBlocksFromInlineChildren(
   theme: DocxTheme,
   documentPath?: string,
   imageScale = 2,
+  input?: ExportDocumentInput,
 ) {
   const { AlignmentType, Paragraph, TextRun } = docx;
   if (!children.some((child) => child?.type === 'image')) {
-    return [await paragraphFromInlineChildren(docx, children, theme)];
+    return [await paragraphFromInlineChildren(docx, children, theme, {}, input, imageScale)];
   }
 
   const blocks: DocxBlock[] = [];
   let pendingInline: any[] = [];
   const flushInline = async () => {
     if (pendingInline.length === 0) return;
-    blocks.push(await paragraphFromInlineChildren(docx, pendingInline, theme));
+    blocks.push(await paragraphFromInlineChildren(docx, pendingInline, theme, {}, input, imageScale));
     pendingInline = [];
   };
 
@@ -2202,6 +2392,7 @@ function isInlineMdastNode(node: any) {
     'strong',
     'delete',
     'inlineCode',
+    'inlineMath',
     'link',
     'break',
     'html',
@@ -2217,6 +2408,7 @@ async function tableCellToDocxBlocks(
   isHeader: boolean,
   documentPath?: string,
   imageScale = 2,
+  input?: ExportDocumentInput,
 ) {
   const { Paragraph, TextRun } = docx;
   if (children.length === 0) {
@@ -2226,17 +2418,17 @@ async function tableCellToDocxBlocks(
   if (children.every(isInlineMdastNode)) {
     return [
       new Paragraph({
-        children: (await Promise.all(children.map((child) => inlineToRuns(docx, child, theme, { bold: isHeader })))).flat(),
+        children: (await Promise.all(children.map((child) => inlineToRuns(docx, child, theme, { bold: isHeader }, input, imageScale)))).flat(),
         spacing: { before: 0, after: 0, line: 300 },
       }),
     ];
   }
 
-  const blocks = await mdastToDocxBlocks(docx, children, theme, contentTheme, 0, documentPath, imageScale);
+  const blocks = await mdastToDocxBlocks(docx, children, theme, contentTheme, 0, documentPath, imageScale, input);
   return blocks.length > 0 ? blocks : [new Paragraph('')];
 }
 
-function codeBlockToDocxTable(docx: DocxModule, value: string, theme: DocxTheme) {
+function codeBlockToDocxTable(docx: DocxModule, value: string, theme: DocxTheme, input?: ExportDocumentInput) {
   const {
     AlignmentType,
     BorderStyle,
@@ -2251,8 +2443,10 @@ function codeBlockToDocxTable(docx: DocxModule, value: string, theme: DocxTheme)
     WidthType,
   } = docx;
   const lines = String(value ?? '').replace(/\t/g, '  ').split('\n');
+  const tableWidth = getDocxContentWidthTwips(input);
   return new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
+    width: { size: tableWidth, type: WidthType.DXA },
+    columnWidths: [tableWidth],
     layout: TableLayoutType.FIXED,
     borders: {
       top: { style: BorderStyle.SINGLE, size: 4, color: theme.border },
@@ -2266,6 +2460,7 @@ function codeBlockToDocxTable(docx: DocxModule, value: string, theme: DocxTheme)
       new TableRow({
         children: [
           new TableCell({
+            width: { size: tableWidth, type: WidthType.DXA },
             shading: { type: ShadingType.CLEAR, fill: theme.fill },
             margins: { top: 140, bottom: 140, left: 160, right: 160 },
             verticalAlign: VerticalAlignTable.TOP,
@@ -2411,6 +2606,7 @@ async function mdastToDocxBlocks(
   listDepth = 0,
   documentPath?: string,
   imageScale = 2,
+  input?: ExportDocumentInput,
 ): Promise<DocxBlock[]> {
   const {
     AlignmentType,
@@ -2440,23 +2636,23 @@ async function mdastToDocxBlocks(
           HeadingLevel.HEADING_5,
           HeadingLevel.HEADING_6,
         ][level - 1],
-        children: (await Promise.all((node.children ?? []).map((child: any) => inlineToRuns(docx, child, theme)))).flat(),
+        children: (await Promise.all((node.children ?? []).map((child: any) => inlineToRuns(docx, child, theme, {}, input, imageScale)))).flat(),
         spacing: { before: level <= 2 ? 360 : 260, after: 160 },
       }));
       continue;
     }
 
     if (node.type === 'paragraph') {
-      blocks.push(...await paragraphBlocksFromInlineChildren(docx, node.children ?? [], theme, documentPath, imageScale));
+      blocks.push(...await paragraphBlocksFromInlineChildren(docx, node.children ?? [], theme, documentPath, imageScale, input));
       continue;
     }
 
     if (node.type === 'blockquote') {
       const textRuns = (await Promise.all((node.children ?? []).map(async (child: any) => {
         if (child.type === 'paragraph') {
-          return (await Promise.all((child.children ?? []).map((inline: any) => inlineToRuns(docx, inline, theme)))).flat();
+          return (await Promise.all((child.children ?? []).map((inline: any) => inlineToRuns(docx, inline, theme, {}, input, imageScale)))).flat();
         }
-        return inlineToRuns(docx, child, theme);
+        return inlineToRuns(docx, child, theme, {}, input, imageScale);
       }))).flat();
       blocks.push(new Paragraph({
         children: textRuns,
@@ -2501,7 +2697,35 @@ async function mdastToDocxBlocks(
         continue;
       }
 
-      blocks.push(codeBlockToDocxTable(docx, node.value ?? '', theme));
+      blocks.push(codeBlockToDocxTable(docx, node.value ?? '', theme, input));
+      continue;
+    }
+
+    if (node.type === 'math') {
+      const source = String(node.value ?? '');
+      const image = input ? await renderDocxMathImage(input, source, true, imageScale) : null;
+      if (image) {
+        blocks.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 180, after: 220 },
+          children: [
+            createDocxImageRun(docx, image, {
+              title: 'Math formula',
+              description: source,
+              name: 'Math formula',
+            }),
+          ],
+        }));
+      } else {
+        blocks.push(new Paragraph({
+          children: [new TextRun({
+            text: `$$ ${source} $$`,
+            font: theme.codeFont,
+            color: theme.accent,
+          })],
+          spacing: { before: 120, after: 160 },
+        }));
+      }
       continue;
     }
 
@@ -2510,7 +2734,7 @@ async function mdastToDocxBlocks(
         const marker = getDocxListMarker(node, item, index);
         const paragraphChild = (item.children ?? []).find((child: any) => child.type === 'paragraph');
         const runs = paragraphChild
-          ? (await Promise.all((paragraphChild.children ?? []).map((child: any) => inlineToRuns(docx, child, theme)))).flat()
+          ? (await Promise.all((paragraphChild.children ?? []).map((child: any) => inlineToRuns(docx, child, theme, {}, input, imageScale)))).flat()
           : [];
         blocks.push(new Paragraph({
           children: [new TextRun({ text: marker, color: theme.accent }), ...runs],
@@ -2518,17 +2742,24 @@ async function mdastToDocxBlocks(
           spacing: { after: 100, line: 330 },
         }));
         const nested = (item.children ?? []).filter((child: any) => child.type !== 'paragraph');
-        blocks.push(...await mdastToDocxBlocks(docx, nested, theme, contentTheme, listDepth + 1, documentPath, imageScale));
+        blocks.push(...await mdastToDocxBlocks(docx, nested, theme, contentTheme, listDepth + 1, documentPath, imageScale, input));
       }
       continue;
     }
 
     if (node.type === 'table') {
       const rows = [];
+      const columnCount = Math.max(
+        1,
+        ...(node.children ?? []).map((row: any) => (row.children ?? []).length),
+      );
+      const tableWidth = getDocxContentWidthTwips(input);
+      const columnWidth = Math.floor(tableWidth / columnCount);
       for (const [rowIndex, row] of (node.children ?? []).entries()) {
         const cells = [];
         for (const cell of row.children ?? []) {
           cells.push(new TableCell({
+            width: { size: columnWidth, type: WidthType.DXA },
             children: await tableCellToDocxBlocks(
               docx,
               cell.children ?? [],
@@ -2537,6 +2768,7 @@ async function mdastToDocxBlocks(
               rowIndex === 0,
               documentPath,
               imageScale,
+              input,
             ),
             shading: rowIndex === 0 ? { type: ShadingType.CLEAR, fill: theme.fill } : undefined,
             margins: { top: 110, bottom: 110, left: 140, right: 140 },
@@ -2553,7 +2785,8 @@ async function mdastToDocxBlocks(
       }
       blocks.push(new Table({
         rows,
-        width: { size: 100, type: WidthType.PERCENTAGE },
+        width: { size: tableWidth, type: WidthType.DXA },
+        columnWidths: Array.from({ length: columnCount }, () => columnWidth),
         layout: TableLayoutType.FIXED,
         borders: {
           top: { style: BorderStyle.SINGLE, size: 4, color: theme.border },
@@ -2576,8 +2809,24 @@ async function mdastToDocxBlocks(
     }
 
     if (node.type === 'html') {
+      const source = String(node.value ?? '');
+      const image = input ? await renderDocxHtmlBlockImage(input, source, imageScale) : null;
+      if (image) {
+        blocks.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 180, after: 220 },
+          children: [
+            createDocxImageRun(docx, image, {
+              title: 'HTML block',
+              description: source.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() || 'HTML block',
+              name: 'HTML block',
+            }),
+          ],
+        }));
+        continue;
+      }
       blocks.push(new Paragraph({
-        children: [new TextRun({ text: String(node.value ?? '').replace(/<[^>]*>/g, '') })],
+        children: [new TextRun({ text: source.replace(/<[^>]*>/g, '') })],
       }));
       continue;
     }
@@ -2616,6 +2865,7 @@ export async function exportDocx(input: ExportDocumentInput, outputPath?: string
     0,
     input.documentPath,
     docxImageScale,
+    input,
   );
   const blocks = [...tocBlocks, ...bodyBlocks];
   const { Document, Packer, Paragraph } = docx;

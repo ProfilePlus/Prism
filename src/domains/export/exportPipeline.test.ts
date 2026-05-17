@@ -1223,6 +1223,9 @@ describe('export pipeline docx header and footer', () => {
     expect(documentXml).toContain('目录');
     expect(documentXml).toContain('导出验收文档');
     expect(documentXml).toContain('项目');
+    expect(documentXml).toMatch(/<w:tcW w:type="dxa" w:w="\d+"/);
+    expect(documentXml).toMatch(/<w:gridCol w:w="\d+"/);
+    expect(documentXml).toContain('<w:gridCol w:w="9866"/>');
     expect(documentXml).toContain('const title');
     expect(documentXml).not.toContain('graph TD');
     expect(mediaFiles.some((path) => /\.(png|jpe?g|svg)$/.test(path))).toBe(true);
@@ -1251,7 +1254,7 @@ describe('export pipeline docx header and footer', () => {
     expect(documentXml).toContain('待确认');
   });
 
-  it('embeds relative local svg images in docx output', async () => {
+  it('embeds relative local svg images in docx output with a png fallback', async () => {
     fsMock.writeFile.mockClear();
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="120"><text>Local Docx SVG</text></svg>';
     fsMock.readFile.mockImplementationOnce(async (targetPath: string) => {
@@ -1272,12 +1275,13 @@ describe('export pipeline docx header and footer', () => {
 
     expect(fsMock.readFile).toHaveBeenCalledWith('/tmp/prism-doc/assets/logo.svg');
     expect(documentXml).toContain('<w:drawing>');
+    expect(mediaFiles.some((filePath) => /\.svg$/.test(filePath))).toBe(true);
     expect(mediaFiles.some((filePath) => /\.png$/.test(filePath))).toBe(true);
-    expect(mediaFiles.some((filePath) => /\.svg$/.test(filePath))).toBe(false);
   });
 
-  it('rasterizes Mermaid foreignObject labels for docx output', async () => {
+  it('renders Mermaid docx diagrams with root-level non-html labels and svg png fallback', async () => {
     fsMock.writeFile.mockClear();
+    mermaidMock.initialize.mockClear();
     mermaidMock.render.mockResolvedValueOnce({
       svg: [
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80">',
@@ -1303,9 +1307,43 @@ describe('export pipeline docx header and footer', () => {
     const mediaFiles = Object.keys(zip.files).filter((filePath) => filePath.startsWith('word/media/'));
     const documentXml = await zip.file('word/document.xml')?.async('string');
 
+    expect(mermaidMock.initialize).toHaveBeenCalledWith(expect.objectContaining({
+      htmlLabels: false,
+      flowchart: expect.objectContaining({ htmlLabels: false }),
+    }));
     expect(documentXml).toContain('<w:drawing>');
+    expect(mediaFiles.some((filePath) => /\.svg$/.test(filePath))).toBe(true);
     expect(mediaFiles.some((filePath) => /\.png$/.test(filePath))).toBe(true);
-    expect(mediaFiles.some((filePath) => /\.svg$/.test(filePath))).toBe(false);
+  });
+
+  it('rasterizes rendered math and sanitized html blocks for docx visual fallback', async () => {
+    fsMock.writeFile.mockClear();
+
+    await exportDocx(createInput({
+      content: [
+        '# Rich blocks',
+        '',
+        'Inline math $E = mc^2$ keeps a rendered visual fallback.',
+        '',
+        '$$',
+        '\\int_0^1 x^2 dx = \\frac{1}{3}',
+        '$$',
+        '',
+        '<div class="callout"><strong>HTML 卡片</strong><span>完整渲染</span></div>',
+      ].join('\n'),
+    }), '/tmp/rich-blocks.docx');
+
+    const { default: JSZip } = await import('jszip');
+    const bytes = fsMock.writeFile.mock.calls[0][1] as Uint8Array;
+    const zip = await JSZip.loadAsync(bytes);
+    const documentXml = await zip.file('word/document.xml')?.async('string') ?? '';
+    const mediaFiles = Object.keys(zip.files).filter((filePath) => filePath.startsWith('word/media/'));
+
+    expect(documentXml).toContain('Rich blocks');
+    expect(documentXml).toContain('Inline math');
+    expect(documentXml).toContain('<w:drawing>');
+    expect((documentXml.match(/<w:drawing>/g) ?? [])).toHaveLength(3);
+    expect(mediaFiles.some((filePath) => /\.png$/.test(filePath))).toBe(true);
   });
 
   it('normalizes docx drawing ids for WPS-compatible image rendering', async () => {
