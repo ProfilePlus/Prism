@@ -247,8 +247,10 @@
 - `src/App.recovery.test.tsx` 覆盖 App 层导出进度与失败诊断：`prism-export-progress` 事件会展示/隐藏进度状态并清理旧失败浮层；`prism-export-failure` 事件会展示诊断浮层，诊断文本可复制到系统剪贴板，并显示复制成功 toast。
 - `src/domains/export/isolatedWebviewExport.ts` 将独立导出 WebView 停在主窗口背后的极小可见窗口，启用 `backgroundThrottling: disabled`，并加入 90 秒无进度 watchdog；`isolatedWebviewExport.test.ts` 覆盖 worker 不再离屏隐藏、无进度会失败并清理 worker。
 - `src/domains/export/exportPipeline.ts` 为 `requestAnimationFrame` 等待增加 timer fallback，Mermaid 多图导出按 `正在渲染图表 N / 总数` 报告进度，并给 DOCX Mermaid 图片链路增加 render / 图片加载超时；`exportPipeline.test.ts` 覆盖 rAF 不回调时 HTML 导出仍能完成，以及多 Mermaid 的逐图进度。
+- `src/domains/export/exportPipeline.ts` 将长文 PDF 从“每页一次 `html2canvas`”优化为“最多 4 页一批渲染后无损切片”，保持用户选择的 2x / 3x / 4x 清晰度，不恢复自动降级；`exportPipeline.test.ts` 覆盖长 PDF 会合批渲染、PDF 页数仍大于渲染批次数、每次渲染仍使用 2x scale。
 - `docs/verification/prism-complex-export-smoke.md` 记录自动化 pipeline 产物 smoke、命令入口集成 smoke 和真实 Prism UI 四格式导出 smoke 通过；2026-05-15 通过当前 `.app` 应用内导出菜单生成 `ui-raster-fixed.html|pdf|png|docx`，并用 `file`、`pdf-lib`、`sips`、`jszip`、`textutil` 和 Quick Look thumbnail 检查产物。
 - `docs/verification/prism-complex-export-smoke.md` 记录 2026-05-17 独立导出 WebView 卡死修复 smoke：真实 `.app` 曾在 HTML 导出 `preview-heavy.md` 时停在“正在渲染图表”并 20 分钟后超时；修复后通过命令面板导出 `preview-heavy-webview-smoke-fixed.html`，文件在几秒内生成，HTML 中有 20 个 Mermaid SVG，1 个 fixture 内故意非法 Mermaid 以单图 fallback 落地，没有阻断整份导出。
+- `docs/verification/prism-complex-export-smoke.md` 记录 2026-05-17 PDF 长文速度优化：49 页级 PDF 的瓶颈是逐页 `html2canvas` 重渲染，修复后长文会以批次进度推进，例如 `正在生成 PDF 页面 1-4 / 49`。
 - `src/domains/export/exportPipeline.ts` 已修复真实 PDF / PNG 导出暴露的 `html2canvas` 现代 CSS color function 兼容问题：栅格导出 iframe 使用 raster-safe CSS，并在截图前把 computed `color(...)` 归一为 `rgb(...)` / `rgba(...)`；HTML 导出保持完整主题 CSS。
 - `docs/verification/prism-pandoc-citation-html-smoke.md` 记录 Pandoc smoke 方案和本机阻塞。
 
@@ -256,7 +258,7 @@
 
 - 自动测试强：导出 pipeline、命令入口和设置归一化覆盖广；HTML 导出已覆盖 Pandoc 返回 HTML 的安全清理；导出进度事件、App 层进度 UI、失败诊断浮层、warning 汇总和复制路径已有回归；导出 pipeline 已从主入口 chunk 拆出，降低启动首包压力。
 - 自动化产物 smoke 中等偏强：复杂 Markdown 已可生成并读取 HTML/PDF/PNG/DOCX 产物；PNG 自动化仍使用 `html2canvas` 测试替身，但真实 UI smoke 已补同一 fixture 的 PDF / PNG 文件级结果。
-- 真实导出 UI smoke 较强：当前 `.app` 通过真实导出菜单生成 HTML / PDF / PNG / DOCX；PDF 用 `pdf-lib` 确认 2 页 A4，PNG 用 `sips` 确认 2054 x 3316，DOCX 用 `jszip`、`textutil` 和 Quick Look thumbnail 确认可解析、保留中文 / 表格 / 任务列表且 Mermaid 未退化为源码。独立 WebView 导出也已用真实 `.app` 复测重媒体 HTML 导出，不再长期卡在“正在渲染图表”。
+- 真实导出 UI smoke 较强：当前 `.app` 通过真实导出菜单生成 HTML / PDF / PNG / DOCX；PDF 用 `pdf-lib` 确认 2 页 A4，PNG 用 `sips` 确认 2054 x 3316，DOCX 用 `jszip`、`textutil` 和 Quick Look thumbnail 确认可解析、保留中文 / 表格 / 任务列表且 Mermaid 未退化为源码。独立 WebView 导出也已用真实 `.app` 复测重媒体 HTML 导出，不再长期卡在“正在渲染图表”。PDF 长文批量渲染已有自动化回归，真实 49 页耗时仍建议发布前人工复测一次。
 - Pandoc 真实验证弱：本机 `pandoc --version` 为 `command not found`，未生成 citeproc 实际 HTML。
 
 ### 缺口

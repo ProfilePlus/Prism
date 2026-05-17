@@ -748,7 +748,7 @@ describe('export pipeline image progress', () => {
     expect(fsMock.writeFile).not.toHaveBeenCalled();
   });
 
-  it('renders long pdf documents as bounded page slices with page progress', async () => {
+  it('renders long pdf documents in multi-page batches without lowering scale', async () => {
     fsMock.writeFile.mockClear();
     canvasRenderMock.render.mockClear();
     const warnings: string[] = [];
@@ -766,20 +766,18 @@ describe('export pipeline image progress', () => {
 
     const renderCalls = canvasRenderMock.render.mock.calls as unknown as Array<[
       HTMLElement,
-      { scale: number; windowHeight: number },
+      { scale: number; height: number; windowHeight: number },
     ]>;
     expect(renderCalls.length).toBeGreaterThan(1);
     expect(renderCalls.every(([, options]) => options.scale === 2)).toBe(true);
     expect(renderCalls.every(([, options]) => options.windowHeight < 60_000)).toBe(true);
-    expect(progress).toEqual(expect.arrayContaining([
-      `正在生成 PDF 页面 1 / ${renderCalls.length}`,
-      `正在生成 PDF 页面 ${renderCalls.length} / ${renderCalls.length}`,
-    ]));
+    expect(progress.some((message) => /正在生成 PDF 页面 1-\d+ \/ \d+/.test(message))).toBe(true);
     expect(warnings).not.toEqual(expect.arrayContaining([expect.stringContaining('0.21x')]));
     const { PDFDocument } = await import('pdf-lib');
     const bytes = fsMock.writeFile.mock.calls[0][1] as Uint8Array;
     const pdf = await PDFDocument.load(bytes);
-    expect(pdf.getPageCount()).toBe(renderCalls.length);
+    expect(pdf.getPageCount()).toBeGreaterThan(renderCalls.length);
+    expect(renderCalls.some(([, options]) => options.height > 4096)).toBe(true);
   });
 
   it('stops pdf export before rendering documents with excessive page counts', async () => {

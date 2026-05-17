@@ -404,3 +404,24 @@ Checkpoint：
 - `npm run build`：通过，仅有既有 Vite large chunk warning。
 - `git diff --check`：通过。
 - `npm run tauri:build:app-smoke`：通过，生成 `src-tauri/target/release/bundle/macos/Prism.app`。
+
+### 2026-05-17 PDF 长文导出速度优化
+
+背景：
+
+- 真实反馈：49 页 PDF 导出接近 5 分钟，主要慢在 PDF 渲染阶段。
+- 根因：当前 PDF 管线为 `html2canvas` 栅格化后用 `pdf-lib` 嵌入 PDF；旧实现每页调用一次 `html2canvas`，长文页数会线性放大 DOM 解析、布局和绘制成本。
+- 约束：不允许自动降清晰度，不改用有损 JPEG，不牺牲 Mermaid / KaTeX / 主题视觉一致性。
+
+修复：
+
+- `src/domains/export/exportPipeline.ts` 将 PDF 页面渲染从单页循环改成最多 4 页一批渲染，再按页无损切片为 PNG 嵌入 PDF。
+- 清晰度仍使用用户选择的 `pngScale`，默认 2x；不会回到旧的自动降级策略。
+- 批量高度仍受 `MAX_EXPORT_CANVAS_DIMENSION` 和 `MAX_EXPORT_CANVAS_AREA` 约束；超过安全 canvas 限制时自动缩小批次，不降低 scale。
+- 真实 Tauri 环境优先用 `canvas.toBlob('image/png')` 输出页图，减少 base64 中转；测试 / 非 Tauri 环境保留 `toDataURL` fallback。
+- 导出进度从单页消息扩展为批次消息，例如 `正在生成 PDF 页面 1-4 / 49`，用户能看出 PDF 正在按批推进。
+
+验证命令：
+
+- `npm test -- --run src/domains/export/exportPipeline.test.ts`：通过，1 file / 37 tests。
+- `npm test -- --run src/domains/export/exportPipeline.test.ts src/domains/export/index.test.ts src/domains/export/isolatedWebviewExport.test.ts src/domains/commands/exportCommand.integration.test.ts`：通过，4 files / 44 tests。

@@ -41,6 +41,11 @@ type RasterDocxImageType = 'png' | 'jpg' | 'gif' | 'bmp';
 type ExportDocxImage =
   | { type: RasterDocxImageType; data: Uint8Array; width: number; height: number };
 type ExportFileLabel = 'HTML' | 'PDF' | 'PNG' | 'Word';
+interface PdfRenderedPage {
+  data: Uint8Array;
+  width: number;
+  height: number;
+}
 interface PandocCitationHtmlResult {
   html: string;
   warnings: string;
@@ -62,8 +67,9 @@ const MAX_EXPORT_CANVAS_DIMENSION = 16_000;
 const MAX_EXPORT_CANVAS_AREA = 64_000_000;
 const PDF_EXPORT_RASTER_SCALE = 2;
 const PDF_EXPORT_MAX_PAGES = 500;
-const PDF_EXPORT_PAGE_RENDER_TIMEOUT_MS = 30_000;
+const PDF_EXPORT_BATCH_RENDER_TIMEOUT_MS = 60_000;
 const PDF_EXPORT_MAX_RENDER_VIEWPORT_HEIGHT = 4_096;
+const PDF_EXPORT_MAX_PAGES_PER_BATCH = 4;
 const EXPORT_MERMAID_RENDER_TIMEOUT_MS = 20_000;
 const EXPORT_FONT_READY_TIMEOUT_MS = 3_000;
 
@@ -85,6 +91,15 @@ function assertExportCanvasWithinLimits(width: number, height: number, scale: nu
       `${label}画布超出系统限制 (${scaledWidth} x ${scaledHeight} @ ${scale}x)，请降低导出清晰度或拆分文档。`,
     );
   }
+}
+
+function isExportCanvasWithinLimits(width: number, height: number, scale: number) {
+  const scaledWidth = Math.ceil(width * scale);
+  const scaledHeight = Math.ceil(height * scale);
+  const area = scaledWidth * scaledHeight;
+  return scaledWidth <= MAX_EXPORT_CANVAS_DIMENSION
+    && scaledHeight <= MAX_EXPORT_CANVAS_DIMENSION
+    && area <= MAX_EXPORT_CANVAS_AREA;
 }
 
 function stripMarkdownExtension(filename: string) {
@@ -446,6 +461,40 @@ function dataUrlToBytes(dataUrl: string) {
   return bytes;
 }
 
+async function canvasToPngBytes(canvas: HTMLCanvasElement, label: string) {
+  const shouldUseBlob = typeof canvas.toBlob === 'function'
+    && typeof window !== 'undefined'
+    && Boolean((window as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
+  const blob = await new Promise<Blob | null>((resolve) => {
+    if (!shouldUseBlob) {
+      resolve(null);
+      return;
+    }
+    let settled = false;
+    const finish = (value: Blob | null) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      resolve(value);
+    };
+    const timer = window.setTimeout(() => finish(null), 5_000);
+    try {
+      canvas.toBlob((value) => finish(value), 'image/png');
+    } catch {
+      finish(null);
+    }
+  });
+  if (blob) {
+    return new Uint8Array(await blob.arrayBuffer());
+  }
+
+  const dataUrl = canvas.toDataURL('image/png');
+  if (!dataUrl.startsWith('data:image/png')) {
+    throw new Error(label);
+  }
+  return dataUrlToBytes(dataUrl);
+}
+
 function getSvgSize(svg: string) {
   const svgDocument = new DOMParser().parseFromString(svg, 'image/svg+xml');
   const element = svgDocument.documentElement;
@@ -727,6 +776,67 @@ function normalizeRasterComputedColors(root: HTMLElement) {
 
 function getPdfPageRenderWindowHeight(sliceHeight: number) {
   return Math.ceil(Math.min(PDF_EXPORT_MAX_RENDER_VIEWPORT_HEIGHT, Math.max(1200, sliceHeight)));
+}
+
+function resolvePdfRenderBatchEndPage(
+  pageIndex: number,
+  pageCount: number,
+  pageCssHeight: number,
+  documentHeight: number,
+  width: number,
+  scale: number,
+) {
+  let batchEndPage = Math.min(pageCount, pageIndex + PDF_EXPORT_MAX_PAGES_PER_BATCH);
+  while (batchEndPage > pageIndex + 1) {
+    const batchStartY = Math.floor(pageIndex * pageCssHeight);
+    const batchEndY = Math.min(documentHeight, Math.floor(batchEndPage * pageCssHeight));
+    const batchHeight = Math.max(1, batchEndY - batchStartY);
+    if (isExportCanvasWithinLimits(width, batchHeight, scale)) break;
+    batchEndPage -= 1;
+  }
+  return batchEndPage;
+}
+
+function getPdfPageRenderProgressMessage(startPage: number, endPage: number, pageCount: number) {
+  return startPage === endPage
+    ? `正在生成 PDF 页面 ${startPage} / ${pageCount}`
+    : `正在生成 PDF 页面 ${startPage}-${endPage} / ${pageCount}`;
+}
+
+async function createPdfRenderedPageFromBatch(
+  batchCanvas: HTMLCanvasElement,
+  pixelY: number,
+  pixelHeight: number,
+  errorLabel: string,
+): Promise<PdfRenderedPage> {
+  const y = Math.max(0, Math.min(batchCanvas.height - 1, pixelY));
+  const height = Math.max(1, Math.min(batchCanvas.height - y, pixelHeight));
+  const coversWholeBatch = y === 0 && height === batchCanvas.height;
+  const canvas = coversWholeBatch ? batchCanvas : document.createElement('canvas');
+
+  if (!coversWholeBatch) {
+    canvas.width = batchCanvas.width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error(`${errorLabel}切片失败`);
+    context.drawImage(
+      batchCanvas,
+      0,
+      y,
+      batchCanvas.width,
+      height,
+      0,
+      0,
+      batchCanvas.width,
+      height,
+    );
+  }
+
+  return {
+    data: await canvasToPngBytes(canvas, `${errorLabel}画布超出系统限制`),
+    width: canvas.width,
+    height: canvas.height,
+  };
 }
 
 async function collectExportCss(
@@ -1397,7 +1507,7 @@ export async function exportPdf(input: ExportDocumentInput, outputPath?: string)
 
   for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
     const image = renderedPages[pageIndex];
-    const embedded = await pdf.embedPng(dataUrlToBytes(image.dataUrl));
+    const embedded = await pdf.embedPng(image.data);
     const scaledHeight = contentWidth * (image.height / image.width);
     const page = pdf.addPage([pageWidth, pageHeight]);
     page.drawImage(embedded, {
@@ -1486,16 +1596,31 @@ async function createRenderedPdfPages(
       target.ownerDocument.defaultView?.getComputedStyle(target).backgroundColor ?? '',
     ) || '#ffffff';
 
-    const pages = [];
-    for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
-      const y = Math.floor(pageIndex * pageCssHeight);
-      const nextY = Math.min(height, Math.floor((pageIndex + 1) * pageCssHeight));
-      const sliceHeight = Math.max(1, nextY - y);
+    const pages: PdfRenderedPage[] = [];
+    for (let pageIndex = 0; pageIndex < pageCount;) {
+      const batchEndPage = resolvePdfRenderBatchEndPage(
+        pageIndex,
+        pageCount,
+        pageCssHeight,
+        height,
+        width,
+        requestedScale,
+      );
+      const batchStartY = Math.floor(pageIndex * pageCssHeight);
+      const batchEndY = Math.min(height, Math.floor(batchEndPage * pageCssHeight));
+      const batchHeight = Math.max(1, batchEndY - batchStartY);
       const scale = requestedScale;
-      const windowHeight = getPdfPageRenderWindowHeight(sliceHeight);
-      assertExportCanvasWithinLimits(width, sliceHeight, scale, `PDF 第 ${pageIndex + 1} 页`);
+      const windowHeight = getPdfPageRenderWindowHeight(batchHeight);
+      assertExportCanvasWithinLimits(
+        width,
+        batchHeight,
+        scale,
+        batchEndPage === pageIndex + 1
+          ? `PDF 第 ${pageIndex + 1} 页`
+          : `PDF 第 ${pageIndex + 1}-${batchEndPage} 页`,
+      );
 
-      reportProgress(input, `正在生成 PDF 页面 ${pageIndex + 1} / ${pageCount}`);
+      reportProgress(input, getPdfPageRenderProgressMessage(pageIndex + 1, batchEndPage, pageCount));
       await nextFrame();
       const canvas = await withTimeout(
         html2canvas(target, {
@@ -1504,26 +1629,42 @@ async function createRenderedPdfPages(
           useCORS: true,
           logging: false,
           width,
-          height: sliceHeight,
+          height: batchHeight,
           x: 0,
-          y,
+          y: batchStartY,
           windowWidth: width,
           windowHeight,
           scrollX: 0,
           scrollY: 0,
         }),
-        PDF_EXPORT_PAGE_RENDER_TIMEOUT_MS,
-        `PDF 第 ${pageIndex + 1} 页渲染超时，请减少单页复杂图表或改用 HTML 导出。`,
+        PDF_EXPORT_BATCH_RENDER_TIMEOUT_MS,
+        batchEndPage === pageIndex + 1
+          ? `PDF 第 ${pageIndex + 1} 页渲染超时，请减少单页复杂图表或改用 HTML 导出。`
+          : `PDF 第 ${pageIndex + 1}-${batchEndPage} 页渲染超时，请减少复杂图表或改用 HTML 导出。`,
       );
-      const dataUrl = canvas.toDataURL('image/png');
-      if (!dataUrl.startsWith('data:image/png')) {
-        throw new Error(`PDF 单页画布超出系统限制 (${Math.ceil(width * scale)} x ${Math.ceil(sliceHeight * scale)})`);
+      canvas.width ||= Math.ceil(width * scale);
+      canvas.height ||= Math.ceil(batchHeight * scale);
+
+      const pixelPerCssY = canvas.height / batchHeight;
+      for (let splitPageIndex = pageIndex; splitPageIndex < batchEndPage; splitPageIndex += 1) {
+        const pageStartY = Math.floor(splitPageIndex * pageCssHeight);
+        const pageEndY = Math.min(height, Math.floor((splitPageIndex + 1) * pageCssHeight));
+        const pageOffsetY = Math.max(0, pageStartY - batchStartY);
+        const nextPageOffsetY = Math.max(pageOffsetY + 1, pageEndY - batchStartY);
+        const pixelY = Math.round(pageOffsetY * pixelPerCssY);
+        const nextPixelY = splitPageIndex === batchEndPage - 1
+          ? canvas.height
+          : Math.round(nextPageOffsetY * pixelPerCssY);
+        const pixelHeight = Math.max(1, nextPixelY - pixelY);
+        pages.push(await createPdfRenderedPageFromBatch(
+          canvas,
+          pixelY,
+          pixelHeight,
+          `PDF 第 ${splitPageIndex + 1} 页`,
+        ));
       }
-      pages.push({
-        dataUrl,
-        width: canvas.width || Math.ceil(width * scale),
-        height: canvas.height || Math.ceil(sliceHeight * scale),
-      });
+
+      pageIndex = batchEndPage;
       await nextFrame();
     }
     return pages;
