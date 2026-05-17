@@ -61,6 +61,9 @@ type CitationPlaceholderContext = 'html' | 'builtIn';
 const MAX_EXPORT_CANVAS_DIMENSION = 16_000;
 const MAX_EXPORT_CANVAS_AREA = 64_000_000;
 const PDF_EXPORT_RASTER_SCALE = 2;
+const PDF_EXPORT_MAX_PAGES = 500;
+const PDF_EXPORT_PAGE_RENDER_TIMEOUT_MS = 30_000;
+const PDF_EXPORT_MAX_RENDER_VIEWPORT_HEIGHT = 4_096;
 
 function stripMarkdownExtension(filename: string) {
   return filename.replace(/\.(md|markdown|txt)$/i, '') || 'Untitled';
@@ -72,6 +75,22 @@ function getExportTitle(input: Pick<ExportDocumentInput, 'filename' | 'title'>) 
 
 function nextFrame() {
   return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 }
 
 function reportProgress(input: ExportDocumentInput, message: string) {
@@ -676,6 +695,10 @@ function getSafeRasterScale(width: number, height: number, requestedScale = 2) {
   const dimensionScale = MAX_EXPORT_CANVAS_DIMENSION / Math.max(normalizedWidth, normalizedHeight);
   const areaScale = Math.sqrt(MAX_EXPORT_CANVAS_AREA / (normalizedWidth * normalizedHeight));
   return Math.max(0.1, Math.min(requestedScale, dimensionScale, areaScale));
+}
+
+function getPdfPageRenderWindowHeight(sliceHeight: number) {
+  return Math.ceil(Math.min(PDF_EXPORT_MAX_RENDER_VIEWPORT_HEIGHT, Math.max(1200, sliceHeight)));
 }
 
 async function collectExportCss(
@@ -1394,6 +1417,12 @@ async function createRenderedPdfPages(
     const cssPxToPdfPoint = options.contentWidth / width;
     const pageCssHeight = Math.max(1, options.contentHeight / cssPxToPdfPoint);
     const pageCount = Math.max(1, Math.ceil(height / pageCssHeight));
+    if (!Number.isFinite(pageCssHeight) || !Number.isFinite(pageCount)) {
+      throw new Error('PDF 页面尺寸计算失败');
+    }
+    if (pageCount > PDF_EXPORT_MAX_PAGES) {
+      throw new Error(`PDF 页数过多（${pageCount} 页，最大 ${PDF_EXPORT_MAX_PAGES} 页），请拆分文档或改用 HTML 导出。`);
+    }
     const requestedScale = options.scale ?? PDF_EXPORT_RASTER_SCALE;
     const backgroundColor = normalizeCssColorFunctionsForRaster(
       target.ownerDocument.defaultView?.getComputedStyle(target).backgroundColor ?? '',
@@ -1406,6 +1435,7 @@ async function createRenderedPdfPages(
       const nextY = Math.min(height, Math.floor((pageIndex + 1) * pageCssHeight));
       const sliceHeight = Math.max(1, nextY - y);
       const scale = getSafeRasterScale(width, sliceHeight, requestedScale);
+      const windowHeight = getPdfPageRenderWindowHeight(sliceHeight);
       if (scale < requestedScale && !warnedScaleCap) {
         warnedScaleCap = true;
         reportWarning(
@@ -1414,20 +1444,26 @@ async function createRenderedPdfPages(
         );
       }
 
-      const canvas = await html2canvas(target, {
-        backgroundColor,
-        scale,
-        useCORS: true,
-        logging: false,
-        width,
-        height: sliceHeight,
-        x: 0,
-        y,
-        windowWidth: width,
-        windowHeight: height,
-        scrollX: 0,
-        scrollY: 0,
-      });
+      reportProgress(input, `正在生成 PDF 页面 ${pageIndex + 1} / ${pageCount}`);
+      await nextFrame();
+      const canvas = await withTimeout(
+        html2canvas(target, {
+          backgroundColor,
+          scale,
+          useCORS: true,
+          logging: false,
+          width,
+          height: sliceHeight,
+          x: 0,
+          y,
+          windowWidth: width,
+          windowHeight,
+          scrollX: 0,
+          scrollY: 0,
+        }),
+        PDF_EXPORT_PAGE_RENDER_TIMEOUT_MS,
+        `PDF 第 ${pageIndex + 1} 页渲染超时，请减少单页复杂图表或改用 HTML 导出。`,
+      );
       const dataUrl = canvas.toDataURL('image/png');
       if (!dataUrl.startsWith('data:image/png')) {
         throw new Error(`PDF 单页画布超出系统限制 (${Math.ceil(width * scale)} x ${Math.ceil(sliceHeight * scale)})`);
@@ -1437,6 +1473,7 @@ async function createRenderedPdfPages(
         width: canvas.width || Math.ceil(width * scale),
         height: canvas.height || Math.ceil(sliceHeight * scale),
       });
+      await nextFrame();
     }
     return pages;
   } catch (err) {

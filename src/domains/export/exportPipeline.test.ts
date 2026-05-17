@@ -687,26 +687,71 @@ describe('export pipeline image progress', () => {
     expect(__exportPipelineTesting.getSafeRasterScale(980, 2_000, 2)).toBe(2);
   });
 
-  it('renders long pdf documents as page slices without whole-document downscaling', async () => {
+  it('renders long pdf documents as bounded page slices with page progress', async () => {
     fsMock.writeFile.mockClear();
     canvasRenderMock.render.mockClear();
     const warnings: string[] = [];
+    const progress: string[] = [];
     iframeScrollMetrics = { width: 980, height: 60_000 };
 
     try {
-      await exportPdf(createInput({ onWarning: (message) => warnings.push(message) }), '/tmp/long.pdf');
+      await exportPdf(createInput({
+        onProgress: (message) => progress.push(message),
+        onWarning: (message) => warnings.push(message),
+      }), '/tmp/long.pdf');
     } finally {
       iframeScrollMetrics = null;
     }
 
-    const renderCalls = canvasRenderMock.render.mock.calls as unknown as Array<[HTMLElement, { scale: number }]>;
+    const renderCalls = canvasRenderMock.render.mock.calls as unknown as Array<[
+      HTMLElement,
+      { scale: number; windowHeight: number },
+    ]>;
     expect(renderCalls.length).toBeGreaterThan(1);
     expect(renderCalls.every(([, options]) => options.scale === 2)).toBe(true);
+    expect(renderCalls.every(([, options]) => options.windowHeight < 60_000)).toBe(true);
+    expect(progress).toEqual(expect.arrayContaining([
+      `正在生成 PDF 页面 1 / ${renderCalls.length}`,
+      `正在生成 PDF 页面 ${renderCalls.length} / ${renderCalls.length}`,
+    ]));
     expect(warnings).not.toEqual(expect.arrayContaining([expect.stringContaining('0.21x')]));
     const { PDFDocument } = await import('pdf-lib');
     const bytes = fsMock.writeFile.mock.calls[0][1] as Uint8Array;
     const pdf = await PDFDocument.load(bytes);
     expect(pdf.getPageCount()).toBe(renderCalls.length);
+  });
+
+  it('stops pdf export before rendering documents with excessive page counts', async () => {
+    fsMock.writeFile.mockClear();
+    canvasRenderMock.render.mockClear();
+    iframeScrollMetrics = { width: 980, height: 1_000_000 };
+
+    try {
+      await expect(exportPdf(createInput(), '/tmp/too-many-pages.pdf')).rejects.toThrow('PDF 页数过多');
+    } finally {
+      iframeScrollMetrics = null;
+    }
+
+    expect(canvasRenderMock.render).not.toHaveBeenCalled();
+    expect(fsMock.writeFile).not.toHaveBeenCalled();
+  });
+
+  it('fails pdf export with a diagnostic error when a page render stalls', async () => {
+    fsMock.writeFile.mockClear();
+    canvasRenderMock.render.mockClear();
+    vi.useFakeTimers();
+    canvasRenderMock.render.mockReturnValueOnce(new Promise(() => {}) as never);
+
+    try {
+      const exportPromise = exportPdf(createInput(), '/tmp/stalled.pdf');
+      const assertion = expect(exportPromise).rejects.toThrow('PDF 第 1 页渲染超时');
+      await vi.runAllTimersAsync();
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(fsMock.writeFile).not.toHaveBeenCalled();
   });
 
   it('reports diagnostic progress stages for pdf export', async () => {
@@ -718,6 +763,7 @@ describe('export pipeline image progress', () => {
       '正在解析 Markdown',
       '正在应用导出主题',
       '正在渲染图表',
+      '正在生成 PDF 页面 1 / 1',
       '正在生成 PDF 文件',
       '正在写入 PDF 文件',
     ]);

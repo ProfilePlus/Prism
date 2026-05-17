@@ -666,12 +666,11 @@ describe('command registry', () => {
     }));
     const successToast = showToast.mock.calls.find(([toast]) => typeof toast !== 'string' && toast.title === 'PDF 导出完成')?.[0] as any;
     expect(successToast.actions.map((action: any) => action.label)).toEqual(['打开', '显示位置']);
-    openerMock.openPath.mockRejectedValueOnce(new Error('opener failed'));
 
     await successToast.actions[0].onClick();
 
-    expect(openerMock.openPath).toHaveBeenCalledWith('/tmp/report-copy.pdf');
     expect(invokeMock).toHaveBeenCalledWith('open_path_with_system', { path: '/tmp/report-copy.pdf' });
+    expect(openerMock.openPath).not.toHaveBeenCalled();
   });
 
   it('overwrites the previous export path without reopening the save dialog', async () => {

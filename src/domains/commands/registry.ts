@@ -441,12 +441,12 @@ function showExportPathActionError(context: CommandContext, title: string, error
 
 async function openExportedPath(path: string) {
   try {
-    await openPath(path);
-  } catch (primaryError) {
+    await invoke('open_path_with_system', { path });
+  } catch (nativeError) {
     try {
-      await invoke('open_path_with_system', { path });
-    } catch {
-      throw primaryError;
+      await openPath(path);
+    } catch (pluginError) {
+      throw new Error(`系统打开失败: ${formatError(nativeError)}；备用打开失败: ${formatError(pluginError)}`);
     }
   }
 }
