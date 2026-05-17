@@ -20,6 +20,11 @@ import {
   importCustomFont,
 } from '../../domains/settings/fontService';
 import { EXPORT_TEMPLATES } from '../../domains/export/templates';
+import {
+  EXPORT_QUALITY_PRESETS,
+  getExportQualityPreset,
+  normalizeExportQualityScale,
+} from '../../domains/export/quality';
 
 interface SettingsModalProps {
   visible: boolean;
@@ -675,18 +680,22 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
             </div>
             <div className="settings-row">
               <div>
-                <div className="row-label">PNG 清晰度</div>
-                <div className="row-hint">{settings.exportDefaults.pngScale}x</div>
+                <div className="row-label">导出清晰度</div>
+                <div className="row-hint">
+                  {getExportQualityPreset(normalizeExportQualityScale(settings.exportDefaults.pngScale)).description}
+                </div>
               </div>
-              <input
-                type="range"
-                min={1}
-                max={3}
-                step={0.5}
-                value={settings.exportDefaults.pngScale}
-                onChange={(e) => settings.setExportPngScale(Number(e.target.value))}
-                style={{ width: 160 }}
-              />
+              <select
+                value={normalizeExportQualityScale(settings.exportDefaults.pngScale)}
+                onChange={(e) => settings.setExportPngScale(normalizeExportQualityScale(Number(e.target.value)))}
+                style={selectStyle}
+              >
+                {EXPORT_QUALITY_PRESETS.map((preset) => (
+                  <option key={preset.scale} value={preset.scale}>
+                    {preset.shortLabel}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

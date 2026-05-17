@@ -782,6 +782,59 @@ describe('command registry', () => {
     ]);
   });
 
+  it('applies the quality selected in the export save dialog to the current export only', async () => {
+    const baseContext = createCommandContext();
+    const requestExportPath = vi.fn().mockResolvedValue({
+      path: '/tmp/report.png',
+      qualityScale: 4,
+    });
+    const recordExportHistory = vi.fn();
+    const context = createCommandContext({
+      documentStore: {
+        ...baseContext.documentStore,
+        currentDocument: {
+          path: '/tmp/report.md',
+          name: 'report.md',
+          content: '# Report',
+          isDirty: false,
+          lastKnownMtime: null,
+          lastKnownSize: null,
+          lastSavedAt: 0,
+          saveError: null,
+          viewMode: 'edit',
+          scrollState: { editorRatio: 0, previewRatio: 0 },
+          saveStatus: 'saved',
+        },
+      },
+      settingsStore: {
+        ...baseContext.settingsStore,
+        exportDefaults: {
+          ...baseContext.settingsStore.exportDefaults,
+          pngScale: 2,
+        },
+        recordExportHistory,
+      },
+      requestExportPath,
+    });
+
+    await runCommand('exportPng', context);
+
+    expect(exportMock.resolveExportOptions).toHaveBeenCalledWith(expect.objectContaining({
+      settings: expect.objectContaining({
+        exportDefaults: expect.objectContaining({ pngScale: 4 }),
+      }),
+    }));
+    expect(exportMock.exportDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ pngScale: 4 }),
+      'png',
+      '/tmp/report.png',
+    );
+    expect(recordExportHistory).toHaveBeenCalledWith(expect.objectContaining({
+      outputPath: '/tmp/report.png',
+      settings: expect.objectContaining({ pngScale: 4 }),
+    }));
+  });
+
   it('emits copyable diagnostics when export fails', async () => {
     const baseContext = createCommandContext();
     const requestExportPath = vi.fn().mockResolvedValue('/tmp/report.pdf');

@@ -141,7 +141,7 @@ export interface CommandContext {
     filename: string;
     documentPath?: string;
     suggestedPath?: string;
-  }) => Promise<string | null>;
+  }) => Promise<string | { path: string; qualityScale?: number } | null>;
   requestSavePath?: (input: {
     filename: string;
     documentPath?: string;

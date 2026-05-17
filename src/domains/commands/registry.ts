@@ -31,6 +31,7 @@ import {
   resolveExportOptions,
   type ExportFormat,
 } from '../export';
+import { normalizeExportQualityScale } from '../export/quality';
 import type { ExportHistoryEntry, ExportHistorySettings, SettingsState } from '../settings/types';
 import type {
   CommandContext,
@@ -310,6 +311,17 @@ function createExportHistorySettings(settings: SettingsState): ExportHistorySett
   };
 }
 
+function applyExportQualityScale(settings: SettingsState, qualityScale?: number): SettingsState {
+  if (!qualityScale) return settings;
+  return {
+    ...settings,
+    exportDefaults: {
+      ...settings.exportDefaults,
+      pngScale: normalizeExportQualityScale(qualityScale, settings.exportDefaults.pngScale),
+    },
+  };
+}
+
 function applyExportHistorySettings(
   baseSettings: SettingsState,
   historySettings: ExportHistorySettings,
@@ -398,7 +410,7 @@ function buildExportFailureDiagnostic(input: {
     `页眉页脚: ${input.settings.exportDefaults.pageHeaderFooter ? '开启' : '关闭'}`,
     `页眉文本: ${input.settings.exportDefaults.pageHeaderText || '(空)'}`,
     `页脚文本: ${input.settings.exportDefaults.pageFooterText || '(空)'}`,
-    `PNG 清晰度: ${input.settings.exportDefaults.pngScale}x`,
+    `导出清晰度: ${input.settings.exportDefaults.pngScale}x`,
     `HTML 内联主题: ${input.settings.exportDefaults.htmlIncludeTheme ? '是' : '否'}`,
     `DOCX 字体策略: ${input.settings.exportDefaults.docxFontPolicy}`,
     `DOCX 自定义字体: ${input.settings.exportDefaults.docxCustomFontId || '(未指定)'}`,
@@ -474,6 +486,7 @@ async function handleExport(
   let outputPath: string | null | undefined;
   let lastProgress = '准备导出';
   const exportSettings = options.settings ?? context.settingsStore;
+  let resolvedExportSettings = exportSettings;
   const exportWarnings: string[] = [];
   const formatLabel = getExportFormatLabel(format);
 
@@ -483,13 +496,18 @@ async function handleExport(
       return;
     }
 
-    outputPath = options.outputPath ?? await context.requestExportPath?.({
+    const requestedOutput = options.outputPath ?? await context.requestExportPath?.({
       format,
       filename: doc.name,
       documentPath: doc.path,
       suggestedPath: options.suggestedPath,
     });
+    const selectedQualityScale = typeof requestedOutput === 'object' && requestedOutput
+      ? requestedOutput.qualityScale
+      : undefined;
+    outputPath = typeof requestedOutput === 'string' ? requestedOutput : requestedOutput?.path;
     if (!outputPath) return;
+    resolvedExportSettings = applyExportQualityScale(exportSettings, selectedQualityScale);
 
     setExportProgress(lastProgress);
     await waitForExportProgressPaint();
@@ -498,7 +516,7 @@ async function handleExport(
       content: doc.content,
       filename: doc.name,
       documentPath: doc.path,
-      settings: exportSettings,
+      settings: resolvedExportSettings,
       onProgress: (message) => {
         lastProgress = message;
         setExportProgress(message);
@@ -524,7 +542,7 @@ async function handleExport(
           documentName: doc.name,
           format,
           outputPath: completedOutputPath,
-          settings: createExportHistorySettings(exportSettings),
+          settings: createExportHistorySettings(resolvedExportSettings),
         });
       }
       context.showToast?.({
@@ -563,7 +581,7 @@ async function handleExport(
       documentPath: doc.path,
       outputPath,
       stage: lastProgress,
-      settings: exportSettings,
+      settings: resolvedExportSettings,
       warnings: exportWarnings,
       error: err,
     });
@@ -584,7 +602,7 @@ async function handleExport(
           onClick: () => handleExport(format, context, {
             ...options,
             outputPath: outputPath ?? options.outputPath,
-            settings: exportSettings,
+            settings: resolvedExportSettings,
           }),
         },
       ],

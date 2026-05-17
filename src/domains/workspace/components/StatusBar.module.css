@@ -65,6 +65,52 @@
   gap: 2px;
 }
 
+.exportStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  max-width: 132px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--c-void) 12%, var(--c-fog));
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--c-canvas) 88%, var(--c-chalk));
+  color: var(--c-void);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+}
+
+.exportStatus:hover {
+  background: var(--c-chalk);
+  border-color: color-mix(in srgb, var(--c-void) 18%, var(--c-fog));
+}
+
+.exportStatusIcon {
+  width: 13px;
+  height: 13px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  animation: prism-status-export-spin 1.2s linear infinite;
+}
+
+.exportStatusIcon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.exportStatusText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes prism-status-export-spin {
+  to { transform: rotate(360deg); }
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -284,6 +330,22 @@
 :global(html[data-content-theme='miaoyan']) .left,
 :global(html[data-content-theme='miaoyan']) .right {
   gap: 6px;
+}
+
+:global(html[data-content-theme='miaoyan']) .exportStatus {
+  height: 19px;
+  border-color: var(--miaoyan-divider);
+  border-radius: 999px;
+  background: var(--miaoyan-panel-secondary);
+  color: var(--miaoyan-accent);
+  font-family: var(--miaoyan-font);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.6px;
+}
+
+:global(html[data-content-theme='miaoyan']) .exportStatus:hover {
+  background: var(--miaoyan-selection);
 }
 
 :global(html[data-content-theme='miaoyan']) .main .left > .sep:first-of-type {

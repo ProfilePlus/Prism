@@ -17,6 +17,12 @@ const IconExport = () => (
   </svg>
 );
 
+const IconExportProgress = () => (
+  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false">
+    <path d="M10 2.9a7.1 7.1 0 1 1-6.86 8.92.68.68 0 0 1 1.32-.34A5.74 5.74 0 1 0 10 4.26a.68.68 0 1 1 0-1.36Zm0 3.06c.38 0 .68.3.68.68v3.08l2.2 1.32a.68.68 0 0 1-.7 1.16l-2.53-1.52a.68.68 0 0 1-.33-.58V6.64c0-.38.3-.68.68-.68Z" />
+  </svg>
+);
+
 const IconCollapse = () => (
   <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false">
     <path d="M6.08 3.72c.4 0 .72.32.72.72v11.12a.72.72 0 0 1-1.44 0V4.44c0-.4.32-.72.72-.72Zm8.34 2.02c.28.28.28.74 0 1.02L11.18 10l3.24 3.24a.72.72 0 0 1-1.02 1.02L9.65 10.5a.72.72 0 0 1 0-1.02l3.75-3.74c.28-.28.74-.28 1.02 0Z" />
@@ -75,6 +81,9 @@ interface StatusBarProps {
   typographyIssueCount?: number;
   typographyIssueTitle?: string;
   onTypographyDiagnosticsClick?: () => void;
+  exportProgress?: string | null;
+  exportProgressInBackground?: boolean;
+  onShowExportProgress?: () => void;
 }
 
 export function StatusBar({
@@ -97,6 +106,9 @@ export function StatusBar({
   typographyIssueCount = 0,
   typographyIssueTitle,
   onTypographyDiagnosticsClick,
+  exportProgress = null,
+  exportProgressInBackground = false,
+  onShowExportProgress,
 }: StatusBarProps) {
   const rootPath = useWorkspaceStore((s) => s.rootPath);
   const fileTreeMode = useWorkspaceStore((s) => s.fileTreeMode);
@@ -219,6 +231,18 @@ export function StatusBar({
         </div>
 
         <div className={styles.right}>
+          {exportProgress && exportProgressInBackground && (
+            <button
+              className={styles.exportStatus}
+              title={`导出中：${exportProgress}`}
+              onClick={onShowExportProgress}
+            >
+              <span className={styles.exportStatusIcon} aria-hidden="true">
+                <IconExportProgress />
+              </span>
+              <span className={styles.exportStatusText}>导出中</span>
+            </button>
+          )}
           <button
             className={`${styles.btn} ${styles.iconBtn} ${focusMode ? styles.active : ''}`}
             onClick={onToggleFocusMode}

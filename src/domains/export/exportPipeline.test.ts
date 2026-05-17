@@ -682,9 +682,24 @@ describe('export pipeline image progress', () => {
     expect(fsMock.writeFile).toHaveBeenCalledWith('/tmp/no-reload.png', expect.any(Uint8Array));
   });
 
-  it('caps raster export scale for very tall documents', () => {
-    expect(__exportPipelineTesting.getSafeRasterScale(980, 60_000, 2)).toBeLessThan(0.3);
-    expect(__exportPipelineTesting.getSafeRasterScale(980, 2_000, 2)).toBe(2);
+  it('rejects over-limit png exports instead of lowering the requested scale', async () => {
+    fsMock.writeFile.mockClear();
+    canvasRenderMock.render.mockClear();
+    const warnings: string[] = [];
+    iframeScrollMetrics = { width: 980, height: 60_000 };
+
+    try {
+      await expect(exportPng(createInput({
+        pngScale: 2,
+        onWarning: (message) => warnings.push(message),
+      }), '/tmp/too-tall.png')).rejects.toThrow('PNG 导出画布超出系统限制');
+    } finally {
+      iframeScrollMetrics = null;
+    }
+
+    expect(warnings).toEqual([]);
+    expect(canvasRenderMock.render).not.toHaveBeenCalled();
+    expect(fsMock.writeFile).not.toHaveBeenCalled();
   });
 
   it('renders long pdf documents as bounded page slices with page progress', async () => {

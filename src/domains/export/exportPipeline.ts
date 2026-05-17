@@ -65,6 +65,26 @@ const PDF_EXPORT_MAX_PAGES = 500;
 const PDF_EXPORT_PAGE_RENDER_TIMEOUT_MS = 30_000;
 const PDF_EXPORT_MAX_RENDER_VIEWPORT_HEIGHT = 4_096;
 
+function normalizeExportRasterScale(scale: unknown, fallback = 2) {
+  if (typeof scale !== 'number' || !Number.isFinite(scale)) return fallback;
+  return Math.min(4, Math.max(1, Math.round(scale)));
+}
+
+function assertExportCanvasWithinLimits(width: number, height: number, scale: number, label: string) {
+  const scaledWidth = Math.ceil(width * scale);
+  const scaledHeight = Math.ceil(height * scale);
+  const area = scaledWidth * scaledHeight;
+  if (
+    scaledWidth > MAX_EXPORT_CANVAS_DIMENSION
+    || scaledHeight > MAX_EXPORT_CANVAS_DIMENSION
+    || area > MAX_EXPORT_CANVAS_AREA
+  ) {
+    throw new Error(
+      `${label}画布超出系统限制 (${scaledWidth} x ${scaledHeight} @ ${scale}x)，请降低导出清晰度或拆分文档。`,
+    );
+  }
+}
+
 function stripMarkdownExtension(filename: string) {
   return filename.replace(/\.(md|markdown|txt)$/i, '') || 'Untitled';
 }
@@ -689,14 +709,6 @@ function normalizeRasterComputedColors(root: HTMLElement) {
   });
 }
 
-function getSafeRasterScale(width: number, height: number, requestedScale = 2) {
-  const normalizedWidth = Math.max(1, width);
-  const normalizedHeight = Math.max(1, height);
-  const dimensionScale = MAX_EXPORT_CANVAS_DIMENSION / Math.max(normalizedWidth, normalizedHeight);
-  const areaScale = Math.sqrt(MAX_EXPORT_CANVAS_AREA / (normalizedWidth * normalizedHeight));
-  return Math.max(0.1, Math.min(requestedScale, dimensionScale, areaScale));
-}
-
 function getPdfPageRenderWindowHeight(sliceHeight: number) {
   return Math.ceil(Math.min(PDF_EXPORT_MAX_RENDER_VIEWPORT_HEIGHT, Math.max(1200, sliceHeight)));
 }
@@ -920,9 +932,11 @@ async function svgToRasterDataUrl(
   options: {
     mimeType?: 'image/png' | 'image/jpeg';
     quality?: number;
+    scale?: number;
   } = {},
 ) {
   const mimeType = options.mimeType ?? 'image/png';
+  const scale = normalizeExportRasterScale(options.scale);
   const container = document.createElement('div');
   container.style.position = 'fixed';
   container.style.left = '-12000px';
@@ -959,11 +973,12 @@ async function svgToRasterDataUrl(
         img.src = url;
       });
       const canvas = document.createElement('canvas');
-      canvas.width = width * 2;
-      canvas.height = height * 2;
+      assertExportCanvasWithinLimits(width, height, scale, 'SVG 栅格化');
+      canvas.width = Math.ceil(width * scale);
+      canvas.height = Math.ceil(height * scale);
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('无法创建 Mermaid 图片画布');
-      ctx.scale(2, 2);
+      ctx.scale(scale, scale);
       ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-preview').trim() || '#ffffff';
       ctx.fillRect(0, 0, width, height);
       ctx.drawImage(image, 0, 0, width, height);
@@ -980,8 +995,11 @@ async function svgToRasterDataUrl(
   }
 }
 
-async function svgToDocxPngImage(svgText: string) {
-  const image = await svgToRasterDataUrl(svgText, { mimeType: 'image/png' });
+async function svgToDocxPngImage(svgText: string, scale = 2) {
+  const image = await svgToRasterDataUrl(svgText, {
+    mimeType: 'image/png',
+    scale,
+  });
   if (!image) throw new Error('SVG 栅格化结果为空');
   return {
     type: 'png' as const,
@@ -991,7 +1009,7 @@ async function svgToDocxPngImage(svgText: string) {
   };
 }
 
-async function renderMermaidImage(source: string, contentTheme: ContentTheme) {
+async function renderMermaidImage(source: string, contentTheme: ContentTheme, scale = 2) {
   const { default: mermaid } = await import('mermaid');
   const config = getMermaidConfig(contentTheme) as any;
   const candidates = [
@@ -1019,7 +1037,7 @@ async function renderMermaidImage(source: string, contentTheme: ContentTheme) {
           renderSandbox,
         );
         const docxSvg = prepareSvgForDocx(svg);
-        const image = await svgToDocxPngImage(docxSvg).catch(() => null);
+        const image = await svgToDocxPngImage(docxSvg, scale).catch(() => null);
         if (image) {
           return image satisfies MermaidDocxImage;
         }
@@ -1034,14 +1052,18 @@ async function renderMermaidImage(source: string, contentTheme: ContentTheme) {
   return null;
 }
 
-async function renderMarkdownImage(source: string, documentPath?: string): Promise<ExportDocxImage | null> {
+async function renderMarkdownImage(
+  source: string,
+  documentPath?: string,
+  scale = 2,
+): Promise<ExportDocxImage | null> {
   const media = await readLocalExportMedia(source, documentPath).catch(() => null);
   if (!media) return null;
 
   if (media.mimeType === 'image/svg+xml') {
     const svgText = new TextDecoder().decode(media.bytes);
     const docxSvg = prepareSvgForDocx(svgText);
-    return svgToDocxPngImage(docxSvg).catch(() => null);
+    return svgToDocxPngImage(docxSvg, scale).catch(() => null);
   }
 
   const type = getDocxRasterType(media.mimeType, media.filePath);
@@ -1310,7 +1332,7 @@ export async function exportPdf(input: ExportDocumentInput, outputPath?: string)
   const renderedPages = await createRenderedPdfPages(input, {
     contentWidth,
     contentHeight,
-    scale: PDF_EXPORT_RASTER_SCALE,
+    scale: input.pngScale ?? PDF_EXPORT_RASTER_SCALE,
   });
   reportProgress(input, exportProgressMessages.generateFile('PDF'));
   const pdf = await PDFDocument.create();
@@ -1423,26 +1445,19 @@ async function createRenderedPdfPages(
     if (pageCount > PDF_EXPORT_MAX_PAGES) {
       throw new Error(`PDF 页数过多（${pageCount} 页，最大 ${PDF_EXPORT_MAX_PAGES} 页），请拆分文档或改用 HTML 导出。`);
     }
-    const requestedScale = options.scale ?? PDF_EXPORT_RASTER_SCALE;
+    const requestedScale = normalizeExportRasterScale(options.scale ?? PDF_EXPORT_RASTER_SCALE);
     const backgroundColor = normalizeCssColorFunctionsForRaster(
       target.ownerDocument.defaultView?.getComputedStyle(target).backgroundColor ?? '',
     ) || '#ffffff';
-    let warnedScaleCap = false;
 
     const pages = [];
     for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
       const y = Math.floor(pageIndex * pageCssHeight);
       const nextY = Math.min(height, Math.floor((pageIndex + 1) * pageCssHeight));
       const sliceHeight = Math.max(1, nextY - y);
-      const scale = getSafeRasterScale(width, sliceHeight, requestedScale);
+      const scale = requestedScale;
       const windowHeight = getPdfPageRenderWindowHeight(sliceHeight);
-      if (scale < requestedScale && !warnedScaleCap) {
-        warnedScaleCap = true;
-        reportWarning(
-          input,
-          `当前页面内容较大，PDF 单页图像已自动降至 ${Number(scale.toFixed(2))}x，避免系统画布尺寸限制。`,
-        );
-      }
+      assertExportCanvasWithinLimits(width, sliceHeight, scale, `PDF 第 ${pageIndex + 1} 页`);
 
       reportProgress(input, `正在生成 PDF 页面 ${pageIndex + 1} / ${pageCount}`);
       await nextFrame();
@@ -1504,14 +1519,8 @@ async function createRenderedPng(input: ExportDocumentInput, options: { scale?: 
     await nextFrame();
     normalizeRasterComputedColors(target);
 
-    const requestedScale = options.scale ?? 2;
-    const scale = getSafeRasterScale(width, height, requestedScale);
-    if (scale < requestedScale) {
-      reportWarning(
-        input,
-        `当前文档较长，图像导出已自动降至 ${Number(scale.toFixed(2))}x，避免系统画布尺寸限制。`,
-      );
-    }
+    const scale = normalizeExportRasterScale(options.scale);
+    assertExportCanvasWithinLimits(width, height, scale, 'PNG 导出');
 
     const canvas = await html2canvas(target, {
       backgroundColor: normalizeCssColorFunctionsForRaster(getComputedStyle(target).backgroundColor) || '#ffffff',
@@ -1647,6 +1656,7 @@ async function paragraphBlocksFromInlineChildren(
   children: any[],
   theme: DocxTheme,
   documentPath?: string,
+  imageScale = 2,
 ) {
   const { AlignmentType, Paragraph, TextRun } = docx;
   if (!children.some((child) => child?.type === 'image')) {
@@ -1668,7 +1678,7 @@ async function paragraphBlocksFromInlineChildren(
     }
 
     await flushInline();
-    const image = await renderMarkdownImage(String(child.url ?? ''), documentPath);
+    const image = await renderMarkdownImage(String(child.url ?? ''), documentPath, imageScale);
     if (!image) {
       const fallback = String(child.alt || child.title || child.url || '图片无法导出');
       blocks.push(new Paragraph({
@@ -1717,6 +1727,7 @@ async function tableCellToDocxBlocks(
   contentTheme: ContentTheme,
   isHeader: boolean,
   documentPath?: string,
+  imageScale = 2,
 ) {
   const { Paragraph, TextRun } = docx;
   if (children.length === 0) {
@@ -1732,7 +1743,7 @@ async function tableCellToDocxBlocks(
     ];
   }
 
-  const blocks = await mdastToDocxBlocks(docx, children, theme, contentTheme, 0, documentPath);
+  const blocks = await mdastToDocxBlocks(docx, children, theme, contentTheme, 0, documentPath, imageScale);
   return blocks.length > 0 ? blocks : [new Paragraph('')];
 }
 
@@ -1910,6 +1921,7 @@ async function mdastToDocxBlocks(
   contentTheme: ContentTheme,
   listDepth = 0,
   documentPath?: string,
+  imageScale = 2,
 ): Promise<DocxBlock[]> {
   const {
     AlignmentType,
@@ -1946,7 +1958,7 @@ async function mdastToDocxBlocks(
     }
 
     if (node.type === 'paragraph') {
-      blocks.push(...await paragraphBlocksFromInlineChildren(docx, node.children ?? [], theme, documentPath));
+      blocks.push(...await paragraphBlocksFromInlineChildren(docx, node.children ?? [], theme, documentPath, imageScale));
       continue;
     }
 
@@ -1971,7 +1983,7 @@ async function mdastToDocxBlocks(
 
     if (node.type === 'code') {
       if (isMermaidSource(String(node.value ?? ''), node.lang)) {
-        const image = await renderMermaidImage(String(node.value ?? ''), contentTheme);
+        const image = await renderMermaidImage(String(node.value ?? ''), contentTheme, imageScale);
         if (image) {
           blocks.push(new Paragraph({
             alignment: AlignmentType.CENTER,
@@ -2017,7 +2029,7 @@ async function mdastToDocxBlocks(
           spacing: { after: 100, line: 330 },
         }));
         const nested = (item.children ?? []).filter((child: any) => child.type !== 'paragraph');
-        blocks.push(...await mdastToDocxBlocks(docx, nested, theme, contentTheme, listDepth + 1, documentPath));
+        blocks.push(...await mdastToDocxBlocks(docx, nested, theme, contentTheme, listDepth + 1, documentPath, imageScale));
       }
       continue;
     }
@@ -2028,7 +2040,15 @@ async function mdastToDocxBlocks(
         const cells = [];
         for (const cell of row.children ?? []) {
           cells.push(new TableCell({
-            children: await tableCellToDocxBlocks(docx, cell.children ?? [], theme, contentTheme, rowIndex === 0, documentPath),
+            children: await tableCellToDocxBlocks(
+              docx,
+              cell.children ?? [],
+              theme,
+              contentTheme,
+              rowIndex === 0,
+              documentPath,
+              imageScale,
+            ),
             shading: rowIndex === 0 ? { type: ShadingType.CLEAR, fill: theme.fill } : undefined,
             margins: { top: 110, bottom: 110, left: 140, right: 140 },
             verticalAlign: VerticalAlignTable.TOP,
@@ -2098,7 +2118,16 @@ export async function exportDocx(input: ExportDocumentInput, outputPath?: string
     ? createDocxTocBlocks(docx, buildExportTocItemsFromMdast(tree.children ?? []), theme)
     : [];
   reportProgress(input, exportProgressMessages.renderDiagrams);
-  const bodyBlocks = await mdastToDocxBlocks(docx, tree.children ?? [], theme, input.contentTheme, 0, input.documentPath);
+  const docxImageScale = normalizeExportRasterScale(input.pngScale);
+  const bodyBlocks = await mdastToDocxBlocks(
+    docx,
+    tree.children ?? [],
+    theme,
+    input.contentTheme,
+    0,
+    input.documentPath,
+    docxImageScale,
+  );
   const blocks = [...tocBlocks, ...bodyBlocks];
   const { Document, Packer, Paragraph } = docx;
   const fonts = [];
@@ -2193,7 +2222,6 @@ export const __exportPipelineTesting = {
   getPdfHeaderY,
   getPdfPageNumberLabel,
   getPdfPageNumberY,
-  getSafeRasterScale,
   normalizeCssColorFunctionsForRaster,
   normalizePdfChromeText,
   stripRasterUnsafeColorDeclarations,

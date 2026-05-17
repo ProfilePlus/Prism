@@ -1634,7 +1634,8 @@ body.dark .modal-overlay { background: rgba(0, 0, 0, 0.6); }
   color: var(--c-ash);
 }
 
-.prism-export-save-field input {
+.prism-export-save-field input,
+.prism-export-save-field select {
   height: 36px;
   border: 1px solid var(--c-fog);
   border-radius: 8px;
@@ -1646,7 +1647,18 @@ body.dark .modal-overlay { background: rgba(0, 0, 0, 0.6); }
   outline: none;
 }
 
-.prism-export-save-field input:focus {
+.prism-export-save-field select {
+  cursor: pointer;
+}
+
+.prism-export-save-field small {
+  color: var(--c-graphite);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.prism-export-save-field input:focus,
+.prism-export-save-field select:focus {
   border-color: var(--c-graphite);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-graphite) 12%, transparent);
 }
@@ -1730,6 +1742,16 @@ body.dark .modal-overlay { background: rgba(0, 0, 0, 0.6); }
 .prism-export-save-error {
   color: #b42318;
   background: rgba(210, 61, 48, 0.09);
+}
+
+.prism-export-quality-note {
+  border: 1px solid color-mix(in srgb, var(--c-void) 8%, var(--c-fog));
+  border-radius: 10px;
+  padding: 10px 11px;
+  background: color-mix(in srgb, var(--c-chalk) 72%, var(--c-canvas));
+  color: var(--c-graphite);
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .prism-export-overwrite {
@@ -2315,7 +2337,7 @@ body.dark .prism-toast::after {
 }
 
 .prism-export-progress {
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .prism-toast--loading .prism-toast-icon {
@@ -5416,6 +5438,7 @@ html[data-content-theme='miaoyan'] .prism-export-overwrite-text {
 }
 
 html[data-content-theme='miaoyan'] .prism-export-save-field input,
+html[data-content-theme='miaoyan'] .prism-export-save-field select,
 html[data-content-theme='miaoyan'] .prism-export-save-location > div,
 html[data-content-theme='miaoyan'] .prism-export-save-location button,
 html[data-content-theme='miaoyan'] .prism-export-save-footer button {
@@ -5428,6 +5451,12 @@ html[data-content-theme='miaoyan'] .prism-export-save-footer button {
 
 html[data-content-theme='miaoyan'] .prism-export-save-location > div {
   background: var(--miaoyan-panel-secondary);
+}
+
+html[data-content-theme='miaoyan'] .prism-export-quality-note {
+  border-color: var(--miaoyan-divider);
+  background: var(--miaoyan-panel-secondary);
+  color: var(--miaoyan-secondary-text);
 }
 
 html[data-content-theme='miaoyan'] .prism-export-save-location button:hover,

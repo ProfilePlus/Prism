@@ -73,7 +73,21 @@ vi.mock('./domains/workspace/components/Sidebar', () => ({
 }));
 
 vi.mock('./domains/workspace/components/StatusBar', () => ({
-  StatusBar: () => <div data-testid="status-bar" />,
+  StatusBar: ({
+    exportProgress,
+    exportProgressInBackground,
+    onShowExportProgress,
+  }: {
+    exportProgress?: string | null;
+    exportProgressInBackground?: boolean;
+    onShowExportProgress?: () => void;
+  }) => (
+    <div data-testid="status-bar">
+      {exportProgress && exportProgressInBackground && (
+        <button type="button" onClick={onShowExportProgress}>导出中</button>
+      )}
+    </div>
+  ),
 }));
 
 vi.mock('./components/shell/ContextMenu', () => ({
@@ -287,6 +301,43 @@ describe('App export diagnostics wiring', () => {
     });
 
     expect(screen.queryByText('正在写入 PDF 文件')).not.toBeInTheDocument();
+  });
+
+  it('can move export progress to the status bar and restore the toast', async () => {
+    mockRecoveryQueue(null);
+    useDocumentStore.setState({
+      currentDocument: {
+        path: '/tmp/report.md',
+        name: 'report.md',
+        content: '# Report',
+        isDirty: false,
+        lastSavedAt: 1000,
+        lastKnownMtime: 1000,
+        lastKnownSize: 8,
+        saveStatus: 'saved',
+        saveError: null,
+        viewMode: 'edit',
+        scrollState: { editorRatio: 0, previewRatio: 0 },
+      },
+    });
+    render(<App />);
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('prism-export-progress', {
+        detail: { visible: true, message: '正在生成 PDF 页面 2 / 49' },
+      }));
+    });
+
+    expect(screen.getByRole('status')).toHaveTextContent('正在生成 PDF 页面 2 / 49');
+
+    fireEvent.click(screen.getByRole('button', { name: '后台' }));
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '导出中' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '导出中' }));
+
+    expect(screen.getByRole('status')).toHaveTextContent('正在生成 PDF 页面 2 / 49');
   });
 
   it('shows export failure diagnostics and copies them to the clipboard', async () => {

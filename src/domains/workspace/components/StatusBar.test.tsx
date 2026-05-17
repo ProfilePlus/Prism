@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { StatusBar } from './StatusBar';
 import type { WritingStats } from '../services';
 
@@ -90,5 +90,27 @@ describe('StatusBar', () => {
       'title',
       '中英文之间缺少空格',
     );
+  });
+
+  it('shows a recoverable background export status', () => {
+    const onShowExportProgress = vi.fn();
+    render(
+      <StatusBar
+        writingStats={writingStats}
+        cursor={{ line: 1, column: 1 }}
+        sidebarVisible={true}
+        isSidebarHovered={false}
+        exportProgress="正在生成 PDF 页面 2 / 49"
+        exportProgressInBackground={true}
+        onShowExportProgress={onShowExportProgress}
+      />
+    );
+
+    const status = screen.getByRole('button', { name: '导出中' });
+    expect(status).toHaveAttribute('title', '导出中：正在生成 PDF 页面 2 / 49');
+
+    fireEvent.click(status);
+
+    expect(onShowExportProgress).toHaveBeenCalledTimes(1);
   });
 });

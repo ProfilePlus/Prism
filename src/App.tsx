@@ -30,6 +30,11 @@ import { scanMarkdownLinks } from './domains/editor/extensions/linkDiagnostics';
 import { scanChineseTypography } from './domains/editor/extensions/typographyDiagnostics';
 import type { ExportFormat } from './domains/export';
 import { getExportFormatLabel } from './domains/export';
+import {
+  EXPORT_QUALITY_PRESETS,
+  getExportQualityPreset,
+  normalizeExportQualityScale,
+} from './domains/export/quality';
 import { WindowShell } from './components/shell/WindowShell';
 import { TitleBar } from './components/shell/TitleBar';
 import { MenuBar } from './components/shell/MenuBar';
@@ -142,9 +147,10 @@ interface SaveDialogState {
   format?: ExportFormat;
   directory: string;
   filename: string;
+  qualityScale?: number;
   error: string | null;
   pendingOverwritePath: string | null;
-  resolve: (path: string | null) => void;
+  resolve: (result: string | { path: string; qualityScale?: number } | null) => void;
 }
 
 interface ExportFailureState {
@@ -215,6 +221,7 @@ function App() {
   } | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [exportProgress, setExportProgress] = useState<string | null>(null);
+  const [exportProgressInBackground, setExportProgressInBackground] = useState(false);
   const [exportFailure, setExportFailure] = useState<ExportFailureState | null>(null);
   const [saveDialog, setSaveDialog] = useState<SaveDialogState | null>(null);
   const [shortcutPanelVisible, setShortcutPanelVisible] = useState(false);
@@ -335,6 +342,14 @@ function App() {
     }
   }, []);
 
+  const sendExportProgressToBackground = useCallback(() => {
+    setExportProgressInBackground(true);
+  }, []);
+
+  const showBackgroundExportProgress = useCallback(() => {
+    setExportProgressInBackground(false);
+  }, []);
+
   const {
     activeRecoverySnapshot,
     recoveryAction,
@@ -408,8 +423,13 @@ function App() {
   useEffect(() => {
     const handleExportProgress = (event: Event) => {
       const detail = (event as CustomEvent<{ visible?: boolean; message?: string }>).detail;
-      if (detail?.visible) setExportFailure(null);
-      setExportProgress(detail?.visible ? detail.message ?? '正在导出' : null);
+      if (detail?.visible) {
+        setExportFailure(null);
+        setExportProgress(detail.message ?? '正在导出');
+        return;
+      }
+      setExportProgress(null);
+      setExportProgressInBackground(false);
     };
     window.addEventListener('prism-export-progress', handleExportProgress);
     return () => window.removeEventListener('prism-export-progress', handleExportProgress);
@@ -500,18 +520,25 @@ function App() {
       showToast,
     });
 
-    return new Promise<string | null>((resolve) => {
+    return new Promise<string | { path: string; qualityScale?: number } | null>((resolve) => {
       setSaveDialog({
         kind: 'export',
         format: input.format,
         directory: input.suggestedPath ? dirname(input.suggestedPath) : initialDirectory,
         filename: input.suggestedPath ? basename(input.suggestedPath) : defaultExportFilename(input.filename, input.format),
+        qualityScale: normalizeExportQualityScale(exportDefaults.pngScale),
         error: null,
         pendingOverwritePath: null,
         resolve,
       });
     });
-  }, [exportDefaults.customDirectory, exportDefaults.defaultLocation, showToast, workspace.rootPath]);
+  }, [
+    exportDefaults.customDirectory,
+    exportDefaults.defaultLocation,
+    exportDefaults.pngScale,
+    showToast,
+    workspace.rootPath,
+  ]);
 
   const requestMarkdownSavePath = useCallback(async (input: {
     filename: string;
@@ -528,14 +555,14 @@ function App() {
         filename: ensureMarkdownExtension(input.filename),
         error: null,
         pendingOverwritePath: null,
-        resolve,
+        resolve: (result) => resolve(typeof result === 'string' ? result : null),
       });
     });
   }, [workspace.rootPath]);
 
-  const closeSaveDialog = useCallback((path: string | null = null) => {
+  const closeSaveDialog = useCallback((result: string | { path: string; qualityScale?: number } | null = null) => {
     setSaveDialog((dialog) => {
-      dialog?.resolve(path);
+      dialog?.resolve(result);
       return null;
     });
   }, []);
@@ -600,10 +627,14 @@ function App() {
     }
 
     if (saveDialog.kind === 'export') {
+      const qualityScale = normalizeExportQualityScale(saveDialog.qualityScale, exportDefaults.pngScale);
+      useSettingsStore.getState().setExportPngScale(qualityScale);
       emitExportProgress('准备导出');
+      closeSaveDialog({ path: targetPath, qualityScale });
+      return;
     }
     closeSaveDialog(targetPath);
-  }, [closeSaveDialog, saveDialog]);
+  }, [closeSaveDialog, exportDefaults.pngScale, saveDialog]);
 
   const runConflictAction = useCallback(async (action: SaveConflictAction) => {
     if (conflictAction) return;
@@ -847,6 +878,9 @@ function App() {
             typographyIssueCount={typographyDiagnostics.length}
             typographyIssueTitle={firstTypographyDiagnostic?.message}
             onTypographyDiagnosticsClick={handleTypographyDiagnosticsClick}
+            exportProgress={exportProgress}
+            exportProgressInBackground={exportProgressInBackground}
+            onShowExportProgress={showBackgroundExportProgress}
           />
         </div>
       )}
@@ -936,6 +970,36 @@ function App() {
                 </div>
               </div>
 
+              {saveDialog.kind === 'export' && (
+                <>
+                  <label className="prism-export-save-field">
+                    <span>导出清晰度</span>
+                    <select
+                      value={normalizeExportQualityScale(saveDialog.qualityScale, exportDefaults.pngScale)}
+                      onChange={(event) => setSaveDialog((dialog) => dialog ? {
+                        ...dialog,
+                        qualityScale: normalizeExportQualityScale(Number(event.target.value), exportDefaults.pngScale),
+                        error: null,
+                      } : null)}
+                    >
+                      {EXPORT_QUALITY_PRESETS.map((preset) => (
+                        <option key={preset.scale} value={preset.scale}>
+                          {preset.shortLabel}
+                        </option>
+                      ))}
+                    </select>
+                    <small>
+                      {getExportQualityPreset(
+                        normalizeExportQualityScale(saveDialog.qualityScale, exportDefaults.pngScale),
+                      ).description}
+                    </small>
+                  </label>
+                  <div className="prism-export-quality-note">
+                    Prism 会按所选清晰度导出，不会自动降低质量。大文档可能需要数分钟；导出期间可转入后台继续编辑。
+                  </div>
+                </>
+              )}
+
               {saveDialog.error && (
                 <div className="prism-export-save-error">{saveDialog.error}</div>
               )}
@@ -967,16 +1031,25 @@ function App() {
         </>
       )}
 
-      {(toast || exportProgress) && (
+      {(toast || (exportProgress && !exportProgressInBackground)) && (
         <div className="prism-toast-region">
           {toast && <Toast toast={toast} onDismiss={dismissToast} />}
 
-          {exportProgress && (
+          {exportProgress && !exportProgressInBackground && (
             <div role="status" aria-live="polite" className="prism-toast prism-toast--loading prism-export-progress">
               <span className="prism-toast-icon prism-export-spinner" aria-hidden="true" />
               <span className="prism-toast-copy">
                 <span className="prism-toast-title">正在导出</span>
                 <span className="prism-toast-message">{exportProgress}</span>
+              </span>
+              <span className="prism-toast-actions">
+                <button
+                  type="button"
+                  className="prism-toast-action"
+                  onClick={sendExportProgressToBackground}
+                >
+                  后台
+                </button>
               </span>
               <span className="prism-toast-progressbar" aria-hidden="true"><span /></span>
             </div>
