@@ -415,7 +415,7 @@ Checkpoint：
 
 修复：
 
-- `src/domains/export/exportPipeline.ts` 将 PDF 页面渲染从单页循环改成最多 4 页一批渲染，再按页无损切片为 PNG 嵌入 PDF。
+- `src/domains/export/exportPipeline.ts` 将 PDF 页面渲染从单页循环改成最多 8 页一批渲染，再按页无损切片为 PNG 嵌入 PDF。
 - 清晰度仍使用用户选择的 `pngScale`，默认 2x；不会回到旧的自动降级策略。
 - 批量高度仍受 `MAX_EXPORT_CANVAS_DIMENSION` 和 `MAX_EXPORT_CANVAS_AREA` 约束；超过安全 canvas 限制时自动缩小批次，不降低 scale。
 - 真实 Tauri 环境优先用 `canvas.toBlob('image/png')` 输出页图，减少 base64 中转；测试 / 非 Tauri 环境保留 `toDataURL` fallback。
